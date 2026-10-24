@@ -1,0 +1,48 @@
+# Managed by RF Button Manager installer.
+[Unit]
+Description=RF Button Manager
+After=network.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=rfbutton
+Group=rfbutton
+Environment=RFB_LISTEN=127.0.0.1:8787
+Environment=RFB_RTL433=/usr/bin/rtl_433
+# Set only when a trusted HTTPS reverse proxy serves this exact browser origin.
+Environment=RFB_PUBLIC_ORIGIN=
+EnvironmentFile=-/etc/rf-button-manager/manager.env
+ExecStart=/usr/local/bin/rf-button-manager --listen ${RFB_LISTEN} --data-dir /var/lib/rf-button-manager --rtl433 ${RFB_RTL433} --public-origin=${RFB_PUBLIC_ORIGIN}
+WorkingDirectory=/var/lib/rf-button-manager
+StateDirectory=rf-button-manager
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=45
+KillMode=control-group
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+# libusb needs actual device nodes, including newly allocated hot-plug minors.
+PrivateDevices=no
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadWritePaths=/var/lib/rf-button-manager
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rf-button-manager
+
+[Install]
+WantedBy=multi-user.target

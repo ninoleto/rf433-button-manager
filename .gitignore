@@ -6,3 +6,6 @@
 *.lock
 *.token
 /coverage.out
+/data/
+/rf-data/
+/demo-data/

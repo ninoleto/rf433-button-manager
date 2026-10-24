@@ -1,0 +1,3 @@
+# Managed by RF Button Manager installer. USB receiver access for the service only.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="0bda", ATTR{idProduct}=="2832", GROUP="rfbutton", MODE="0660"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="0bda", ATTR{idProduct}=="2838", GROUP="rfbutton", MODE="0660"
