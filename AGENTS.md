@@ -1,6 +1,6 @@
-# RF433 Manager: coding-agent guide
+# RF433 Button Manager: coding-agent guide
 
-The public project name is **RF433 Manager** (formerly RF Button Manager).
+The public project name is **RF433 Button Manager** (formerly RF Button Manager).
 Existing executable, service, module, package and data-path names remain
 `rf-button-manager` for compatibility. Do not migrate installations for a branding
 change; published release archives and tags must remain unchanged.

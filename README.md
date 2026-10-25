@@ -1,14 +1,14 @@
-# RF433 Manager
+# RF433 Button Manager
 
 **Turn ordinary 433 MHz wireless buttons into controls for Home Assistant.**
 
 Press a wall switch or remote button to turn on a light, activate a scene, or run
-another automation you choose. RF433 Manager listens for supported **433.92 MHz**
+another automation you choose. RF433 Button Manager listens for supported **433.92 MHz**
 signals through a USB RTL-SDR receiver and sends a webhook when it recognizes a
 button you have assigned.
 
 A webhook is simply a special web address that starts an automation when the app
-calls it. You choose what happens in Home Assistant; RF433 Manager connects the
+calls it. You choose what happens in Home Assistant; RF433 Button Manager connects the
 physical button press to that automation.
 
 ## Why this exists
@@ -27,7 +27,7 @@ Docker container or cloud account is required.
 
 1. **Listen:** the RTL-SDR receives the radio signal from your button.
 2. **Decode:** the open-source [rtl_433](https://github.com/merbanan/rtl_433) decoder
-   turns supported signals into data. RF433 Manager manages reception and helps
+   turns supported signals into data. RF433 Button Manager manages reception and helps
    discover supported fixed-code signals.
 3. **Learn:** choose a button in the web interface, select **Learn**, and follow the
    prompts for three separate matching presses. Confirm the result.
@@ -42,14 +42,14 @@ For example, use a wireless wall button to switch on your living-room lights:
 1. In Home Assistant, create an automation with a **Webhook** trigger and an action
    that turns on the lights. Save it.
 2. Copy the complete webhook URL from Home Assistant.
-3. In RF433 Manager, learn your physical button, then paste that complete URL into
+3. In RF433 Button Manager, learn your physical button, then paste that complete URL into
    **Webhook URL**. Select **POST** for a standard Home Assistant webhook.
 4. Choose **Save button**, or **Save & allow destination** when the app asks to
    approve a new server address. Saving does not run the automation.
 5. When ready to operate the lights, use **Test saved action**, enable the button,
    and try a physical press.
 
-RF433 Manager runs as a separate Linux service and connects to Home Assistant over
+RF433 Button Manager runs as a separate Linux service and connects to Home Assistant over
 the network. It does not need to run on the Home Assistant machine. You create and
 manage the automation in Home Assistant; the app sends its trigger. It can also
 call other services that accept HTTP webhooks.
@@ -75,7 +75,7 @@ been tested by the project owner. Broader hardware support and long-term reliabi
 still need testing. Read the [test report](docs/TEST-REPORT.md) and
 [hardware test plan](docs/HARDWARE-TESTS.md) for the evidence and remaining work.
 
-[Download 0.3.6-dev](https://github.com/ninoleto/rf433-manager/releases/tag/v0.3.6-dev)
+[Download 0.3.6-dev](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.6-dev)
 · [Install](#requirements-and-supplied-binary)
 · [Developer guide](docs/DEVELOPMENT.md)
 · [Instructions for AI coding agents](AGENTS.md)
@@ -180,8 +180,8 @@ build or network-hosted assets. Tests with the race detector require a C compile
 the release executable uses pure-Go SQLite and is built with `CGO_ENABLED=0`.
 
 ```sh
-git clone https://github.com/ninoleto/rf433-manager.git
-cd rf433-manager
+git clone https://github.com/ninoleto/rf433-button-manager.git
+cd rf433-button-manager
 export GOTOOLCHAIN=local
 go mod download
 go mod verify
@@ -266,7 +266,7 @@ bash scripts/install.sh --binary "$PWD/bin/rf-button-manager"
 sudo bash scripts/install.sh --binary "$PWD/bin/rf-button-manager" --apply
 ```
 
-The installer creates only RF433 Manager's service, service account, state
+The installer creates only RF433 Button Manager's service, service account, state
 directory, executable and narrowly scoped USB permissions. It does not install
 packages, modify kernel modules, stop competing receiver services, or change Docker
 and Home Assistant. If initial USB permissions have not applied, arrange a
