@@ -28,8 +28,8 @@ synthetic RF data and demonstrate the actual application, not physical receiver 
 
 Learning is entirely browser-driven: choose **Learn**, press/release the button,
 verify three separate presses, then **Confirm and save**. Button events decoded by rtl_433 are learned directly, including common
-EV1527, PT2262 and HT680 event formats. For supported 16–64 bit fixed-code OOK PWM/PPM signals, the application captures
-pulses, obtains measured candidates from rtl_433, and validates them by replay.
+EV1527, PT2262 and HT680 event formats. For supported 16–64 bit fixed-code OOK PWM/PPM/PCM signals, the application captures
+pulses, derives measured timing candidates, and validates them with rtl_433 replay.
 A suggestion alone is never saved. Unrecognized traffic is ignored within a bounded press window. Rolling/encrypted
 codes and ambiguous or changing identities cannot be saved as fixed buttons. This is
 not universal RF learning. See [the learning workflow](docs/LEARNING.md).
@@ -116,7 +116,7 @@ the build machine. Runtime decoding still uses an installed `rtl_433` executable
 Open `http://127.0.0.1:8787` and enter the token from
 `rf-data/management.token`. Keep the token private. A missing receiver is reported;
 demo data is never substituted automatically. Without explicit decoder settings,
-rtl_433 uses its default protocols. Learn discovers supported unknown PWM/PPM
+rtl_433 uses its default protocols. Learn discovers supported unknown PWM/PPM/PCM
 profiles automatically; a connected receiver alone does not prove a button decoded.
 
 For an interface preview without radio hardware, use a **separate** data directory:

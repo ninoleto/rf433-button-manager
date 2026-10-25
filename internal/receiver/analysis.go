@@ -242,24 +242,50 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 		seen[timing] = true
 		timings = append(timings, timing)
 	}
+	// The upstream histogram heuristic can miss NRZ packets with only a subset
+	// of run lengths present. Measure a small candidate set, but leave all bit
+	// decoding and repeated-code proof to rtl_433 replay of the unchanged data.
+	for _, timing := range measuredPCMTimings(request.Capture) {
+		if !seen[timing] {
+			seen[timing] = true
+			timings = append(timings, timing)
+		}
+	}
 	result.Diagnostics.Candidates = len(timings)
 	if len(timings) == 0 || len(timings) > 8 {
-		return result, analysisFailure("unsupported", "No unambiguous supported fixed-code OOK/PWM or OOK/PPM candidate was found in this capture. The intended transmitter was not identified.")
+		return result, analysisFailure("unsupported", "No unambiguous supported fixed-code OOK PWM, PPM or PCM candidate was found in this capture. The intended transmitter was not identified.")
 	}
 	var accepted *DecoderProfile
 	var acceptedRaw json.RawMessage
 	identity := ""
 	for _, timing := range timings {
+		pcm := strings.HasPrefix(timing, "m=OOK_PCM,")
+		if pcm && accepted != nil && !strings.Contains(accepted.FlexDecoder, "m=OOK_PCM,") {
+			continue // Preserve a proven PWM/PPM decoder before the PCM fallback.
+		}
 		frames, _, e := replay([]string{"-R", "0", "-X", "n=RFB-Probe," + timing + ",bits>=16,bits<=64,repeats>=1"})
 		if e != nil {
 			return result, replayFailure()
 		}
 		code := ""
 		bits := 0
+		if pcm {
+			bits = repeatedPCMWidth(frames)
+			if bits == 0 {
+				continue
+			}
+		}
 		frameCount := 0
 		valid := len(frames) > 0
 		for _, frame := range frames {
-			next, n, e := repeatedCode(frame, 0, 1)
+			width := 0
+			if pcm {
+				width = bits
+				if matchingFrameCount(frame, width) == 0 {
+					continue
+				}
+			}
+			next, n, e := repeatedCode(frame, width, 1)
 			if e != nil || (code != "" && next != code) {
 				valid = false
 				break
@@ -300,5 +326,8 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 	result.Raw = acceptedRaw
 	result.Profile = accepted
 	result.Diagnostics.Source = "analyzer candidate validated by capture replay"
+	if strings.Contains(accepted.FlexDecoder, "m=OOK_PCM,") {
+		result.Diagnostics.Source = "measured PCM timing validated by rtl_433 replay"
+	}
 	return result, nil
 }

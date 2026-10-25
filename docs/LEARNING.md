@@ -16,7 +16,7 @@ If no live decoder identifies a button, the app replays captured pulses through
 existing decoders and saved profiles before asking rtl_433 for timing candidates.
 
 When those decoders cannot identify a capture, automatic profile discovery supports
-**fixed-code OOK PWM or PPM, 16–64 bits**, at the application's fixed 433.92 MHz frequency.
+**fixed-code OOK PWM, PPM or gap-delimited NRZ PCM, 16–64 bits**, at the application's fixed 433.92 MHz frequency.
 It requires at least two matching RF frames across the captured recording
 (including separate packet/JSON records) and the same identity across three
 separately armed physical presses. A continuous hold cannot supply three presses.
@@ -107,7 +107,7 @@ flowchart TD
     Pause --> Live[Stop and wait for old live child; start same receiver with pulse output]
     Live --> Capture[Brief press; bounded OOK pulses]
     Capture --> Existing[Replay through existing decoders and profiles]
-    Existing -->|No valid identity| Analyze[rtl_433 file analysis: measured PWM or PPM candidates]
+    Existing -->|No valid identity| Analyze[Measured PWM, PPM or PCM timing candidates]
     Analyze --> Proof[Replay candidate; repeated consistent fixed code; exact bit length]
     Existing -->|Valid identity| Match[Compare with previous separate presses]
     Proof --> Match
@@ -134,7 +134,7 @@ application replays this bounded recording with `rtl_433 -r PRIVATE_FILE`, never
 another USB selector. See [CAPTURE-INVESTIGATION.md](CAPTURE-INVESTIGATION.md) for
 the 0.2.0 diagnostic failure and the actual 23.11 IQ-stream regression evidence.
 
-When needed, `-A -R 0` produces timing candidates. The parser accepts only measured
+When needed, `-A -R 0` produces PWM/PPM timing candidates. The parser accepts only measured
 numeric `m=OOK_PWM` or `m=OOK_PPM` plus `s,l,r,g,t,y` values within bounds. Probe replay requires 16–64
 bits and at least two matching frames across the replay output. Multiple distinct eligible codes are rejected.
 An accepted candidate is narrowed to its exact measured bit count, replayed again,
@@ -143,6 +143,27 @@ uses `repeats>=1`, allowing normal operation when a press yields one JSON row;
 learning still verifies repeated frames across each recording. Legacy `repeats>=2`
 profiles remain valid and keep their existing identity. A profile is not persisted
 until final confirmation and overlap validation succeed.
+
+For PCM fallback, `internal/receiver/pcm.go` measures the timing grid rather than
+requiring rtl_433's histogram analyzer to recognize every possible run length.
+It requires at least two complete frames delimited by long gaps, eight measured
+short mark/space pairs, varied data runs and identical complete-frame widths.
+The cell period is the median of those short pair durations divided by two,
+bounded to 20–2000 microseconds.
+Individual durations must fit 1–16 cells within 40% of one cell, and combined
+mark/space periods within 25%. A delimiter must be at least six times the median
+gap and four times the longest in-frame gap. The midpoint between the largest
+in-frame gap and shortest delimiter defines a fixed reset boundary. At most four
+PCM candidates are added; the existing overall candidate, process and time limits
+remain in force. A proven PWM/PPM candidate takes precedence.
+
+The app passes the measured period and boundary to upstream `m=OOK_PCM`; it does
+not implement a PCM bit decoder. Replay uses the **unchanged** recording. Incomplete
+prefix/suffix rows of other lengths are excluded only when exactly one frame
+length has an unambiguous repeated code. Different codes of that length, multiple
+repeated lengths, or differing complete-frame widths reject the capture. The exact
+profile is then replayed again and reused for the next separately armed presses.
+PCM is a restricted NRZ fallback, not universal waveform matching or FSK discovery.
 
 Profile IDs/models derive from a hash of canonical timing and framing, not an RF
 button code. Different buttons can share a profile. Runtime normalization retains
@@ -239,6 +260,10 @@ and 2 MiB combined payload. Incomplete/malformed packet payloads are not exporte
 A new learning attempt replaces the old recording; a service restart clears it.
 The `limit_reached` flag reports truncation. This export is pulse-domain data, not
 raw IQ: it cannot reconstruct RF information already lost during demodulation.
-To replay a packet offline, extract its `pulse_data` string unchanged into a `.ook`
-or `.fsk` file matching its modulation, then invoke rtl_433 with `-r FILE`, never
-with a live device selector. Retain the original capture for comparisons.
+For an OOK packet, extract its `pulse_data` string unchanged into a `.ook` file
+and use `rtl_433 -r FILE`, never a live device selector. **Do not name textual FSK
+pulse dumps `.fsk`**: that selects a raw-sample format, not this text format.
+Stock rtl_433 23.11 and 25.12 text loaders also fail to restore the FSK discriminator
+from `;fsk`, so simply renaming such a dump `.ook` does not validate FSK decoding.
+FSK investigation needs an appropriate offline loader or original IQ samples.
+Retain the original capture for comparisons.

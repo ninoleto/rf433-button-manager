@@ -1,5 +1,23 @@
 # Project progress
 
+## 2026-10-25: recorded PCM discovery regression fixed (0.3.2-dev)
+
+An operator-exported 0.3.1 recording contains 52 packets (50 FSK, two OOK),
+no decoded button events, and no export truncation. One OOK packet contains two
+identical complete PCM rows surrounded by incomplete fragments. Stock default
+23.11/25.12 decoders and their analyzer did not identify it; explicit upstream PCM
+replay did. The old learner's PWM/PPM-only candidate path rejected it. The new
+bounded measured-PCM fallback reproduces a consistent code using unmodified
+rtl_433 23.11, without changing the recording or hardcoding a remote's timings.
+
+The same private recording fails the regression on 0.3.1 and passes on this code.
+It remains outside Git/history/releases. A separate synthetic PCM fixture covers
+three software-armed observations, save, database reopen, later matching and one
+isolated local webhook despite repeated frames. This is **not** proof that the
+recorded packet belongs to the intended button, or that three new physical presses
+work. The GUI/operator check and physical webhook/USB matrix remain pending.
+
+
 ## 2026-10-25: physical learning still fails; retain actual RF evidence (0.3.1-dev)
 
 0.3.0 is confirmed deployed and receiving on ZORIN. The intended button has not

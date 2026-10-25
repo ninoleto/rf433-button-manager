@@ -56,7 +56,7 @@ receiver. Never persist bus/device numbers or hub ports. Duplicate serials requi
 deliberate resolution; this application does not rewrite EEPROM serials.
 
 Preserve any existing verified custom decoder and explicit protocol selection.
-New fixed-code OOK PWM/PPM profiles are added separately; ordinary Settings updates do
+New fixed-code OOK PWM/PPM/PCM profiles are added separately; ordinary Settings updates do
 not remove them. Normal learning needs no decoder string, terminal history search,
 configuration-file edit or receiver command. The browser workflow captures and
 validates supported signals internally. It does not inherit arbitrary configuration

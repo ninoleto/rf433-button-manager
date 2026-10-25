@@ -23,3 +23,4 @@ manager.env
 *.ook
 *.fsk
 !internal/receiver/testdata/synthetic-pwm.ook
+!internal/receiver/testdata/synthetic-pcm.ook

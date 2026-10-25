@@ -5,7 +5,7 @@
 Runtime: Linux x86_64 for the supplied binary, systemd/udev for the supplied
 installer, an independently installed `/usr/bin/rtl_433` (initial integration
 target 23.11), a compatible RTL-SDR, antenna and supported 433.92 MHz remote, USB
-permissions, and a browser for management. The browser can derive supported fixed-code OOK PWM/PPM profiles internally;
+permissions, and a browser for management. The browser can derive supported fixed-code OOK PWM/PPM/PCM profiles internally;
 other protocols need a working existing decoder or an explicit developer extension. No Go, Node, Docker, MQTT or cloud account is needed to
 install the packaged binary. Keep state on reliable internal storage with space
 for SQLite/WAL and retained backups. No minimum RAM/CPU specification or power-loss

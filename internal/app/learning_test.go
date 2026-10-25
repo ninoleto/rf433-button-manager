@@ -2,12 +2,14 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -271,6 +273,12 @@ func TestCaptureReceiverLossAndHeldTransmissionRestoreReception(t *testing.T) {
 }
 
 func TestCaptureRealReplayPersistenceAndProfileReuse(t *testing.T) {
+	for _, fixture := range []string{"synthetic-pwm.ook", "synthetic-pcm.ook"} {
+		t.Run(fixture, func(t *testing.T) { testCaptureReplayPersistenceAndProfileReuse(t, fixture) })
+	}
+}
+
+func testCaptureReplayPersistenceAndProfileReuse(t *testing.T, fixture string) {
 	binary, err := exec.LookPath("rtl_433")
 	if err != nil {
 		t.Skip("offline replay requires rtl_433")
@@ -284,15 +292,21 @@ func TestCaptureRealReplayPersistenceAndProfileReuse(t *testing.T) {
 	if err = a.UpdateSettings(settingsBefore); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile("../receiver/testdata/synthetic-pwm.ook")
+	raw, err := os.ReadFile("../receiver/testdata/" + fixture)
 	if err != nil {
 		t.Fatal(err)
+	}
+	pulseCount := 0
+	for _, line := range strings.Split(string(raw), "\n") {
+		if line != "" && !strings.HasPrefix(line, ";") {
+			pulseCount++
+		}
 	}
 	for index := 0; index < 2; index++ {
 		generation := startCapture(t, a, r.Buttons[index].ID)
 		for n := 0; n < 3; n++ {
 			c.advance(time.Second)
-			a.ReceivePulse(generation, receiver.PulsePacket{OOK: true, Pulses: 144, Data: raw})
+			a.ReceivePulse(generation, receiver.PulsePacket{OOK: true, Pulses: pulseCount, Data: raw})
 			c.advance(time.Second)
 			a.learningTick()
 			if a.learning == nil {
@@ -342,10 +356,23 @@ func TestCaptureRealReplayPersistenceAndProfileReuse(t *testing.T) {
 	if !reflect.DeepEqual(config, reopened) {
 		t.Fatal("profile/mapping did not survive reopen")
 	}
+	resumed, err := New(s, reopened, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resumed.Close()
+	resumed.now = c.now
+	resumed.muteUntil = c.now()
+	a = resumed
 	// Runtime receives repeated rows and must normalize them to the same mapping.
 	profile := config.DecoderProfiles[0]
-	live, _ := json.Marshal(map[string]any{"model": profile.Model, "codes": []string{"{24}a9b2c5", "{24}a9b2c5"}})
-	a.Receive(live)
+	live, err := exec.Command(binary, "-c", "/dev/null", "-r", "../receiver/testdata/"+fixture, "-R", "0", "-X", profile.FlexDecoder, "-F", "json").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range strings.Split(string(live), "\n") {
+		a.Receive([]byte(event))
+	}
 	if a.Backup().Remotes[0].Buttons[0].LastReceived == "" {
 		t.Fatal("saved profile did not match normal decoded reception")
 	}
@@ -356,6 +383,41 @@ func TestCaptureRealReplayPersistenceAndProfileReuse(t *testing.T) {
 	}
 	if len(a.Backup().DecoderProfiles) != 1 {
 		t.Fatal("legacy settings update dropped profiles")
+	}
+	// Only an isolated local endpoint is used. A saved mapping must fire once,
+	// despite repeated RF frames, after reopening the database in a new app.
+	hits := make(chan struct{}, 10)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Error("unexpected webhook method")
+		}
+		hits <- struct{}{}
+		w.WriteHeader(204)
+	}))
+	defer server.Close()
+	settings = a.Settings()
+	settings.AllowedOrigins = []string{server.URL}
+	if err = a.UpdateSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	button := a.Backup().Remotes[0].Buttons[0]
+	button.Webhook.URL, button.Enabled = server.URL, true
+	if _, err = a.EditButton(button.ID, button); err != nil {
+		t.Fatal(err)
+	}
+	c.advance(2 * time.Second)
+	for _, event := range strings.Split(string(live), "\n") {
+		a.Receive([]byte(event))
+	}
+	select {
+	case <-hits:
+	case <-time.After(2 * time.Second):
+		t.Fatal("saved code did not fire local webhook")
+	}
+	select {
+	case <-hits:
+		t.Fatal("RF repetitions fired a duplicate webhook")
+	default:
 	}
 }
 

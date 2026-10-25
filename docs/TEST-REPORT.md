@@ -1,5 +1,34 @@
 # Verification report — 2026-10-25
 
+## 0.3.2-dev: actual recording reproduces a missing PCM learning path
+
+- Private operator export: 52 complete packets, two OOK and 50 FSK; no decoded
+  events. One OOK packet yields two identical complete rows with upstream PCM.
+- Regression run against 0.3.1 commit b8c88a6: zero accepted candidates (expected
+  failure). The same unchanged recording passes on this version with rtl_433
+  23.11, including exact-profile replay. The raw recording and RF identifiers are
+  excluded from this repository and all packages.
+- Synthetic NRZ fixture uses independently chosen data. Tests cover timing jitter,
+  incomplete fragments, strict same-length identity, conflicting repeated lengths,
+  irregular timing, different complete frame widths, FSK exclusion and bounded
+  short-traffic rejection.
+- Application integration: three separately armed **software** observations,
+  duplicate-mapping rejection, atomic disabled save, database reopen into a new
+  application, normal upstream decode matching and exactly one local test webhook.
+- Full race-enabled Go suite, vet, Node controller checks, deployment/history and
+  prebuilt-updater tests pass. Four checksum-pinned public IQ recordings also pass.
+- Ten headless Chromium integration checks pass, including learning controls and
+  capture export; RF states in browser tests are mocked.
+- No live ZORIN deployment, new physical press, actual Home Assistant webhook or
+  USB recovery test is claimed by this development run.
+
+The original pulse export is not raw IQ. Unmodified stock text-file replay cannot
+correctly validate exported FSK packets; the source loader drops the modulation
+marker. An isolated diagnostic loader that preserved it also produced no built-in
+FSK decode. That observation does not identify those transmissions as noise or
+as the intended remote. No modified rtl_433 binary is distributed.
+
+
 ## 0.3.1-dev: RF evidence export (diagnostic update)
 
 The operator deployed 0.3.0 successfully but learning still timed out. Their

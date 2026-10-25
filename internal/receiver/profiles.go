@@ -13,7 +13,7 @@ import (
 )
 
 // DecoderProfile is persisted only after the application verifies three distinct
-// armed captures. Timings come from rtl_433 analysis, never a built-in guess.
+// armed captures. Timings come from the recording, never a preset remote guess.
 type DecoderProfile struct {
 	ID               string `json:"id"`
 	Name             string `json:"name"`
@@ -27,7 +27,7 @@ type DecoderProfile struct {
 var suggestionPattern = regexp.MustCompile(`Use a flex decoder with -X '([^'\r\n]+)'`)
 var codePattern = regexp.MustCompile(`^\{([0-9]{1,3})\}([0-9a-fA-F]+)$`)
 
-// canonicalTiming accepts only the PWM/PPM numeric vocabulary printed by rtl_433.
+// canonicalTiming accepts only the bounded PWM/PPM/NRZ PCM flex vocabulary.
 func canonicalTiming(spec string) (string, error) {
 	values := map[string]int{}
 	modulation := ""
@@ -53,8 +53,12 @@ func canonicalTiming(spec string) (string, error) {
 			return "", errors.New("unsupported analyzer candidate parameter")
 		}
 	}
-	if (modulation != "OOK_PWM" && modulation != "OOK_PPM") || values["s"] < 1 || values["l"] <= values["s"] || values["r"] <= values["l"] {
-		return "", errors.New("only measured OOK PWM/PPM candidates are supported")
+	widths := values["l"] > values["s"]
+	if modulation == "OOK_PCM" {
+		widths = values["l"] == values["s"] && values["g"] == values["r"] && values["y"] == 0 && values["t"] == 0
+	}
+	if (modulation != "OOK_PWM" && modulation != "OOK_PPM" && modulation != "OOK_PCM") || values["s"] < 1 || !widths || values["r"] <= values["l"] {
+		return "", errors.New("only measured OOK PWM/PPM/NRZ PCM candidates are supported")
 	}
 	return fmt.Sprintf("m=%s,s=%d,l=%d,r=%d,g=%d,t=%d,y=%d", modulation, values["s"], values["l"], values["r"], values["g"], values["t"], values["y"]), nil
 }
@@ -69,7 +73,7 @@ func profileWithRepeats(timing string, bits, repeats int) (DecoderProfile, error
 		return DecoderProfile{}, err
 	}
 	if bits < 16 || bits > 64 {
-		return DecoderProfile{}, errors.New("automatic PWM/PPM learning supports 16–64 bit fixed codes")
+		return DecoderProfile{}, errors.New("automatic fixed-code learning supports 16–64 bit codes")
 	}
 	key := fmt.Sprintf("%s,bits=%d,repeats>=%d", canonical, bits, repeats)
 	hash := sha256.Sum256([]byte(key))
@@ -77,6 +81,8 @@ func profileWithRepeats(timing string, bits, repeats int) (DecoderProfile, error
 	kind := "PWM"
 	if strings.HasPrefix(canonical, "m=OOK_PPM,") {
 		kind = "PPM"
+	} else if strings.HasPrefix(canonical, "m=OOK_PCM,") {
+		kind = "PCM"
 	}
 	model := "RFB-" + kind + "-" + id
 	return DecoderProfile{ID: id, Name: fmt.Sprintf("Fixed-code OOK %s (%d bits)", kind, bits), Model: model, FlexDecoder: "n=" + model + "," + key, Bits: bits}, nil
