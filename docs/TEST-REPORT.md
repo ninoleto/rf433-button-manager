@@ -32,6 +32,15 @@ Executed software checks for the correction:
 - Vet, formatting, JavaScript/shell syntax and deployment/history tests pass.
   A static Linux amd64 executable builds with `make build` and reports 0.2.1-dev.
 
+A separate clean `--no-local` clone of
+`a7dc500a6f4077c8c180b1e39cf0c0ecdfc3b822` passed the documented `make build` with
+Go 1.27.3 and left its tracked worktree unchanged. The static 0.2.1-dev executable
+matched the development build byte-for-byte, SHA-256
+`7bd7cd0e2f39a7c4592afaee6cfd85d6e61b828a7c7a593f16ab69217b2fb513`.
+The update's 52 local documentation links resolved; 70 source files were checked
+for private runtime artifacts and high-confidence credential patterns, with none
+found by those checks.
+
 The environment still prohibits loopback listening sockets, home-checkout writes
 and sudo escalation. The host update helper must run full `make check` before
 deployment; no new full-host-suite pass is claimed here. The excluded tests are
