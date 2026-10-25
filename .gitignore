@@ -9,3 +9,14 @@
 /data/
 /rf-data/
 /demo-data/
+*.bundle
+/SHA256SUMS
+/THIRD_PARTY_NOTICES.txt
+__pycache__/
+node_modules/
+.env
+manager.env
+*backup*.json
+*.cu8
+*.cs16
+*.iq

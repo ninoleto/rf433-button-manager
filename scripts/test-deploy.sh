@@ -33,3 +33,21 @@ if bash "$script_dir/uninstall.sh" --unexpected-option > /dev/null 2>&1; then
   exit 1
 fi
 echo 'Deployment dry-run and argument tests passed.'
+
+# Each known competing decoder must fail before installation; no kill is invoked.
+cat > "$test_dir/mock-bin/pgrep" <<'MOCK'
+#!/usr/bin/env bash
+if [[ ${2:-} == "${RFB_TEST_OWNER:-}" ]]; then
+  echo "$PPID"
+fi
+MOCK
+chmod +x "$test_dir/mock-bin/pgrep"
+for owner in rtl_433 rtl_tcp rtl_test; do
+  if PATH="$test_dir/mock-bin:$PATH" RFB_TEST_OWNER="$owner" bash "$script_dir/check-receiver-owners.sh" > "$test_dir/owner.txt" 2>&1; then
+    echo "Competing $owner was not rejected" >&2
+    exit 1
+  fi
+  grep -q "Competing $owner process PID" "$test_dir/owner.txt"
+done
+PATH="$test_dir/mock-bin:$PATH" RFB_TEST_OWNER='' bash "$script_dir/check-receiver-owners.sh"
+echo 'Known competing rtl_433/rtl_tcp/rtl_test ownership checks passed.'

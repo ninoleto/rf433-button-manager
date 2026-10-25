@@ -7,6 +7,17 @@ if [[ -r /etc/os-release ]]; then
   awk -F= '$1 == "PRETTY_NAME" || $1 == "VERSION_ID" {print}' /etc/os-release
 fi
 uname -srmo
+section 'Internal storage'
+df -h / /var/lib
+section 'Private network candidates and default route (verify the physical LAN)'
+if command -v ip >/dev/null; then
+  ip -4 -brief address show || echo 'Network inspection unavailable in this execution environment'
+  ip -4 route show default || true
+fi
+section 'TCP port 8787 listeners'
+if command -v ss >/dev/null; then
+  ss -ltnp 'sport = :8787' || echo 'Port availability cannot be established in this execution environment'
+fi
 section 'rtl_433 executable and version (no receiver opened)'
 if command -v rtl_433 >/dev/null; then
   command -v rtl_433
@@ -34,6 +45,9 @@ for node in /sys/bus/usb/devices/*; do
 done
 (( found )) || echo 'No supported receiver currently visible'
 section 'Competing receiver-related processes (no arguments or environment)'
+if [[ -r /proc/1/comm && $(</proc/1/comm) != systemd ]]; then
+  echo 'PID 1 is not systemd: this may be a container/sandbox. An empty process list does not establish host receiver availability.'
+fi
 if command -v pgrep >/dev/null; then
   for name in rtl_433 rtl_tcp rtl_test; do
     pgrep -l -x "$name" || true
@@ -41,8 +55,11 @@ if command -v pgrep >/dev/null; then
 fi
 section 'Relevant systemd unit names and states'
 if command -v systemctl >/dev/null && [[ -d /run/systemd/system ]]; then
-  systemctl list-units --type=service --all --plain --no-legend --no-pager 2>/dev/null |
-    awk '/rtl[_-]?433|rf-button-manager/ {print $1, $2, $3, $4}'
+  if units=$(systemctl list-units --type=service --all --plain --no-legend --no-pager 2>/dev/null); then
+    awk '/rtl[_-]?(433|tcp|test)|rf-button-manager/ {print $1, $2, $3, $4}' <<< "$units"
+  else
+    echo 'Host systemd inventory unavailable; receiver ownership remains unverified'
+  fi
 else
   echo 'Running systemd manager unavailable'
 fi

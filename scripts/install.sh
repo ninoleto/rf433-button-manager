@@ -39,7 +39,7 @@ Settings: /etc/rf-button-manager/manager.env (created only if absent)
 Service: /etc/systemd/system/rf-button-manager.service
 USB rule: /etc/udev/rules.d/70-rf-button-manager.rules (0bda:2832/2838 only)
 Actions: stop only this service during upgrade, reload systemd and udev rules,
-         enable/start this service; an existing receiver must be replugged.
+         enable/start this service; receiver-only reconnect may be needed for USB access.
 No USB trigger, driver blacklist, package install, Home Assistant or Docker changes.
 PLAN
 sha256sum -- "$binary"
@@ -55,13 +55,7 @@ done
 [[ -x /usr/bin/rtl_433 ]] || { echo '/usr/bin/rtl_433 is missing. Install/verify rtl_433 separately; this script does not change packages.' >&2; exit 1; }
 
 # Fail before any mutation if a different process owns, or could own, the receiver.
-while read -r pid; do
-  [[ -n "$pid" ]] || continue
-  if ! grep -Eq '/rf-button-manager\.service(/|$)' "/proc/$pid/cgroup" 2>/dev/null; then
-    echo "Competing rtl_433 process PID $pid. Inspect it and arrange an approved handover; it was not stopped." >&2
-    exit 1
-  fi
-done < <(pgrep -x rtl_433 || true)
+bash "$project_dir/scripts/check-receiver-owners.sh"
 
 unit=/etc/systemd/system/rf-button-manager.service
 rules=/etc/udev/rules.d/70-rf-button-manager.rules
@@ -117,6 +111,6 @@ udevadm control --reload-rules
 systemctl enable --now rf-button-manager.service
 systemctl is-active --quiet rf-button-manager.service
 trap - ERR
-echo 'Installed and started RF Button Manager. Replug the receiver once to apply its USB permissions.'
+echo 'Installed and started RF Button Manager. If USB access is denied, arrange a receiver-only reconnect with the operator.'
 echo 'Retrieve the login token locally with: sudo cat /var/lib/rf-button-manager/management.token'
 echo 'Default UI: http://127.0.0.1:8787 (use an SSH tunnel from Windows).'

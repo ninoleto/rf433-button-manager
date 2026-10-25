@@ -11,6 +11,7 @@ test:
 test-deploy:
 	for script in scripts/*.sh; do bash -n "$$script"; done
 	bash scripts/test-deploy.sh
+	bash scripts/test-history.sh
 vet:
 	GOTOOLCHAIN=local $(GO) vet ./...
 check: test vet test-deploy
