@@ -33,7 +33,7 @@ for an undecoded, encrypted or out-of-band transmission.
 4. Verify GitHub authentication with the existing credential:
    `gh api user --jq .login`. It must be `ninoleto` for the intended upstream.
    GitHub authentication is independent of a browser/Google login.
-5. Inspect `ninoleto/rf-button-manager` before creation. A 404 can mean absence or
+5. Inspect `ninoleto/rf433-button-manager` before creation. A 404 can mean absence or
    insufficient access; resolve ambiguity rather than assuming permission. If it
    exists, fetch and inspect its refs/history and integrate preserving existing work.
 
@@ -45,9 +45,9 @@ Once the agreed publication gates are complete and repository absence is establi
 
 ```sh
 test "$(gh api user --jq .login)" = ninoleto
-gh repo create ninoleto/rf-button-manager --public \
+gh repo create ninoleto/rf433-button-manager --public \
   --description 'Native Linux RF remote learning and guarded webhook automation (development)'
-git remote add origin https://github.com/ninoleto/rf-button-manager.git
+git remote add origin https://github.com/ninoleto/rf433-button-manager.git
 git push --set-upstream origin main
 ```
 
@@ -59,7 +59,7 @@ No credential belongs in a Git URL. Confirm the remote commit equals the local o
 ```sh
 git rev-parse HEAD
 git ls-remote origin refs/heads/main
-gh run list --repo ninoleto/rf-button-manager --commit "$(git rev-parse HEAD)"
+gh run list --repo ninoleto/rf433-button-manager --commit "$(git rev-parse HEAD)"
 ```
 
 Inspect and wait on the run for that exact pushed commit. Report workflow/run URL,
@@ -115,7 +115,39 @@ Release notes include supported architecture, toolchain, binary/archive hashes,
 changes, installation instructions, schema compatibility, actual test evidence
 and all remaining hardware limits. Do not fabricate a stable release date.
 
-## Publish the existing 0.3.6-dev package
+## Publish 0.3.7-dev (RF433 Button Manager branding)
+
+This release changes visible product text and the version only. Keep executable,
+archive, service, environment, Go module and data-path identifiers compatible with
+existing installations. Schema 2, receiver behavior and action settings are unchanged.
+
+1. Run the documented clean checks and build, collect dependency notices, and
+   package the tested `main` commit with `scripts/package-release.py`.
+2. Extract freshly; verify every checksum and version. Clone the packaged bundle
+   with `--branch main`, rebuild and compare the binary hash.
+3. Push the reviewed commit without force and require successful CI for that exact
+   commit. Create a new `v0.3.7-dev` tag at it; never move `v0.3.6-dev`.
+4. Publish **RF433 Button Manager 0.3.7-dev** as a prerelease, including the ZIP and
+   a matching checksum asset generated from the final ZIP:
+
+   ```sh
+   cd dist
+   sha256sum rf-button-manager-0.3.7-dev-linux-amd64.zip > rf-button-manager-0.3.7-dev-linux-amd64.zip.sha256
+   ```
+
+5. Verify the public asset hash, tag and prerelease status. Then withdraw the old
+   release to draft if requested, preserving its tag, assets and release notes.
+   Previously downloaded packages continue to exist; withdrawal cannot recall them.
+
+The running server changes only after its operator installs the new binary and
+restarts the service using the existing updater. See README and OPERATIONS for
+backups, disabled actions during the update, verification and rollback.
+
+## Historical 0.3.6-dev package provenance
+
+Superseded by the 0.3.7-dev branding release. Keep this tag and its original
+checksums as historical provenance; do not reuse it for the new executable.
+The original release may be withdrawn to draft after the replacement is public.
 
 The immutable package and tag are separate from later documentation on `main`:
 
@@ -141,13 +173,13 @@ git tag -a v0.3.6-dev f9b496f3387cd357c1270c28566c97d26cb48dd8 \
   -m 'RF Button Manager 0.3.6-dev: packaged development release'
 git push origin main refs/tags/v0.3.6-dev
 git ls-remote origin refs/heads/main refs/tags/v0.3.6-dev 'refs/tags/v0.3.6-dev^{}'
-gh run list --repo ninoleto/rf-button-manager \
+gh run list --repo ninoleto/rf433-button-manager \
   --commit f9b496f3387cd357c1270c28566c97d26cb48dd8
 ```
 
 The workflow runs on tag pushes as well as branch pushes. Inspect the exact
 release-commit run and its jobs with `gh run view RUN_ID --repo
-ninoleto/rf-button-manager`. It must finish with `success` **before** uploading
+ninoleto/rf433-button-manager`. It must finish with `success` **before** uploading
 the ZIP. Also verify CI for the final `main` commit; a passing documentation commit
 alone does not validate the packaged release. If CI fails, keep the asset unpublished
 and report the failing step; do not move the immutable release tag to hide failure.
@@ -157,7 +189,7 @@ after the release-commit CI succeeds:
 
 ```sh
 gh release create v0.3.6-dev /path/to/rf-button-manager-0.3.6-dev-linux-amd64.zip \
-  --repo ninoleto/rf-button-manager --verify-tag --prerelease \
+  --repo ninoleto/rf433-button-manager --verify-tag --prerelease \
   --title 'RF Button Manager 0.3.6-dev' --notes-file /path/to/release-notes.md
 ```
 

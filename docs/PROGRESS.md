@@ -1,5 +1,20 @@
 # Project progress
 
+## 0.3.7-dev: RF433 Button Manager branding
+
+The public repository is now `ninoleto/rf433-button-manager`. Version 0.3.7-dev
+also applies that name inside the embedded browser UI, CLI and new-installation
+messages. Runtime paths and configuration remain compatible; no schema or RF
+behavior changes are included. Existing installations need the new executable
+before their interface changes. See TEST-REPORT for the new automated checks.
+
+The earlier 0.3.6-dev publication completed after the credential issue described
+in the historical entry below was resolved: main and the exact packaged commit
+passed CI, and the public ZIP checksum was verified. Its tag remains historical
+provenance. The operator requested withdrawal of that release once the replacement
+is available; see GitHub Releases for the current publication status.
+
+
 ## 0.3.6-dev public-release preparation
 
 The supplied ZIP and all internal checksums were verified. Its complete 20-commit

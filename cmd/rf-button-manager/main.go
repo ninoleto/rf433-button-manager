@@ -1,4 +1,4 @@
-// RF Button Manager is a native Linux receive-only automation service.
+// RF433 Button Manager is a native Linux receive-only automation service.
 package main
 
 import (
@@ -115,7 +115,7 @@ func run() error {
 	}
 	defer lock.Close()
 	if e = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); e != nil {
-		return errors.New("another RF Button Manager owns this data directory")
+		return errors.New("another RF433 Button Manager owns this data directory")
 	}
 	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
 	token, e := tokenFile(*dir)
@@ -151,7 +151,7 @@ func run() error {
 	}
 	finished := make(chan error, 1)
 	go func() { finished <- server.Serve(ln) }()
-	log.Printf("RF Button Manager %s listening on http://%s; management token: %s", app.Version, *listen, filepath.Join(*dir, "management.token"))
+	log.Printf("RF433 Button Manager %s listening on http://%s; management token: %s", app.Version, *listen, filepath.Join(*dir, "management.token"))
 	select {
 	case e = <-finished:
 		if errors.Is(e, http.ErrServerClosed) {

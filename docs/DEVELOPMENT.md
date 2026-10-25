@@ -36,7 +36,11 @@ git log --oneline --all --decorate
 git status --short
 ```
 
-For the supplied 0.3.6-dev ZIP, HEAD must be
+For every package, compare `git rev-parse HEAD` with its `release.json` commit,
+and the built `--version` with its manifest version. The corresponding release
+tag must identify that same source; `main` may contain later work.
+
+Historical reference: for the 0.3.6-dev ZIP, HEAD must be
 `f9b496f3387cd357c1270c28566c97d26cb48dd8`; compare with the package's
 `release.json`. The bundle contains 20 commits through that version. The GitHub
 tag `v0.3.6-dev` must identify that same source; `main` may contain later documentation.

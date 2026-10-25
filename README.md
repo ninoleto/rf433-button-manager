@@ -75,14 +75,15 @@ been tested by the project owner. Broader hardware support and long-term reliabi
 still need testing. Read the [test report](docs/TEST-REPORT.md) and
 [hardware test plan](docs/HARDWARE-TESTS.md) for the evidence and remaining work.
 
-[Download 0.3.6-dev](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.6-dev)
+[Download 0.3.7-dev](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.7-dev)
 · [Install](#requirements-and-supplied-binary)
 · [Developer guide](docs/DEVELOPMENT.md)
 · [Instructions for AI coding agents](AGENTS.md)
 
-Previously called **RF Button Manager**. The published 0.3.6-dev package, executable,
-service and data paths retain their original names for compatibility. Existing
-installations need no migration for this public project-name change.
+Previously called **RF Button Manager**. Version **0.3.7-dev** also displays the
+new name in the browser interface. Executable, archive, service and data paths
+retain their original names for compatibility. Updating preserves saved buttons,
+webhooks, receiver settings and the management token; no data migration is needed.
 
 ![Running application in explicitly labeled demo mode](docs/screenshots/dashboard.png)
 
@@ -124,17 +125,14 @@ RTL-SDR and a remote using a supported signal format. Runtime state belongs on
 reliable internal storage. A browser is the management client; no Node server,
 Go compiler, Docker container or MQTT broker is required to install the binary.
 
-The release package is `rf-button-manager-0.3.6-dev-linux-amd64.zip`, available
-from the release page. Its SHA-256 is
-`4a55d123df03763ac79f0a6795e3118d65e0d3ac899126a22d8796f466b7df13`.
-Verify before extracting into a fresh directory:
+The release package is `rf-button-manager-0.3.7-dev-linux-amd64.zip`, available
+from the release page. Download its matching `.zip.sha256` asset as well, then
+verify before extracting into a fresh directory:
 
 ```sh
-printf '%s  %s\n' \
-  4a55d123df03763ac79f0a6795e3118d65e0d3ac899126a22d8796f466b7df13 \
-  rf-button-manager-0.3.6-dev-linux-amd64.zip | sha256sum -c -
+sha256sum -c rf-button-manager-0.3.7-dev-linux-amd64.zip.sha256
 rfb_extract_dir=$(mktemp -d)
-unzip rf-button-manager-0.3.6-dev-linux-amd64.zip -d "$rfb_extract_dir"
+unzip rf-button-manager-0.3.7-dev-linux-amd64.zip -d "$rfb_extract_dir"
 cd "$rfb_extract_dir/rf-button-manager"
 ```
 

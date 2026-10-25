@@ -1,5 +1,30 @@
 # Verification reports
 
+## 0.3.7-dev branding verification
+
+This update changes the product name shown in the browser and CLI to **RF433
+Button Manager**, with version 0.3.7-dev. It does not change RF processing,
+webhook dispatch, schema 2, persistence, selectors or installation identifiers.
+The installer ownership marker deliberately retains its original text so older
+managed installations remain recognized by update/uninstall tools.
+
+- Go 1.27.3: dependency download/verification and formatting passed.
+- Full `make check` passed in this environment: Go race tests, vet, all 12 Node
+  controller tests, shell/deployment/history checks and five updater simulations.
+  Four existing pinned public RF recordings and rtl_433 23.11 were available for
+  offline tests. Optional private-recording tests were not supplied for this rename.
+- `make build` passed; the executable reports 0.3.7-dev. A temporary demo instance
+  served the new title, header, footer, login and learning text over HTTP. Demo
+  mode used no receiver and sent no webhooks. No full browser rendering test was run.
+- New source changes were reviewed for secrets and private artifacts; only public
+  branding, version, documentation and the existing controller assertion changed.
+- Clean bundle rebuild and exact-commit CI are publication gates; final results,
+  asset checksums and the CI link are recorded in the 0.3.7-dev release notes.
+
+No host installation or new physical RF, webhook, multi-tuner, USB/hub recovery
+or soak test was performed for this branding change. Prior operator acceptance
+remains evidence only for the hardware and version actually tested.
+
 ## 0.3.6-dev publication verification — 2026-10-25 UTC
 
 This is a fresh publication review; version-specific records below describe

@@ -29,7 +29,7 @@ for source in rf-button-manager.service 70-rf-button-manager.rules manager.env.e
 done
 
 cat <<PLAN
-RF Button Manager installation/upgrade plan
+RF433 Button Manager installation/upgrade plan
 Binary source: $binary
 Binary target: /usr/local/bin/rf-button-manager
 Previous binary: /usr/local/bin/rf-button-manager.previous (replaced on upgrade)
@@ -111,6 +111,6 @@ udevadm control --reload-rules
 systemctl enable --now rf-button-manager.service
 systemctl is-active --quiet rf-button-manager.service
 trap - ERR
-echo 'Installed and started RF Button Manager. If USB access is denied, arrange a receiver-only reconnect with the operator.'
+echo 'Installed and started RF433 Button Manager. If USB access is denied, arrange a receiver-only reconnect with the operator.'
 echo 'Retrieve the login token locally with: sudo cat /var/lib/rf-button-manager/management.token'
 echo 'Default UI: http://127.0.0.1:8787 (use an SSH tunnel from Windows).'

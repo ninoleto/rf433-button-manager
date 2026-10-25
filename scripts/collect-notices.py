@@ -26,7 +26,7 @@ def main():
         remaining = remaining[end:].lstrip()
 
     parts = [
-        "RF Button Manager — Third-party dependency notices\n",
+        "RF433 Button Manager — Third-party dependency notices\n",
         "Collected from the pinned module source distributions used by this build.\n"
         "rtl_433 is installed separately and is not included in this executable.\n"
         "Generated C translations may carry additional notices in source headers;\n"

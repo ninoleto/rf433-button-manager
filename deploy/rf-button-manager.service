@@ -1,6 +1,6 @@
 # Managed by RF Button Manager installer.
 [Unit]
-Description=RF Button Manager
+Description=RF433 Button Manager
 After=network.target
 StartLimitIntervalSec=120
 StartLimitBurst=5

@@ -362,7 +362,7 @@
       }
       return;
     }
-    $('learning-version').textContent = state.version ? `RF Button Manager ${state.version}` : '';
+    $('learning-version').textContent = state.version ? `RF433 Button Manager ${state.version}` : '';
     $('learning-title').textContent = inspecting ? 'Inspect signal' : 'Learn a button';
     $('learning-eyebrow').textContent = inspecting ? 'SIGNAL INSPECTION' : 'SIGNAL LEARNING';
     $('inspection-result').hidden = !inspecting;
@@ -493,7 +493,7 @@
     $('receiver-message').textContent = state.receiver.message || (token ? 'Waiting for receiver status' : 'Enter a token to connect');
     $('receiver-dot').className = `status-dot ${['connected', 'disconnected', 'recovering', 'error'].includes(status) ? status : ''}`;
     renderReceiverIdentity();
-    $('version-label').textContent = state.version ? `RF Button Manager · ${state.version}` : 'RF Button Manager';
+    $('version-label').textContent = state.version ? `RF433 Button Manager · ${state.version}` : 'RF433 Button Manager';
     renderNavigation(); renderRemote(); renderEditor(); renderEvents(); renderLearning(); updateActionAvailability();
   }
 
@@ -741,7 +741,7 @@
       if (file.size > 2 * 1024 * 1024) throw new Error('Backup is too large (maximum 2 MiB).');
       let backup;
       try { backup = JSON.parse(await file.text()); } catch (_) { throw new Error('The selected file is not valid JSON.'); }
-      if (![1, 2].includes(backup.schema_version) || !Array.isArray(backup.remotes) || !backup.settings) throw new Error('This file is not a supported RF Button Manager backup.');
+      if (![1, 2].includes(backup.schema_version) || !Array.isArray(backup.remotes) || !backup.settings) throw new Error('This file is not a supported RF433 Button Manager backup.');
       if (!(await ask('Replace current configuration?', `Restore ${file.name}? All current remotes and settings will be replaced. Restored actions remain disabled until you review and enable them.`, 'Restore backup'))) return;
       await mutate('/restore', 'POST', backup);
       editorDirty = false; selectedButton = null; close('settings-dialog'); render();
