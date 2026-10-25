@@ -1,5 +1,19 @@
 # Project progress
 
+## 2026-10-25: physical learning still fails; retain actual RF evidence (0.3.1-dev)
+
+0.3.0 is confirmed deployed and receiving on ZORIN. The intended button has not
+learned. The newest attempt excluded 44 FSK packets and replayed two OOK captures
+without a supported candidate. No claim is made that the intended remote is FSK
+or unsupported. 0.3.1 adds a browser RF-capture export so those recordings can be
+replayed directly, instead of proposing another decoder change from counters.
+
+The linked Android implementation was inspected: it uses upstream rtl_433 25.12,
+default protocol registration and a JSON output bridge. ZORIN uses 23.11. That
+version difference and our limited discovery path require evidence-based comparison;
+upgrading or widening modulation alone has not been proven to fix this remote.
+
+
 ## 2026-10-25: rtl_433-first browser learning (0.3.0-dev)
 
 Restored the supplied development bundle at `6f43a1f5ba5d9f8b109a38235e0265eac3ab0fa1`.

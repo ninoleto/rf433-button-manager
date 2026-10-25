@@ -102,6 +102,9 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     let mock = {...baseState, demo:false, learning:session, learning_notice:null, actions_paused:true};
     const stateRoute = route => route.fulfill({json:mock});
     const learnRoute = async route => {
+      if (route.request().url().endsWith('/capture')) {
+        await route.fulfill({json:{format:'rf-button-manager-capture-v1',packets:[{modulation:'FSK',pulse_data:'synthetic fixture'}]}});return;
+      }
       if (route.request().url().endsWith('/start')) {
         assert.equal(route.request().postDataJSON().button_id, button.id);
         mock = {...mock, learning:{...session}, learning_notice:null, actions_paused:true};
@@ -124,7 +127,15 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
       await visible(page.locator('#learning-retry'));
       assert.equal(await page.locator('#learning-retry').isDisabled(), true, 'Retry waits for cleanup');
       await hidden(page.locator('#learning-confirm'));
-      mock = {...mock, actions_paused:false};
+      mock = {...mock, actions_paused:false, rf_capture_available:true};
+      await page.waitForFunction(() => !document.getElementById('learning-export').disabled);
+      const captureDownload = page.waitForEvent('download');
+      await page.locator('#learning-export').click();
+      const captureFile = await captureDownload;
+      const exportedCapture = JSON.parse(fs.readFileSync(await captureFile.path(), 'utf8'));
+      assert.equal(captureFile.suggestedFilename(), 'rf-button-manager-capture.json');
+      assert.equal(exportedCapture.packets[0].modulation, 'FSK');
+      assert.equal(exportedCapture.format, 'rf-button-manager-capture-v1');
       await page.waitForFunction(() => !document.getElementById('learning-retry').disabled);
       await page.locator('#learning-retry').click();
       await hidden(page.locator('#learning-retry'));

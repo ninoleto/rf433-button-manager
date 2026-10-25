@@ -128,6 +128,7 @@ func (a *App) ReceivePulse(generation uint64, packet receiver.PulsePacket) {
 	if a.closed {
 		return
 	}
+	a.recordCapturePacketLocked(generation, packet)
 	if l == nil || !l.Automatic || generation != l.CaptureGeneration {
 		// The supervisor finishes the old stream after restoration was requested.
 		// Preserve evidence on that session's notice, never accept a late candidate.

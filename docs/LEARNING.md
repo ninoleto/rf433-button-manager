@@ -223,3 +223,22 @@ For extensions, read [DEVELOPMENT.md](DEVELOPMENT.md).
 Upstream references: [rtl_433 operation](https://triq.org/rtl_433/OPERATION.html),
 [pulse analysis](https://triq.org/rtl_433/ANALYZE.html), and the
 [23.11 source](https://github.com/merbanan/rtl_433/tree/23.11).
+
+## Download a diagnostic RF capture (0.3.1)
+
+After a failed attempt, use **Download RF capture** before Retry. The JSON contains
+complete pulse recordings from both OOK and FSK packets, elapsed timestamps and
+actual decoded events. It deliberately retains FSK that automatic discovery
+currently excludes. It is not a configuration backup and contains no management
+token, webhook settings, receiver serial setting or database. Radio identifiers
+from received transmissions can be present. Download is authenticated and never
+uploads anything automatically.
+
+One attempt is retained only in RAM, bounded to 128 pulse packets, 128 JSON events,
+and 2 MiB combined payload. Incomplete/malformed packet payloads are not exported.
+A new learning attempt replaces the old recording; a service restart clears it.
+The `limit_reached` flag reports truncation. This export is pulse-domain data, not
+raw IQ: it cannot reconstruct RF information already lost during demodulation.
+To replay a packet offline, extract its `pulse_data` string unchanged into a `.ook`
+or `.fsk` file matching its modulation, then invoke rtl_433 with `-r FILE`, never
+with a live device selector. Retain the original capture for comparisons.

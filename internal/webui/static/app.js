@@ -313,6 +313,7 @@
     $('event-list').replaceChildren(fragment);
   }
   function renderLearning() {
+    $('learning-export').disabled = !state.rf_capture_available;
     const learning = state.learning || state.learning_notice;
     const active = !!state.learning;
     $('learning-banner').hidden = !state.actions_paused && !active;
@@ -545,6 +546,15 @@
     setError('learning-error', '');
     await mutate('/learn/start', 'POST', { button_id: selectedButton, identity_fields: fields($('button-fields').value) });
   }, 'editor-error');
+  bindAction('learning-export', async () => {
+    const capture = await api('/learn/capture');
+    const blob = new Blob([JSON.stringify(capture, null, 2) + '\n'], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const link = node('a'); link.href = url; link.download = 'rf-button-manager-capture.json';
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('RF capture downloaded. It contains radio identifiers, without application credentials.');
+  }, 'learning-error');
   bindAction('learning-arm', async () => { await mutate('/learn/arm'); }, 'learning-error');
   bindAction('learning-retry', async () => {
     const previous = state.learning_notice;

@@ -291,3 +291,12 @@ fields into `button`. The original event remains available for inspection.
 A live decoded candidate can cancel background file analysis; a late result cannot
 overwrite it. Diagnostics source is `rtl_433 decoded button`. Three separately
 armed matching presses and explicit confirmation are still required.
+
+## GET /api/learn/capture (0.3.1)
+
+Authenticated read-only download of the most recent in-memory RF attempt. Returns
+400 when no data is retained. `format` is `rf-button-manager-capture-v1`; fields
+include `version`, `started_at`, `frequency_hz`, `sample_rate`, `captured_bytes`,
+`limit_reached`, `packets` (offset_ms/modulation/pulses/cleanup/pulse_data), and
+`decoded_events`. `/api/state` includes only `rf_capture_available`, not the raw
+recordings. Config/settings/token/webhooks are never copied into this export.

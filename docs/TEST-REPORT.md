@@ -1,5 +1,22 @@
 # Verification report — 2026-10-25
 
+## 0.3.1-dev: RF evidence export (diagnostic update)
+
+The operator deployed 0.3.0 successfully but learning still timed out. Their
+reported attempt contained 46 complete packets: 44 FSK excluded from discovery,
+and two OOK recordings with zero supported analyzer candidates. This confirms
+the exclusion/analysis path, not which packets came from the intended button.
+Neither physical learning nor the intended webhook has passed.
+
+0.3.1 retains the most recent attempt's valid OOK **and FSK** pulse records and
+actual decoded RF events in bounded RAM. An authenticated browser download exposes
+only that capture, never the database, application token, settings or webhooks.
+Retry/restart replaces or clears it. Tests cover FSK retention, timeout retention,
+128-packet/2-MiB bounds, stale-generation rejection, authentication, isolated copies,
+and omission of private configuration. The browser test downloads a synthetic
+capture through the actual control. No signal-compatibility correction is claimed.
+
+
 ## 0.3.0-dev: direct rtl_433 learning and PWM/PPM discovery
 
 Validation environment: isolated Linux x86_64 build machine, Go 1.27.3,

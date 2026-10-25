@@ -1498,3 +1498,6 @@ dialog::backdrop{
     margin-top:5px
   }
 }
+
+/* Keep diagnostic reasons in the dialog scroll instead of a second hidden pane. */
+#learning-diagnostics { max-height: none; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }

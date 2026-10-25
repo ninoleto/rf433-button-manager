@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.3.0-dev"
+const Version = "0.3.1-dev"
 
 type App struct {
 	mu                                  sync.Mutex
@@ -22,6 +22,7 @@ type App struct {
 	learning                            *Learning
 	learningNotice                      *Learning
 	terminalCapture                     *Learning // Retains cleanup evidence even after the dialog is dismissed.
+	rfCapture                           *RFCapture
 	captureEnabled                      bool
 	captureSuppressed                   bool
 	analysisActive                      bool
@@ -118,7 +119,8 @@ func (a *App) State() any {
 		DecoderProfiles    []receiver.DecoderProfile `json:"decoder_profiles"`
 		ReceiverMode       string                    `json:"receiver_mode"`
 		ReceiverGeneration uint64                    `json:"receiver_generation"`
-	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles, a.receiverMode, a.receiverApplied})
+		RFCaptureAvailable bool                      `json:"rf_capture_available"`
+	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles, a.receiverMode, a.receiverApplied, a.rfCapture != nil && a.rfCapture.Bytes > 0})
 }
 func findButton(c *Config, id string) *Button {
 	for ri := range c.Remotes {
@@ -353,6 +355,7 @@ func (a *App) StartLearning(id string, fields []string) (*Learning, error) {
 		a.captureSuppressed = true
 		a.receiverChangedLocked()
 		l.CaptureGeneration = a.receiverGeneration
+		a.rfCapture = &RFCapture{Format: "rf-button-manager-capture-v1", Version: Version, StartedAt: now.UTC().Format(time.RFC3339Nano), FrequencyHz: 433920000, SampleRate: 250000, generation: l.CaptureGeneration, started: now}
 		l.CaptureReceiver = receiver.Status{State: "recovering", Message: "Capture receiver plan has not started"}
 		l.CaptureReceiverAt = now.UTC().Format(time.RFC3339Nano)
 	}
@@ -464,6 +467,7 @@ func (a *App) Receive(raw []byte) {
 		Model string `json:"model"`
 	}
 	_ = json.Unmarshal(raw, &envelope)
+	a.recordCaptureEventLocked(raw)
 	for _, profile := range a.config.DecoderProfiles {
 		if envelope.Model == profile.Model {
 			normalized, e := receiver.NormalizeProfile(raw, profile)

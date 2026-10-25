@@ -111,6 +111,13 @@ func (a *App) Handler(token string, static fs.FS, publicOrigins ...string) http.
 	handle("POST /api/learn/arm", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.ArmLearning() })
 	handle("POST /api/learn/confirm", func(w http.ResponseWriter, r *http.Request) (any, error) { return nil, a.ConfirmLearning() })
 	handle("POST /api/learn/cancel", func(w http.ResponseWriter, r *http.Request) (any, error) { return nil, a.CancelLearning() })
+	handle("GET /api/learn/capture", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		capture, err := a.ExportRFCapture()
+		if err == nil {
+			w.Header().Set("Content-Disposition", `attachment; filename="rf-button-manager-capture.json"`)
+		}
+		return capture, err
+	})
 	handle("PUT /api/settings", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		var s Settings
 		if e := readJSON(w, r, &s); e != nil {
