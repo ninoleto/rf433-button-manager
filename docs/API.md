@@ -5,15 +5,18 @@ All /api routes require `Authorization: Bearer <token>`; JSON bodies, errors
 minimal liveness; authenticated GET /api/state is status and configuration.
 
 Data: Remote {id,name,columns,buttons:[Button]}. Button {id,name,enabled,debounce_ms,
-signature,identity_fields:[string],webhook:{url,method,payload,headers,timeout_ms},last_received}.
+signature,decoder_profile_id,identity_fields:[string],webhook:{url,method,payload,headers,timeout_ms},last_received}.
 payload is a JSON string (or empty), headers a string/string object.
 Settings {receiver_serial,flex_decoder,protocols:[int],identity_fields:[string],allowed_origins:[string]}.
 Defaults identity_fields = ["id","channel","command","state","button","code","codes"].
 Receiver {state,message,serial,restarts}. Event {id,time,kind,message,button_id,data}.
-Learning {button_id,stage,candidate,raw,presses,required,expires_at}; stages waiting,
-captured,ready. Session null when inactive. Confirmation after 3 armed captures.
+Learning includes session_id, button_id, stage, message, automatic, candidate, raw,
+presses, required, expires_at, identity_fields, diagnostics and optional profile.
+Active stages: preparing, waiting, receiving, analyzing, captured, ready. Inactive
+session is null; learning_notice retains a terminal failure until Cancel or Retry.
+Confirmation requires three separately armed captures; see LEARNING.md.
 
-- GET /api/state -> {remotes,settings,receiver,learning,events,version}
+- GET /api/state -> {remotes,settings,receiver,learning,learning_notice,actions_paused,decoder_profiles,events,version}
 - POST /api/remotes {name,columns,button_count} -> Remote (default 6, two columns)
 - PUT /api/remotes/{id} {name,columns} -> Remote
 - POST /api/remotes/{id}/duplicate -> Remote (mappings cleared, actions disabled)
@@ -28,7 +31,7 @@ captured,ready. Session null when inactive. Confirmation after 3 armed captures.
 - POST /api/learn/confirm {} -> {ok:true}
 - POST /api/learn/cancel {} -> {ok:true}
 - PUT /api/settings -> Settings (receiver restart when changed)
-- GET /api/backup -> JSON {schema_version:1,remotes,settings}
+- GET /api/backup -> JSON {schema_version:2,remotes,settings,decoder_profiles}
 - POST /api/restore -> backup JSON (atomic; actions restored disabled)
 
 Poll GET /api/state at 1 second for initial UI (bounded events, no SSE dependency).
@@ -87,17 +90,21 @@ status and learning are runtime state, not durable configuration.
 | Webhook timeout | 100–30,000 ms; default 5,000 |
 | Payload | Empty or valid JSON encoded as a string, at most 65,536 bytes; GET requires empty |
 | Headers | At most 32; names <=128 bytes, values <=4,096; no reserved/duplicate case-insensitive names |
-| Logical backup | Schema 1; accepted configurations fit within restore's 2 MiB request limit |
+| Logical backup | Export schema 2; restore accepts 1 (migrated) or 2; accepted configurations fit within restore's 2 MiB request limit |
 
 `PUT /api/buttons/{id}` is a full editable-button replacement, not a patch. Use
 the current button object and edit only intended fields. Server-owned `id`,
-`signature` and `last_received` are retained regardless of supplied values.
+`signature`, `decoder_profile_id` and `last_received` are retained regardless of supplied values.
 Changing identity fields clears the signature and disables the button. A direct
 signature assignment is ignored; learning is the supported assignment path.
 Duplicate remote copies action configuration but clears mappings and disables
 all buttons. Clear-button removes both mapping and webhook, then disables it.
 
-The logical export contains only `schema_version`, `remotes`, `settings`. Restore
+The logical export contains `schema_version`, `remotes`, `settings` and
+`decoder_profiles`. Profiles have id, name, model, flex_decoder, bits,
+validated_presses (3), and created_at (RFC3339). They are bounded and validated;
+ordinary button/settings PUT cannot create them or change their association.
+Confirmation saves a new profile together with its mapping. Restore
 validates first, replaces configuration atomically and disables restored actions;
 the token and event archive are not restored. Duplicate/overlapping mappings,
 unknown schema versions and noncanonical signatures are rejected.
@@ -171,14 +178,12 @@ for button in remote['buttons']:
         call('PUT', '/api/buttons/' + button['id'], button)
 ```
 
-Update a receiver using values already verified locally. `verified_serial` and
-`verified_flex` below are variables supplied from that verification, not literal
-placeholders to save. Do not submit a guessed decoder:
+Optional receiver selection uses its verified unique serial; preserve the other
+settings. Normal learning does not require a manual flex decoder:
 
 ```python
 settings = call('GET', '/api/state')['settings']
 settings['receiver_serial'] = verified_serial
-settings['flex_decoder'] = verified_flex
 call('PUT', '/api/settings', settings)
 ```
 
@@ -187,7 +192,8 @@ Learning API sequence, with a real separate press after each start/arm:
 ```python
 target = next(b for b in remote['buttons'] if b['name'] == 'A ON')
 session = call('POST', '/api/learn/start', {'button_id': target['id']})
-# Press/release A ON, inspect GET /api/state: stage=captured, presses=1.
+# Wait for stage=waiting, then press/release A ON.
+# Poll GET /api/state through receiving/analyzing to captured, presses=1.
 # Wait >=1 second after release, then:
 session = call('POST', '/api/learn/arm', {})
 # Press/release A ON, inspect captured/2. Wait, then arm once more:
@@ -216,3 +222,19 @@ Use `GET /api/backup` to export a consistent configuration, save privately with
 mode 0600, and inspect before `POST /api/restore`. Do not print exports or attach
 them to issues. Export the current configuration before replacing it. Full-state
 backup/rollback procedures are in [OPERATIONS.md](OPERATIONS.md).
+
+## Learning status and diagnostics
+
+`actions_paused` stays true through capture cleanup and restoration, even when
+`learning` has become null. Do not infer action availability from the session alone.
+`learning_notice.stage` can be receiver_unavailable, timeout, unsupported,
+inconsistent, capture_limit or analysis_error; its message explains the next step.
+Retry uses POST /api/learn/start with the previous button_id after cleanup. Cancel
+also dismisses a retained notice. The GUI provides these operations directly.
+
+Diagnostics include packets, pulses, bytes, candidates, replays, source and detail.
+They never include credentials or raw IQ data. Profile timing and decoded identities
+may identify a remote; treat full state and diagnostics as private. There is no
+public pulse-injection endpoint or unauthenticated capture control. Profile limits
+are 16 profiles, fixed-code OOK_PWM, 16–64 bits, with exact measured timings and
+repeated frames. See LEARNING.md for resource bounds and validation semantics.

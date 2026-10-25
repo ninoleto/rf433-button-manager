@@ -265,7 +265,7 @@
     updateActionAvailability();
   }
   function updateActionAvailability() {
-    const learning = !!state.learning;
+    const learning = !!state.learning || !!state.actions_paused;
     const busy = mutationCount > 0;
     $('webhook-test').disabled = !!state.demo || learning || busy || editorDirty || !currentButton()?.webhook?.url;
     $('learn-start').disabled = learning || busy || editorDirty;
@@ -275,6 +275,7 @@
     $('learning-arm').disabled = busy;
     $('learning-confirm').disabled = busy;
     $('learning-cancel').disabled = busy;
+    $('learning-retry').disabled = busy || !!state.actions_paused;
   }
   async function mayDiscard() {
     if (!editorDirty) return true;
@@ -312,8 +313,11 @@
     $('event-list').replaceChildren(fragment);
   }
   function renderLearning() {
-    const learning = state.learning;
-    $('learning-banner').hidden = !learning;
+    const learning = state.learning || state.learning_notice;
+    const active = !!state.learning;
+    $('learning-banner').hidden = !state.actions_paused && !active;
+    $('learning-reopen').hidden = !learning;
+    $('learning-banner-text').textContent = active ? 'Learning mode · all webhook actions are paused.' : 'Restoring reception · all webhook actions remain paused.';
     if (!learning) {
       close('learning-dialog');
       learningKey = '';
@@ -325,7 +329,7 @@
     }
     const target = findButton(learning.button_id);
     $('learning-target').textContent = target ? `${target.remote.name} / ${target.button.name}` : `Button ${learning.button_id}`;
-    const key = JSON.stringify([learning.button_id, learning.stage, learning.presses, learning.required, learning.candidate, learning.raw]);
+    const key = JSON.stringify([learning, state.receiver, state.actions_paused]);
     if (key !== learningKey) {
       learningKey = key;
       const presses = Number(learning.presses) || 0;
@@ -338,19 +342,32 @@
       }
       $('learning-steps').replaceChildren(progress);
       $('learning-count').textContent = `${presses} of ${required} matching presses`;
-      $('learning-raw').textContent = learning.raw ? JSON.stringify(learning.raw, null, 2) : 'Waiting for a decoded signal…';
+      $('learning-raw').textContent = learning.raw ? JSON.stringify(learning.raw, null, 2) : 'No decoded candidate yet.';
       $('learning-candidate').textContent = learning.candidate || '—';
-      const ready = learning.stage === 'ready';
-      const captured = learning.stage === 'captured';
+      const ready = active && learning.stage === 'ready';
+      const captured = active && learning.stage === 'captured';
       $('learning-arm').hidden = !captured;
       $('learning-confirm').hidden = !ready;
-      $('learning-instruction').textContent = ready ? 'Signal verified across separate presses' : captured ? 'Release the physical button' : 'Press the physical button once';
-      $('learning-description').textContent = ready ? 'Review the decoded data, then confirm this is the intended button.' : captured ? 'Wait for the signal to stop, then select Ready for next press.' : presses ? 'Press the same button again. Other signals will not verify this candidate.' : 'Keep other remotes idle. Release the button fully after the first press.';
+      $('learning-retry').hidden = active;
+      $('learning-cancel').textContent = active ? 'Cancel learning' : 'Close';
+      const titles = {preparing:'Preparing receiver', waiting:'Press the physical button once', receiving:'Transmission detected', analyzing:'Checking the captured signal', captured:'Press verified — release the button', ready:'Ready to save', receiver_unavailable:'Receiver unavailable', timeout:'No completed capture', unsupported:'Transmission detected but unsupported', inconsistent:'Captures did not agree', capture_limit:'Capture limit reached', analysis_error:'Analysis could not finish'};
+      $('learning-instruction').textContent = titles[learning.stage] || 'Learning stopped';
+      $('learning-description').textContent = learning.message || (ready ? 'Review the decoded data, then confirm this is the intended button.' : captured ? 'Release the button, then select Ready for next press.' : 'Keep other remotes idle. Release the button fully after each press.');
+      $('learning-pause-text').textContent = active || state.actions_paused ? 'All webhook actions are paused' : 'Learning ended; previous mappings are unchanged';
+      const diagnostic = learning.diagnostics || {};
+      $('learning-diagnostics').textContent = [
+        `Receiver: ${state.receiver.state || 'unknown'} — ${state.receiver.message || ''}`,
+        `Mode: ${learning.automatic ? 'Captured pulse analysis and replay' : 'Decoded signal / demonstration'}`,
+        `Captured packets: ${diagnostic.packets || 0}; pulses: ${diagnostic.pulses || 0}; bytes: ${diagnostic.bytes || 0}`,
+        `Analyzer candidates: ${diagnostic.candidates || 0}; offline replays: ${diagnostic.replays || 0}`,
+        `Decoder: ${learning.profile?.name || diagnostic.source || 'No validated profile yet'}`,
+        diagnostic.detail || '',
+      ].filter(Boolean).join('\n');
       setError('learning-error', '');
     }
     const expiry = new Date(learning.expires_at).getTime();
     const seconds = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
-    $('learning-expiry').textContent = Number.isFinite(expiry) ? `${seconds}s remaining` : '';
+    $('learning-expiry').textContent = active && Number.isFinite(expiry) ? `Session limit: ${seconds}s` : '';
     learningWasActive = true;
     if (!$('login-dialog').open && !$('confirm-dialog').open) show('learning-dialog');
   }
@@ -361,7 +378,7 @@
     $('receiver-message').textContent = state.receiver.message || (token ? 'Waiting for receiver status' : 'Enter a token to connect');
     $('receiver-dot').className = `status-dot ${['connected', 'disconnected', 'recovering', 'error'].includes(status) ? status : ''}`;
     $('version-label').textContent = state.version ? `RF Button Manager · ${state.version}` : 'RF Button Manager';
-    renderNavigation(); renderRemote(); renderEditor(); renderEvents(); renderLearning();
+    renderNavigation(); renderRemote(); renderEditor(); renderEvents(); renderLearning(); updateActionAvailability();
   }
 
   $('login-form').addEventListener('submit', async (event) => {
@@ -510,10 +527,15 @@
     await mutate('/learn/start', 'POST', { button_id: selectedButton, identity_fields: fields($('button-fields').value) });
   }, 'editor-error');
   bindAction('learning-arm', async () => { await mutate('/learn/arm'); }, 'learning-error');
+  bindAction('learning-retry', async () => {
+    const previous = state.learning_notice;
+    if (!previous) return;
+    await mutate('/learn/start', 'POST', {button_id: previous.button_id, identity_fields: previous.identity_fields});
+  }, 'learning-error');
   bindAction('learning-confirm', async () => {
     await mutate('/learn/confirm'); fillEditor(); render(); toast('RF signal saved. Review the webhook, then enable this button.');
   }, 'learning-error');
-  async function cancelLearning() { await mutate('/learn/cancel'); toast('Learning cancelled.'); }
+  async function cancelLearning() { await mutate('/learn/cancel'); }
   bindAction('learning-cancel', cancelLearning, 'learning-error');
   $('learning-dialog').addEventListener('cancel', async (event) => {
     event.preventDefault();
@@ -566,7 +588,7 @@
       if (file.size > 2 * 1024 * 1024) throw new Error('Backup is too large (maximum 2 MiB).');
       let backup;
       try { backup = JSON.parse(await file.text()); } catch (_) { throw new Error('The selected file is not valid JSON.'); }
-      if (backup.schema_version !== 1 || !Array.isArray(backup.remotes) || !backup.settings) throw new Error('This file is not a supported RF Button Manager backup.');
+      if (![1, 2].includes(backup.schema_version) || !Array.isArray(backup.remotes) || !backup.settings) throw new Error('This file is not a supported RF Button Manager backup.');
       if (!(await ask('Replace current configuration?', `Restore ${file.name}? All current remotes and settings will be replaced. Restored actions remain disabled until you review and enable them.`, 'Restore backup'))) return;
       await mutate('/restore', 'POST', backup);
       editorDirty = false; selectedButton = null; close('settings-dialog'); render();

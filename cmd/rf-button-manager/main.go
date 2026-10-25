@@ -132,6 +132,9 @@ func run() error {
 		return e
 	}
 	defer manager.Close()
+	if !*demo {
+		manager.EnableCaptureLearning(*rtl, "")
+	}
 	static, e := fs.Sub(webui.FS, "static")
 	if e != nil {
 		return e
@@ -179,15 +182,22 @@ func runReceiver(ctx context.Context, a *app.App, binary string, demo bool) {
 			}
 		}
 	}
+	runReceiverLoop(ctx, a, binary, receiver.Run)
+}
+
+type receiverRunner func(context.Context, receiver.Config, func([]byte), func(receiver.Status), ...func(receiver.PulsePacket)) error
+
+func runReceiverLoop(ctx context.Context, a *app.App, binary string, run receiverRunner) {
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		settings := a.Settings()
+		plan, generation := a.ReceiverPlan(binary)
+		a.ReceiverPlanApplied(generation)
 		child, cancel := context.WithCancel(ctx)
 		done := make(chan error, 1)
 		go func() {
-			done <- receiver.Run(child, receiver.Config{Binary: binary, Serial: settings.ReceiverSerial, FlexDecoder: settings.FlexDecoder, Protocols: settings.Protocols}, a.Receive, a.SetReceiver)
+			done <- run(child, plan, a.Receive, func(s receiver.Status) { a.SetReceiverFor(generation, s) }, func(p receiver.PulsePacket) { a.ReceivePulse(generation, p) })
 		}()
 		select {
 		case <-ctx.Done():

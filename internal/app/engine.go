@@ -10,30 +10,37 @@ import (
 	"time"
 )
 
-const Version = "0.1.0-dev"
+const Version = "0.2.0-dev"
 
 type App struct {
-	mu              sync.Mutex
-	actionGate      sync.RWMutex
-	store           *Store
-	config          Config
-	receiver        receiver.Status
-	learning        *Learning
-	events          []Event
-	inFlight        map[string]bool
-	actionSlots     chan struct{}
-	lastSeen        map[string]time.Time
-	lastTest        map[string]time.Time
-	muteUntil       time.Time
-	epoch           uint64
-	storageErr      bool
-	demo            bool
-	closed          bool
-	now             func() time.Time
-	ctx             context.Context
-	cancel          context.CancelFunc
-	wg              sync.WaitGroup
-	settingsChanged chan struct{}
+	mu                                  sync.Mutex
+	actionGate                          sync.RWMutex
+	store                               *Store
+	config                              Config
+	receiver                            receiver.Status
+	learning                            *Learning
+	learningNotice                      *Learning
+	captureEnabled                      bool
+	captureSuppressed                   bool
+	analysisActive                      bool
+	analyzeCapture                      func(context.Context, receiver.AnalysisRequest) (receiver.AnalysisResult, error)
+	rtlBinary, captureTempDir           string
+	receiverGeneration, receiverApplied uint64
+	events                              []Event
+	inFlight                            map[string]bool
+	actionSlots                         chan struct{}
+	lastSeen                            map[string]time.Time
+	lastTest                            map[string]time.Time
+	muteUntil                           time.Time
+	epoch                               uint64
+	storageErr                          bool
+	demo                                bool
+	closed                              bool
+	now                                 func() time.Time
+	ctx                                 context.Context
+	cancel                              context.CancelFunc
+	wg                                  sync.WaitGroup
+	settingsChanged                     chan struct{}
 }
 
 func New(store *Store, c Config, demo bool) (*App, error) {
@@ -70,6 +77,9 @@ func (a *App) eventLocked(kind, message, button string, data json.RawMessage) bo
 func (a *App) SetReceiver(s receiver.Status) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.setReceiverLocked(s)
+}
+func (a *App) setReceiverLocked(s receiver.Status) {
 	if a.closed {
 		return
 	}
@@ -80,11 +90,7 @@ func (a *App) SetReceiver(s receiver.Status) {
 }
 func (a *App) expireLocked() {
 	if a.learning != nil && !a.now().Before(a.learning.expires) {
-		id := a.learning.ButtonID
-		a.learning = nil
-		a.epoch++
-		a.muteUntil = a.now().Add(time.Second)
-		a.eventLocked("learning", "Learning expired; no mapping changed", id, nil)
+		a.finishLearningLocked("timeout", "Learning timed out. No mapping changed. Retry when you are ready to press the button.")
 	}
 }
 func (a *App) State() any {
@@ -92,15 +98,18 @@ func (a *App) State() any {
 	defer a.mu.Unlock()
 	a.expireLocked()
 	return clone(struct {
-		Remotes      []Remote        `json:"remotes"`
-		Settings     Settings        `json:"settings"`
-		Receiver     receiver.Status `json:"receiver"`
-		Learning     *Learning       `json:"learning"`
-		Events       []Event         `json:"events"`
-		Version      string          `json:"version"`
-		Demo         bool            `json:"demo"`
-		StorageError bool            `json:"storage_error"`
-	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr})
+		Remotes         []Remote                  `json:"remotes"`
+		Settings        Settings                  `json:"settings"`
+		Receiver        receiver.Status           `json:"receiver"`
+		Learning        *Learning                 `json:"learning"`
+		Events          []Event                   `json:"events"`
+		Version         string                    `json:"version"`
+		Demo            bool                      `json:"demo"`
+		StorageError    bool                      `json:"storage_error"`
+		LearningNotice  *Learning                 `json:"learning_notice"`
+		ActionsPaused   bool                      `json:"actions_paused"`
+		DecoderProfiles []receiver.DecoderProfile `json:"decoder_profiles"`
+	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles})
 }
 func findButton(c *Config, id string) *Button {
 	for ri := range c.Remotes {
@@ -117,7 +126,7 @@ func (a *App) mutate(fn func(*Config) error) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.expireLocked()
-	if a.learning != nil {
+	if a.learning != nil || a.captureSuppressed {
 		return errors.New("finish or cancel learning before editing configuration")
 	}
 	next := clone(a.config)
@@ -189,6 +198,7 @@ func (a *App) DuplicateRemote(id string) (Remote, error) {
 				for i := range out.Buttons {
 					out.Buttons[i].ID = newID()
 					out.Buttons[i].Signature = ""
+					out.Buttons[i].DecoderProfileID = ""
 					out.Buttons[i].Enabled = false
 					out.Buttons[i].LastReceived = ""
 				}
@@ -234,11 +244,13 @@ func (a *App) EditButton(id string, next Button) (Button, error) {
 		}
 		next.ID = id
 		next.Signature = b.Signature
+		next.DecoderProfileID = b.DecoderProfileID
 		next.LastReceived = b.LastReceived
 		oldFields, _ := json.Marshal(b.IdentityFields)
 		newFields, _ := json.Marshal(next.IdentityFields)
 		if string(oldFields) != string(newFields) {
 			next.Signature = ""
+			next.DecoderProfileID = ""
 			next.Enabled = false
 		}
 		*b = next
@@ -276,15 +288,15 @@ func (a *App) DeleteButton(id string) error {
 func (a *App) UpdateSettings(s Settings) error {
 	e := a.mutate(func(c *Config) error { c.Settings = s; return nil })
 	if e == nil {
-		select {
-		case a.settingsChanged <- struct{}{}:
-		default:
-		}
+		a.mu.Lock()
+		a.receiverChangedLocked()
+		a.mu.Unlock()
 	}
 	return e
 }
 func (a *App) Backup() Config { a.mu.Lock(); defer a.mu.Unlock(); return clone(a.config) }
 func (a *App) Restore(c Config) error {
+	migrateConfig(&c)
 	if e := validateConfig(c); e != nil {
 		return e
 	}
@@ -296,10 +308,9 @@ func (a *App) Restore(c Config) error {
 	}
 	e := a.mutate(func(next *Config) error { *next = c; return nil })
 	if e == nil {
-		select {
-		case a.settingsChanged <- struct{}{}:
-		default:
-		}
+		a.mu.Lock()
+		a.receiverChangedLocked()
+		a.mu.Unlock()
 	}
 	return e
 }
@@ -310,7 +321,7 @@ func (a *App) StartLearning(id string, fields []string) (*Learning, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.expireLocked()
-	if a.learning != nil {
+	if a.learning != nil || a.captureSuppressed {
 		return nil, errors.New("another button is already learning")
 	}
 	b := findButton(&a.config, id)
@@ -325,7 +336,19 @@ func (a *App) StartLearning(id string, fields []string) (*Learning, error) {
 	}
 	now := a.now()
 	a.epoch++
-	a.learning = &Learning{ButtonID: id, Stage: "waiting", Required: 3, Fields: append([]string{}, fields...), expires: now.Add(90 * time.Second), armedAt: now, ExpiresAt: now.Add(90 * time.Second).UTC().Format(time.RFC3339)}
+	a.learningNotice = nil
+	a.learning = &Learning{SessionID: newID(), ButtonID: id, Stage: "waiting", Message: "Press the physical button once, then release it.", Required: 3, Fields: append([]string{}, fields...), expires: now.Add(90 * time.Second), armedAt: now, ExpiresAt: now.Add(90 * time.Second).UTC().Format(time.RFC3339)}
+	if a.captureEnabled && !a.demo {
+		l := a.learning
+		l.Automatic = true
+		l.Stage = "preparing"
+		l.Message = "Preparing the receiver for learning. All actions are paused."
+		l.expires = now.Add(180 * time.Second)
+		l.ExpiresAt = l.expires.UTC().Format(time.RFC3339)
+		l.ctx, l.cancel = context.WithCancel(a.ctx)
+		a.captureSuppressed = true
+		a.receiverChangedLocked()
+	}
 	a.eventLocked("learning", "Learning started; all webhook actions paused", id, nil)
 	return clone(a.learning), nil
 }
@@ -337,19 +360,22 @@ func (a *App) ArmLearning() (*Learning, error) {
 	if l == nil || l.Stage != "captured" {
 		return nil, errors.New("capture a candidate before arming the next press")
 	}
+	if l.Automatic && !l.lastRF.IsZero() && a.now().Sub(l.lastRF) < time.Second {
+		return nil, errors.New("release the button and wait for one second of RF silence before the next press")
+	}
 	l.Stage = "waiting"
+	l.Message = "Press the same physical button once, then release it."
 	l.armedAt = a.now()
+	l.firstPulse = time.Time{}
+	l.packets = nil
+	l.bytes = 0
 	return clone(l), nil
 }
 func (a *App) CancelLearning() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.learning != nil {
-		a.eventLocked("learning", "Learning cancelled; previous mapping kept", a.learning.ButtonID, nil)
-	}
-	a.learning = nil
-	a.epoch++
-	a.muteUntil = a.now().Add(time.Second)
+	a.finishLearningLocked("cancelled", "Learning cancelled; previous mapping kept")
+	a.learningNotice = nil
 	return nil
 }
 func signaturesOverlap(one, two string) bool {
@@ -381,6 +407,22 @@ func (a *App) ConfirmLearning() error {
 		}
 	}
 	b.Signature = l.Candidate
+	b.DecoderProfileID = ""
+	if l.Profile != nil {
+		profile := *l.Profile
+		profile.ValidatedPresses = 3
+		profile.CreatedAt = a.now().UTC().Format(time.RFC3339)
+		found := false
+		for _, existing := range next.DecoderProfiles {
+			if existing.ID == profile.ID {
+				found = true
+			}
+		}
+		if !found {
+			next.DecoderProfiles = append(next.DecoderProfiles, profile)
+		}
+		b.DecoderProfileID = profile.ID
+	}
 	b.IdentityFields = append([]string{}, l.Fields...)
 	b.Enabled = false
 	if e := validateConfig(next); e != nil {
@@ -391,10 +433,8 @@ func (a *App) ConfirmLearning() error {
 		return errors.New("mapping could not be saved")
 	}
 	a.config = next
-	a.learning = nil
-	a.epoch++
-	a.muteUntil = a.now().Add(time.Second)
-	a.eventLocked("learning", "Signal saved; review webhook and enable button", b.ID, nil)
+	a.finishLearningLocked("saved", "Signal and validated decoder saved; action remains disabled")
+	a.learningNotice = nil
 	return nil
 }
 
@@ -405,9 +445,26 @@ func (a *App) Receive(raw []byte) {
 		return
 	}
 	a.expireLocked()
+	var envelope struct {
+		Model string `json:"model"`
+	}
+	_ = json.Unmarshal(raw, &envelope)
+	for _, profile := range a.config.DecoderProfiles {
+		if envelope.Model == profile.Model {
+			normalized, e := receiver.NormalizeProfile(raw, profile)
+			if e != nil {
+				return
+			}
+			raw = normalized
+			break
+		}
+	}
 	now := a.now()
 	a.eventLocked("rf", "Decoded RF transmission", "", append(json.RawMessage{}, raw...))
 	if l := a.learning; l != nil {
+		if l.Automatic {
+			return
+		} // Only captured pulse replay verifies automatic learning.
 		sig, e := Signature(raw, l.Fields)
 		if e != nil {
 			a.eventLocked("learning", e.Error(), l.ButtonID, nil)
@@ -426,9 +483,14 @@ func (a *App) Receive(raw []byte) {
 		l.Raw = append(json.RawMessage{}, raw...)
 		l.Presses++
 		l.Stage = "captured"
+		l.Message = "Press verified. Release the button, then select Ready for next press."
 		if l.Presses >= l.Required {
 			l.Stage = "ready"
+			l.Message = "Three separate presses matched. Confirm this is the intended button and save. Its action will remain disabled."
 		}
+		return
+	}
+	if a.captureSuppressed {
 		return
 	}
 	for ri := range a.config.Remotes {
@@ -468,7 +530,7 @@ func (a *App) TestButton(id string) error {
 	if a.closed {
 		return errors.New("service stopping")
 	}
-	if a.learning != nil {
+	if a.learning != nil || a.captureSuppressed {
 		return errors.New("webhook tests are paused during learning")
 	}
 	if a.demo {

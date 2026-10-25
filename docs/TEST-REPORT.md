@@ -1,5 +1,44 @@
 # Verification report — 2026-10-25
 
+## Browser learning update: 0.2.0-dev
+
+The new code was prepared from the existing imported history at `08b7fc4`.
+The installed baseline was operator-verified at 0.1.0-dev: application/authentication/
+configuration persistence passed; receiver samples were acquired after one initial
+receiver reconnect. Physical A ON decoding remained unsuccessful. This update has
+not yet been deployed or tested with that physical remote.
+
+Verified software checks for the update:
+
+- 49 top-level Go tests with `-race -count=1`, excluding exactly eight existing
+  tests that require a local HTTP listening socket. New cases include cancellation
+  during analysis, late results, timeouts without browser polling, receiver loss,
+  prolonged transmissions, inconsistent captures, duplicate mappings, existing
+  configuration preservation, schema migration and profile persistence/reuse.
+- Real installed rtl_433 23.11 replay of an explicitly synthetic OOK/PWM fixture;
+  measured candidate discovery, exact-profile replay and simultaneous JSON/pulse
+  output parsing. All invocations use file input, never USB.
+- Rejection of unproven analyzer suggestions, unsafe candidates, mixed codes,
+  malformed/oversized captures, excessive output and unbounded analysis lifetime.
+- A supervisor test deliberately holds old-child cleanup open and verifies that
+  the replacement live receiver cannot start until cleanup finishes.
+- Two frontend-controller scenarios using the actual app.js with an in-memory
+  DOM/API adapter: capture progress, diagnostic details, failure retention, cleanup
+  gating, retry and confirmation. These do not establish browser rendering.
+- `go vet`, module checksum verification, existing deployment/history tests,
+  JavaScript/shell syntax and local documentation-link checks.
+
+The full Go suite was attempted and blocked by `socket: operation not permitted`
+in an existing `httptest.NewServer` test. The eight excluded tests cover HTTP
+webhook behavior and existing suppression/concurrency checks; they must run in the
+normal host before deployment. Playwright/browser rendering and all physical
+learning/webhook/USB recovery tests remain pending. No new physical PASS is claimed.
+
+The one-time host update helper runs full `make check` before deployment and takes
+a stopped state snapshot because schema 2 requires matching old data for a 0.1
+rollback. The current session cannot write the home checkout, use sudo, or start
+local test servers; these are environment limitations, not completed checks.
+
 ## Continuation evidence (separate from original package report below)
 
 The original package's report below describes its earlier isolated run. It is not

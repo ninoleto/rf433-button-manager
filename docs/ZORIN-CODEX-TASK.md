@@ -1,3 +1,7 @@
+> Historical installation handoff. Browser learning in 0.2 supersedes the manual
+> decoder prerequisite here; use [LEARNING.md](LEARNING.md). Existing application
+> authorization still applies. Physical receiver handover/replug needs participation.
+
 # Ready-to-paste local Codex continuation task
 
 **Continuation note, 2026-10-25:** The operator has explicitly authorized this

@@ -11,6 +11,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"context"
+	"github.com/ninoleto/rf-button-manager/internal/receiver"
 )
 
 type Webhook struct {
@@ -21,14 +24,15 @@ type Webhook struct {
 	TimeoutMS int               `json:"timeout_ms"`
 }
 type Button struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Enabled        bool     `json:"enabled"`
-	DebounceMS     int      `json:"debounce_ms"`
-	Signature      string   `json:"signature"`
-	IdentityFields []string `json:"identity_fields"`
-	Webhook        Webhook  `json:"webhook"`
-	LastReceived   string   `json:"last_received"`
+	DecoderProfileID string   `json:"decoder_profile_id,omitempty"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	Enabled          bool     `json:"enabled"`
+	DebounceMS       int      `json:"debounce_ms"`
+	Signature        string   `json:"signature"`
+	IdentityFields   []string `json:"identity_fields"`
+	Webhook          Webhook  `json:"webhook"`
+	LastReceived     string   `json:"last_received"`
 }
 type Remote struct {
 	ID      string   `json:"id"`
@@ -44,9 +48,10 @@ type Settings struct {
 	AllowedOrigins []string `json:"allowed_origins"`
 }
 type Config struct {
-	SchemaVersion int      `json:"schema_version"`
-	Remotes       []Remote `json:"remotes"`
-	Settings      Settings `json:"settings"`
+	DecoderProfiles []receiver.DecoderProfile `json:"decoder_profiles"`
+	SchemaVersion   int                       `json:"schema_version"`
+	Remotes         []Remote                  `json:"remotes"`
+	Settings        Settings                  `json:"settings"`
 }
 type Event struct {
 	ID       int64           `json:"id"`
@@ -57,23 +62,42 @@ type Event struct {
 	Data     json.RawMessage `json:"data,omitempty"`
 }
 type Learning struct {
-	ButtonID  string          `json:"button_id"`
-	Stage     string          `json:"stage"`
-	Candidate string          `json:"candidate"`
-	Raw       json.RawMessage `json:"raw"`
-	Presses   int             `json:"presses"`
-	Required  int             `json:"required"`
-	ExpiresAt string          `json:"expires_at"`
-	Fields    []string        `json:"identity_fields"`
-	expires   time.Time
-	armedAt   time.Time
-	lastRF    time.Time
+	SessionID   string                       `json:"session_id"`
+	Automatic   bool                         `json:"automatic"`
+	Message     string                       `json:"message"`
+	Diagnostics receiver.LearningDiagnostics `json:"diagnostics"`
+	Profile     *receiver.DecoderProfile     `json:"profile,omitempty"`
+	ButtonID    string                       `json:"button_id"`
+	Stage       string                       `json:"stage"`
+	Candidate   string                       `json:"candidate"`
+	Raw         json.RawMessage              `json:"raw"`
+	Presses     int                          `json:"presses"`
+	Required    int                          `json:"required"`
+	ExpiresAt   string                       `json:"expires_at"`
+	Fields      []string                     `json:"identity_fields"`
+	expires     time.Time
+	armedAt     time.Time
+	lastRF      time.Time
+	firstPulse  time.Time
+	packets     []receiver.PulsePacket
+	bytes       int
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 var defaultFields = []string{"id", "channel", "command", "state", "button", "code", "codes"}
 
 func DefaultConfig() Config {
-	return Config{SchemaVersion: 1, Remotes: []Remote{}, Settings: Settings{Protocols: []int{}, IdentityFields: append([]string{}, defaultFields...), AllowedOrigins: []string{"http://127.0.0.1:8123"}}}
+	return Config{SchemaVersion: 2, DecoderProfiles: []receiver.DecoderProfile{}, Remotes: []Remote{}, Settings: Settings{Protocols: []int{}, IdentityFields: append([]string{}, defaultFields...), AllowedOrigins: []string{"http://127.0.0.1:8123"}}}
+}
+
+func migrateConfig(c *Config) {
+	if c.SchemaVersion == 1 {
+		c.SchemaVersion = 2
+	}
+	if c.DecoderProfiles == nil {
+		c.DecoderProfiles = []receiver.DecoderProfile{}
+	}
 }
 func newID() string {
 	b := make([]byte, 16)
@@ -222,7 +246,7 @@ func validateConfig(c Config) error {
 	if err != nil || len(encoded) >= 2<<20 {
 		return errors.New("configuration exceeds the 2 MiB backup/restore limit")
 	}
-	if c.SchemaVersion != 1 {
+	if c.SchemaVersion != 2 {
 		return errors.New("unsupported backup schema")
 	}
 	if e := validateSettings(c.Settings); e != nil {
@@ -230,6 +254,19 @@ func validateConfig(c Config) error {
 	}
 	if len(c.Remotes) > 100 {
 		return errors.New("maximum 100 remotes")
+	}
+	if len(c.DecoderProfiles) > 16 {
+		return errors.New("maximum 16 learned decoder profiles")
+	}
+	profiles := map[string]receiver.DecoderProfile{}
+	for _, p := range c.DecoderProfiles {
+		if err := p.Validate(true); err != nil {
+			return err
+		}
+		if _, exists := profiles[p.ID]; exists {
+			return errors.New("duplicate decoder profile")
+		}
+		profiles[p.ID] = p
 	}
 	ids := map[string]bool{}
 	// Parse each signature once. Comparing raw canonical values preserves large
@@ -253,6 +290,15 @@ func validateConfig(c Config) error {
 			ids[b.ID] = true
 			if e := validateButton(b, c.Settings); e != nil {
 				return e
+			}
+			if b.DecoderProfileID != "" {
+				p, ok := profiles[b.DecoderProfileID]
+				var signal struct {
+					Model string `json:"model"`
+				}
+				if !ok || json.Unmarshal([]byte(b.Signature), &signal) != nil || signal.Model != p.Model {
+					return errors.New("mapping references an absent or different decoder profile")
+				}
 			}
 			if b.Signature != "" {
 				canonical, err := Signature([]byte(b.Signature), b.IdentityFields)

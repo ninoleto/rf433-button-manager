@@ -7,7 +7,7 @@ Status: development implementation. Physical acceptance is tracked separately in
 
 Go 1.27, standard net/http server, modernc.org/sqlite (pinned pure-Go SQLite),
 embedded HTML/CSS/JavaScript with no CDN or frontend build tool. One Linux executable
-manages one rtl_433 child, listens on loopback by default, and persists configuration
+manages one live rtl_433 child plus at most one file-replay child, listens on loopback by default, and persists configuration
 and bounded event history in SQLite. Native systemd unit, no Docker or MQTT dependency.
 MIT license for our code; rtl_433 is installed separately and retains its own license.
 
@@ -15,7 +15,7 @@ MIT license for our code; rtl_433 is installed separately and retains its own li
 
 - cmd/rf-button-manager: flags, startup, shutdown and single-instance lock.
 - internal/app: SQLite, configuration validation, learning, debounce, webhook dispatch and API.
-- internal/receiver: Linux USB discovery and supervised rtl_433 subprocess.
+- internal/receiver: Linux USB discovery, supervised live rtl_433, bounded pulse capture and offline analysis/replay.
 - internal/webui: embedded remote editor and live monitor.
 - deploy, scripts: systemd, install/uninstall, read-only ZORIN inspection.
 - docs: architecture, API, operations, hardware acceptance and persistent progress.
@@ -127,12 +127,14 @@ The child command is built as separate arguments, not passed through a shell:
 ```text
 rtl_433 -c /dev/null -d :SERIAL -D quit -f 433.92M \
   -F json -F log:/dev/stderr -M stats:1:10 \
-  [-R 0] [-R PROTOCOL_ID ...] [-X EXACT_FLEX_SPECIFICATION]
+  [-R 0] [-R PROTOCOL_ID ...] [-X EXISTING_FLEX_SPECIFICATION] \
+  [-X VALIDATED_PROFILE ...] [-w OOK:- during learning]
 ```
 
 `-R 0` is added when explicit protocols or a flex decoder are configured. With
 both empty, rtl_433 uses its built-in defaults; this does not establish Switch433
-support. The manager never inherits another program's config file.
+support. Learned profiles append `-X` without disabling built-ins when legacy
+settings are empty. The manager never inherits another program's config file.
 
 Discovery runs every second. USB paths, bus numbers and device numbers are only
 in-memory incarnation observations, never persisted selectors. Removal, changed
@@ -140,9 +142,9 @@ incarnation or ambiguity stops the child before reacquisition. Recovery starts
 with a one-second delay, doubles up to 30 seconds and resets after one stable
 minute. A missing sample heartbeat for 45 seconds causes a restart. Ordinary RF
 silence does not. `recovering` means a child is starting; `connected` requires
-recognized statistics or RF JSON, not simply successful process creation.
+recognized statistics, RF JSON or captured pulses, not simply successful process creation.
 
-Stdout carries JSON; stderr is drained independently and a bounded sanitized last
+Stdout carries JSON and, during learning, `-w OOK:-` pulse records; stderr is drained independently and a bounded sanitized last
 diagnostic is available on child failure. It never enters learning. Scanner lines
 are limited to 256 KiB; RF application input to 64 KiB. Shutdown sends SIGTERM to
 the dedicated process group, waits two seconds, then escalates to SIGKILL if
@@ -157,12 +159,24 @@ already-running requests, then excludes new dispatches. An epoch invalidates
 stale scheduled work across configuration edits and learning transitions. A
 request that has already reached a destination cannot be undone.
 
-Learning lasts 90 seconds, needs three explicit captures separated by at least
-750 ms of candidate silence, and saves only after confirmation and overlap checks.
-Cancel/expiry preserve the previous mapping. Startup suppresses RF actions for
-two seconds; exiting learning adds one second. Per-button sliding debounce is
-700 ms by default. Pending requests, debounce timestamps and learning are not
-durable queues; nothing is replayed after a restart.
+Automatic learning has a 180-second session limit, 30 seconds to acquire the
+receiver, 20 seconds to detect a transmission per armed press, and a 6-second
+continuous RF activity limit. It captures until one second of RF silence, replays
+measured candidates, and requires three separately armed matching presses plus
+confirmation. The demo retains its 90-second decoded-event path. Cancel/failure/
+timeout preserve previous mappings. A timer drives cleanup even with no browser.
+
+The receiver plan carries a generation. The supervisor cancels and waits for the
+old live process before applying a replacement. An acknowledgement from an older
+plan cannot resume actions. `captureSuppressed` remains set until both the normal
+receiver plan is acknowledged and the offline analysis worker has finished cleanup.
+Cancelled/expired sessions discard late results. The offline child is restricted
+to `-r` file input and never selects USB. See [LEARNING.md](LEARNING.md) for the
+full pipeline, profile contract and bounds.
+
+Startup suppresses RF actions briefly and leaving learning adds one second.
+Per-button sliding debounce is 700 ms by default. Pending requests, debounce
+timestamps and learning are not durable queues; nothing replays after restart.
 
 Each button gets one pending action slot and there are eight globally. Busy
 presses are rejected and logged. Dispatch rechecks configuration epoch, learning,
@@ -173,12 +187,12 @@ See [CONFIGURATION.md](CONFIGURATION.md) for identity and operator details.
 
 SQLite uses one connection, WAL, `synchronous=FULL` and a 5,000 ms busy timeout.
 The `configuration` table contains one JSON value (`id=1`), while `events` stores
-JSON with monotonic IDs. Logical configuration has `schema_version=1`. There are
+JSON with monotonic IDs. Logical configuration has `schema_version=2`; schema 1 migrates on validated open/restore. There are
 at most 500 stored events and 150 recent events in API state. Raw event data over
 8 KiB is omitted from history. This is operational history, not an unlimited audit
 archive of every RF transmission.
 
-Configuration, mappings, token and bounded history persist. Receiver status,
+Configuration, mappings, validated decoder profiles, token and bounded history persist. Receiver status,
 learning, action slots and debounce timestamps do not. Logical restore validates
 the whole configuration, disables all restored actions and clears their
 `last_received` values; it does not restore the token or event archive. Corrupt

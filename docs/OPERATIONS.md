@@ -10,12 +10,12 @@ USB IDs/serials, process names and config filenames. It does not open the receiv
 read webhook configurations, install packages or stop anything. Review the output
 before sharing it because serial numbers identify hardware.
 
-Inspect the **actual** existing `Switch433` flex definition and representative JSON
-on ZORIN before migrating it. Do not publish webhook IDs, authorization headers or
-other secrets in a GitHub issue. The old analyzer trace contains guesses and is not
-a substitute for the final working decoder. If a test script currently owns the
-receiver, agree on its handover before stopping it. The installer deliberately
-refuses competing `rtl_433`, `rtl_tcp` and `rtl_test` processes outside its own unit.
+Preserve existing verified decoder configuration during upgrades. Normal learning
+uses the browser to capture, analyze and validate supported signals; it never asks
+the operator to recover terminal history or copy decoder strings. Analyzer guesses
+alone are not proof. Keep real captures and configuration private. If another job
+currently owns the receiver, agree on its exact handover before stopping it. The
+installer refuses competing rtl_433, rtl_tcp and rtl_test processes outside its unit.
 Inspect other SDR/RF software and actual USB file-descriptor ownership too; a
 process-name check alone cannot identify every possible receiver owner. A sandbox
 that hides host processes cannot establish that the receiver is free.
@@ -48,7 +48,8 @@ the managed unit itself is replaced on upgrade.
 `rtl_433` is not bundled or upgraded. The initial target is the existing 23.11
 installation. `/etc/rf-button-manager/manager.env` can override its absolute path.
 The service's `-c /dev/null` decoder invocation intentionally does not inherit
-unrelated `rtl_433` configurations. Enter the required decoder through the GUI.
+unrelated `rtl_433` configurations. Use **Learn** for supported signals; existing
+advanced decoder settings are preserved. See [LEARNING.md](LEARNING.md).
 
 ## Start, stop and access
 
@@ -220,7 +221,7 @@ manual decision; no purge flag is provided.
 | Permission denied | Replug after rule installation; verify `rfbutton` group ownership on the newly created device node. |
 | Device busy | Inspect named processes and their owning units. Stop only the explicitly approved previous receiver service. |
 | Ambiguous receiver | Remove the unintended compatible receiver or configure a genuinely unique serial. |
-| Connected, no decoded events | A quiet channel is normal; verify frequency, antenna, remote battery and exact decoder. |
+| Connected, no decoded events | A quiet channel is normal. Choose Learn and follow its capture instructions; inspect Diagnostics if a press is unsupported. |
 | Candidate changes between presses | Do not confirm. Inspect actual frames, bit length, variable fields and protocol support. |
 | One held press runs repeatedly | Increase the release/debounce interval and collect timing evidence; repeat the held-button acceptance test. |
 | HTTP 4xx/5xx | Verify endpoint, method, Home Assistant automation and headers; response means transport reached the endpoint, not successful action. |
@@ -231,22 +232,38 @@ manual decision; no purge flag is provided.
 | Service restart limit reached | Inspect the journal, fix the startup cause, then `systemctl reset-failed rf-button-manager.service` and start it. |
 | Database write failure | Check free space, permissions and storage health. Preserve the database and logs; do not delete the database as a first repair. |
 
-## Unsupported-protocol diagnostic workflow
+## Learning diagnostics
 
-Do not run a second capture process while the manager owns the receiver. Arrange a
-short approved capture window, stop this service, and use a private scratch
-directory. Upstream `rtl_433 -A` provides pulse timing analysis and `-S unknown`
-records undecoded samples. Bound capture duration and disk usage; captures may
-include nearby devices. Restore normal service after the capture.
+Use **Learn** and expand **Diagnostics and receiver status**. The application
+reports whether it acquired pulses, how many candidates/replays were checked, and
+whether it reused a profile. **Retry learning** starts a fresh three-press attempt
+after receiver restoration; it never silently saves a partial candidate. No user
+receiver command or service shutdown is needed for normal learning.
 
-Compare repeated presses of each button, identify stable frame bits and derive a
-specific flex decoder using the upstream documentation. Validate it against saved
-samples, including other buttons and background traffic. Only after a decoder
-reliably separates buttons should its exact flex specification be entered into
-Settings. Some protocols require a proper upstream decoder; rolling or encrypted
-codes may not be suitable for static mapping. This is a diagnostic/development
-workflow, not an automatic learn-any-radio promise.
+No detected transmission: check the remote battery, range and antenna, then retry.
+Detected but unsupported: the capture did not meet supported fixed-code OOK/PWM
+requirements, or replay could not validate it. Inconsistent: different identities
+were received; keep other remotes idle and retry the same button. A rolling or
+encrypted remote remains unsupported, even if several presses look superficially
+similar. Captures are temporary/private, bounded and deleted after analysis.
+
+An unsupported modulation may need a deliberate developer extension and new
+fixtures/tests; see [DEVELOPMENT.md](DEVELOPMENT.md) and [LEARNING.md](LEARNING.md).
+Do not run a second live receiver process or convert an analyzer suggestion into
+an asserted working decoder. Physical USB recovery tests remain separate and
+require operator participation; no hub reset or reboot is part of learning.
 
 References: [rtl_433 operation and analysis](https://triq.org/rtl_433/OPERATION.html),
 [systemd service semantics](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html),
 [Home Assistant webhooks](https://www.home-assistant.io/docs/automation/trigger/#webhook-trigger).
+
+## 0.2 development upgrade and rollback
+
+The browser capture workflow changes logical configuration from schema 1 to 2.
+Startup validates and migrates the existing configuration without dropping remotes,
+mappings, legacy decoder settings, profiles or token. Schema-1 logical backups are
+accepted and migrated on restore; restores still disable all actions. An older
+0.1 binary rejects schema 2. Before upgrading, take a stopped application-state
+snapshot on internal storage. A rollback to 0.1 requires that matching snapshot
+as well as the old executable; retain the newer state separately. Do not edit
+SQLite or delete profiles to force an old executable to start.

@@ -82,7 +82,7 @@ func (a *App) dispatch(id string, epoch uint64, test bool) {
 	a.mu.Lock()
 	a.expireLocked()
 	b := findButton(&a.config, id)
-	if a.closed || a.learning != nil || epoch != a.epoch || b == nil || a.storageErr || (!test && !b.Enabled) {
+	if a.closed || a.learning != nil || a.captureSuppressed || epoch != a.epoch || b == nil || a.storageErr || (!test && !b.Enabled) {
 		a.mu.Unlock()
 		return
 	}

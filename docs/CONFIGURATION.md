@@ -55,18 +55,12 @@ currently connected compatible devices. Automatic selection requires exactly one
 receiver. Never persist bus/device numbers or hub ports. Duplicate serials require
 deliberate resolution; this application does not rewrite EEPROM serials.
 
-Locate the actual working Switch433 flex value in existing configurations or
-known working scripts. Search filenames first and inspect only the relevant
-argument locally: these files may contain webhook credentials. Preserve the full
-timing, modulation, bit-length and match settings. Record its provenance and
-representative repeated real frames privately. Finding a plausible string is not
-proof it worked; analyzer suggestions are diagnostic input, not a verified decoder.
-No example timing in this project is a working Switch433 configuration.
-
-If the final decoder cannot be found, installation and GUI setup can finish with
-actions disabled and decoder setup explicitly pending. Do not run a second
-capture process while another application owns the receiver. The diagnostic
-workflow in [OPERATIONS.md](OPERATIONS.md) requires an agreed capture window.
+Preserve any existing verified custom decoder and explicit protocol selection.
+New fixed-code OOK/PWM profiles are added separately; ordinary Settings updates do
+not remove them. Normal learning needs no decoder string, terminal history search,
+configuration-file edit or receiver command. The browser workflow captures and
+validates supported signals internally. It does not inherit arbitrary configuration
+files or treat sample timings as a working Switch433 decoder.
 
 The receiver needs USB access as `rfbutton`. A new udev rule may require an
 operator to reconnect that receiver. Ask before unplugging; never reset hubs,
@@ -107,13 +101,14 @@ ones. Ordinary button PUT requests cannot assign a signature; use learning.
 
 ## Learn A ON with three separate presses
 
-Prerequisites: verified decoder, intended receiver acquiring samples, actions kept
+Prerequisites: intended receiver acquiring samples, actions kept
 disabled. Create a six-button, two-column remote if missing; default labels are
 A ON, A OFF, B ON, B OFF, C ON, C OFF. Do not invent signal codes.
 
 1. Select **A ON**, save pending editor changes and choose **Learn signal**.
-   Keep other remotes idle. Learning lasts 90 seconds, waits for existing requests
-   to finish and suppresses new actions globally.
+   Keep other remotes idle. Wait for the receiver-ready instruction. Learning has
+   a 180-second overall limit, waits for existing requests to finish, and suppresses
+   new actions globally. Capture and replay are managed by the application.
 2. Briefly press physical **A ON once** and release fully. Wait for **1 of 3
    matching presses** and inspect the decoded candidate.
 3. Wait at least one second after release, select **Ready for next press**, then
@@ -121,9 +116,12 @@ A ON, A OFF, B ON, B OFF, C ON, C OFF. Do not invent signal codes.
 4. Again wait at least one second, arm and make the third distinct press. Expect
    **3 of 3** and the confirmation control.
 5. Review the candidate and choose **Confirm and save**. The saved action remains
-   disabled. If frames are absent or identity changes, stop and diagnose.
+   disabled. The validated profile is saved atomically with the mapping. Later
+   buttons on this remote preferentially reuse that profile.
 
-Cancel/expiry preserve any previous mapping. Arming alone never counts as a press;
+Failures remain visible with a reason, **Retry learning** and expandable
+**Diagnostics and receiver status**. See [LEARNING.md](LEARNING.md) for supported
+signals, states, capture limits and recovery. Cancel/expiry preserve any previous mapping. Arming alone never counts as a press;
 a held transmission cannot satisfy three captures. Restart only this service to
 verify persistence. Learning proves those observed decodes, not webhook behavior
 or recovery through untested USB ports/hubs. Record these separately with an operator.
@@ -133,7 +131,8 @@ or recovery through untested USB ports/hubs. Record these separately with an ope
 Each matching frame advances a silence timer. A new action needs a gap at least
 `debounce_ms` since the prior matching frame. Default 700 ms; range 100–60,000 ms.
 Held bursts keep extending the interval. Distinct presses faster than the interval
-can be suppressed. Learning has a separate 750 ms quiet requirement.
+can be suppressed. Automatic learning requires one second of RF silence and explicit arming between
+captures. The synthetic demo retains the older 750 ms decoded-event interval.
 
 Add an origin in Settings, save a button GET/POST webhook, and test only in an
 agreed safe window. **Test webhook sends a real request even if the button is
@@ -151,7 +150,7 @@ Home Assistant automation setup is separate; treat its webhook ID as a credentia
 | Observation | Establishes | Does not establish |
 | --- | --- | --- |
 | `/healthz` returns 200 | HTTP application liveness | Storage health, USB access or decoding |
-| `receiver.state=connected` | Recognized statistics/RF JSON arrived | A particular button decoded |
+| `receiver.state=connected` | Sample statistics, decoded JSON or captured pulses arrived | A particular button decoded |
 | Real press produces an RF event | Some frame decoded | Correct mapping/action |
 | Three real captures confirmed | Mapping saved for that identity | HTTP delivery or recovery |
 | `webhook_ok` / HTTP 2xx | Endpoint accepted the request | Intended physical state |

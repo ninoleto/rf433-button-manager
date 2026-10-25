@@ -2,7 +2,7 @@
 
 ## Development versus stable
 
-`0.1.0-dev` is a development build. A public source repository or green automated
+`0.2.0-dev` is a development build. A public source repository or green automated
 CI does not establish receiver compatibility, physical learning, Home Assistant
 behavior, USB recovery, soak or reboot behavior. Publish a development prerelease
 only with those limitations clearly listed. A stable release requires applicable

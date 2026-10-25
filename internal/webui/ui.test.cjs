@@ -95,6 +95,50 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     await page.locator('#button-save').click();
     await page.waitForFunction(() => document.getElementById('editor-heading').textContent === 'A ON');
   });
+  await check('capture progress, diagnostics and retry controls (mocked RF states)', async () => {
+    const baseState = await (await fetch(`${base}/api/state`, {headers:{Authorization:`Bearer ${token}`}})).json();
+    const button = baseState.remotes[0].buttons[0];
+    const session = {session_id:'browser-fixture', button_id:button.id, automatic:true, stage:'waiting', message:'Receiver ready. Press once.', presses:0, required:3, candidate:'', raw:null, identity_fields:['codes'], expires_at:new Date(Date.now()+180000).toISOString(), diagnostics:{packets:0,pulses:0,bytes:0,candidates:0,replays:0}};
+    let mock = {...baseState, demo:false, learning:session, learning_notice:null, actions_paused:true};
+    const stateRoute = route => route.fulfill({json:mock});
+    const learnRoute = async route => {
+      if (route.request().url().endsWith('/start')) {
+        assert.equal(route.request().postDataJSON().button_id, button.id);
+        mock = {...mock, learning:{...session}, learning_notice:null, actions_paused:true};
+      } else {
+        mock = {...mock, learning:null, learning_notice:null, actions_paused:false};
+      }
+      await route.fulfill({json:{ok:true}});
+    };
+    await page.route('**/api/state', stateRoute);
+    await page.route('**/api/learn/*', learnRoute);
+    try {
+      await visible(page.locator('#learning-dialog'));
+      await page.waitForFunction(() => document.getElementById('learning-instruction').textContent === 'Press the physical button once');
+      mock = {...mock, learning:{...session, stage:'receiving', message:'Transmission detected. Release the button.', diagnostics:{packets:1,pulses:144,bytes:1441,candidates:0,replays:0}}};
+      await page.waitForFunction(() => document.getElementById('learning-instruction').textContent === 'Transmission detected');
+      await page.locator('#learning-diagnostic-panel summary').click();
+      await visible(page.locator('#learning-diagnostics'));
+      assert.match(await page.locator('#learning-diagnostics').textContent(), /pulses: 144/);
+      mock = {...mock, learning:null, actions_paused:true, learning_notice:{...session, stage:'unsupported', message:'Transmission detected, but replay could not validate a supported fixed code.'}};
+      await visible(page.locator('#learning-retry'));
+      assert.equal(await page.locator('#learning-retry').isDisabled(), true, 'Retry waits for cleanup');
+      await hidden(page.locator('#learning-confirm'));
+      mock = {...mock, actions_paused:false};
+      await page.waitForFunction(() => !document.getElementById('learning-retry').disabled);
+      await page.locator('#learning-retry').click();
+      await hidden(page.locator('#learning-retry'));
+      assert.match(await page.locator('#learning-count').textContent(), /0 of 3/);
+      await page.locator('#learning-cancel').click();
+      await hidden(page.locator('#learning-dialog'));
+    } finally {
+      await page.unroute('**/api/state', stateRoute);
+      await page.unroute('**/api/learn/*', learnRoute);
+      await page.reload();
+      await hidden(page.locator('#login-dialog'));
+      await page.locator('.rf-button').first().click();
+    }
+  });
   await check('settings, backup download and restore disable actions', async () => {
     await page.locator('#settings-open').click();
     await visible(page.locator('#settings-dialog'));
@@ -102,7 +146,7 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     await page.locator('#backup-download').click();
     const download = await downloading;
     const content = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
-    assert.equal(content.schema_version, 1);
+    assert.equal(content.schema_version, 2);
     assert.equal(content.remotes[0].buttons.length, 6);
     content.remotes[0].buttons[0].enabled = true;
     await page.locator('#backup-file').setInputFiles({name:'ui-backup.json', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(content))});

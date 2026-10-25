@@ -80,6 +80,10 @@ type nativeProcess struct {
 }
 
 func startProcess(parent context.Context, binary string, args []string, stopTimeout time.Duration) (process, error) {
+	return startProcessDetailed(parent, binary, args, stopTimeout, false)
+}
+
+func startProcessDetailed(parent context.Context, binary string, args []string, stopTimeout time.Duration, captureStderr bool) (process, error) {
 	ctx, cancel := context.WithCancel(parent)
 	outR, outW, err := os.Pipe()
 	if err != nil {
@@ -115,7 +119,7 @@ func startProcess(parent context.Context, binary string, args []string, stopTime
 		scanner := bufio.NewScanner(file)
 		scanner.Buffer(make([]byte, 4096), 256*1024)
 		for scanner.Scan() {
-			if !deliver {
+			if !deliver && !captureStderr {
 				line := strings.TrimSpace(strings.Map(func(r rune) rune {
 					if r < 32 || r == 127 {
 						return -1
@@ -132,7 +136,7 @@ func startProcess(parent context.Context, binary string, args []string, stopTime
 				}
 				continue
 			} // Drain stderr; never route logs into RF learning.
-			r := record{data: append([]byte(nil), scanner.Bytes()...)}
+			r := record{data: append([]byte(nil), scanner.Bytes()...), stderr: !deliver}
 			select {
 			case p.records <- r:
 			case <-ctx.Done():
@@ -148,6 +152,7 @@ func startProcess(parent context.Context, binary string, args []string, stopTime
 	}
 	go scan(outR, "stdout", true)
 	go scan(errR, "stderr", false)
+	go func() { p.readers.Wait(); close(p.records) }()
 	go func() { p.wait <- cmd.Wait(); close(p.done) }()
 	return p, nil
 }

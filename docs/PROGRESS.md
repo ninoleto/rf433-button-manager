@@ -1,5 +1,36 @@
 # Project progress
 
+## 2026-10-25: browser capture learning (0.2.0-dev)
+
+The operator verified the preceding 0.1 installation, authentication, configuration
+persistence and receiver sample acquisition after an initial receiver-only reconnect.
+A ON remained at 0/3 because the old learner accepted only already-decoded JSON.
+Those observations do not establish physical button decoding or USB recovery.
+
+Implemented a browser-only capture/analyze/replay workflow, measured fixed-code
+OOK/PWM profiles, three separate matching presses, atomic confirmation, profile
+reuse, progress/failure explanations and retry/diagnostics. Existing remotes and
+legacy settings are retained. Actions remain suppressed through receiver/replay
+cleanup; new mappings stay disabled. No verified legacy Switch433 definition was
+located and no stock/guessed timing was installed. See [LEARNING.md](LEARNING.md).
+
+Software evidence: 49 top-level Go tests pass with the race detector when the eight
+socket-dependent tests are excluded; real installed rtl_433 23.11 file replay,
+combined JSON/pulse output, candidate proof, lifecycle, persistence and exclusive
+receiver transitions are included. Two frontend-controller scenarios pass with
+an in-memory DOM/API adapter. Vet, module checksums, shell/deployment/history tests
+and JavaScript syntax pass. These are software tests and synthetic RF evidence.
+
+The full suite reaches an existing HTTP test and is blocked by denied loopback
+sockets. Browser rendering tests and physical learning remain pending. The existing
+home checkout and system service are read-only from this agent session; the update
+is staged with preserved Git ancestry, not claimed deployed. A reviewed one-time
+host helper is kept outside public source to run the full checks, import the new
+history, snapshot application data, replace only its binary and verify service
+restart/persistence. It preserves authentication/listener and performs no RF or
+Home Assistant action test. Source publication and GitHub CI remain pending the
+agreed testing gates. Earlier entries below are historical evidence for earlier builds.
+
 2026-10-25: Requirements read; upstream rtl_433, Home Assistant and SQLite researched.
 Architecture and API contract established. Implementation started in isolated workspace.
 No server connection, service modification or physical receiver test performed.

@@ -5,8 +5,8 @@
 Runtime: Linux x86_64 for the supplied binary, systemd/udev for the supplied
 installer, an independently installed `/usr/bin/rtl_433` (initial integration
 target 23.11), a compatible RTL-SDR, antenna and supported 433.92 MHz remote, USB
-permissions, and a browser for management. A verified decoder is required for
-learning that remote. No Go, Node, Docker, MQTT or cloud account is needed to
+permissions, and a browser for management. The browser can derive supported fixed-code OOK/PWM profiles internally;
+other protocols need a working existing decoder or an explicit developer extension. No Go, Node, Docker, MQTT or cloud account is needed to
 install the packaged binary. Keep state on reliable internal storage with space
 for SQLite/WAL and retained backups. No minimum RAM/CPU specification or power-loss
 reliability has been established by hardware testing.
@@ -203,3 +203,25 @@ Do not silently introduce retry semantics for physical actions.
 [RELEASING.md](RELEASING.md) covers public-history review and packaging;
 [TEST-REPORT.md](TEST-REPORT.md) and [HARDWARE-TESTS.md](HARDWARE-TESTS.md) distinguish
 executed software checks from outstanding physical gates.
+
+## Extending browser capture learning
+
+Read [LEARNING.md](LEARNING.md) first. Production capture uses the same live child
+as normal reception and one offline worker; do not add a second USB reader. To add
+a modulation, implement strict candidate parsing/framing and conservative identity
+normalization in `internal/receiver`, add explicit persisted profile validation,
+and supply synthetic plus operator-approved private replay tests. Do not broaden
+the candidate parser to accept arbitrary analyzer output or shell commands.
+
+Cover cancellation during analysis, independent timeouts, mixed captures, stale
+receiver acknowledgements, duplicate mapping rejection, atomic profile/mapping
+persistence and restoration before action dispatch. Add UI progress/failure states
+and documentation for the precise supported range. Run `go test -race ./...` with
+rtl_433 available; replay tests use file input and must never touch USB. The fixture
+`internal/receiver/testdata/synthetic-pwm.ook` is artificial software-test data,
+not evidence for a physical remote or a default decoder configuration.
+
+`make test-ui` runs the real frontend controller against an in-memory DOM/API
+adapter using Node.js 20+ and no external modules. It covers capture progress,
+failure persistence, retry gating and confirmation. It does not establish real
+browser layout; the separate Playwright suite remains the rendering check.

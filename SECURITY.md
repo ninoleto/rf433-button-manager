@@ -30,7 +30,10 @@ unsuitable as sole authorization for high-impact operations.
 
 **Test webhook can execute with a disabled button.** Installation and learning
 do not require real webhook tests. Learning waits for current requests and blocks
-new dispatches, but cannot undo requests already delivered.
+new dispatches, but cannot undo requests already delivered. Suppression continues
+until capture analysis and receiver transitions have cleaned up. Learning uses
+private bounded pulse files, deleted after offline analysis. One replay child has
+file input only; it never opens the receiver. Raw captures are not API downloads.
 
 ## Secret handling and rotation
 

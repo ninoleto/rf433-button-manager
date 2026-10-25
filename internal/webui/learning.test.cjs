@@ -1,0 +1,97 @@
+/* Exercises the actual frontend controller with an in-memory DOM/API adapter.
+ * No sockets, radio, webhooks or browser-layout claims. For real browser rendering
+ * use ui.test.cjs separately. Only synthetic IDs and state are supplied here.
+ */
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+
+class Element {
+  constructor() { this.children=[]; this.handlers={}; this.dataset={}; this.textContent=''; this.value=''; this.hidden=false; this.disabled=false; this.open=false; }
+  append(...children) { this.children.push(...children.flatMap(c => c.fragment ? c.children : [c])); }
+  replaceChildren(...children) { this.children=[]; this.append(...children); }
+  setAttribute(name,value) { this[name]=value; }
+  addEventListener(name,handler) { (this.handlers[name] ||= []).push(handler); }
+  showModal() { this.open=true; }
+  close() { this.open=false; }
+  focus() {}
+  reset() {}
+  async click() { if(this.disabled || this.hidden) return; for(const handler of this.handlers.click || []) await handler({preventDefault(){},target:this}); }
+}
+
+async function harness() {
+  const html=fs.readFileSync(path.join(__dirname,'static/index.html'),'utf8');
+  const elements=new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],new Element()]));
+  const el=id=>{assert.ok(elements.has(id),`Missing real HTML element: ${id}`);return elements.get(id);};
+  const button={id:'fixture-button',name:'A ON',enabled:false,signature:'',identity_fields:['codes'],webhook:{url:''}};
+  let state={remotes:[{id:'fixture-remote',name:'Synthetic remote',columns:2,buttons:[button]}],settings:{},receiver:{state:'connected',message:'Synthetic samples'},events:[],version:'test',learning:null,learning_notice:null,actions_paused:false};
+  const calls=[];
+  let timerID=0; const timers=new Map();
+  const session=()=>({session_id:'fixture-session',button_id:button.id,identity_fields:['codes'],automatic:true,stage:'waiting',message:'Receiver ready. Press once.',presses:0,required:3,candidate:'',expires_at:new Date(Date.now()+180000).toISOString(),diagnostics:{}});
+  const context={document:{getElementById:el,createElement:()=>new Element(),createDocumentFragment:()=>Object.assign(new Element(),{fragment:true}),querySelectorAll:()=>[],documentElement:new Element()},window:{addEventListener(){}},sessionStorage:{getItem:()=> 'synthetic-test-token',setItem(){},removeItem(){}},localStorage:{getItem:()=>null,setItem(){}},AbortController,URL,Blob,Date,console,
+    setTimeout:(fn,delay)=>{timers.set(++timerID,{fn,delay});return timerID;},clearTimeout:id=>timers.delete(id),
+    fetch:async(url,options)=>{
+      calls.push({url,method:options.method,body:options.body?JSON.parse(options.body):null});
+      if(url==='/api/state') return {ok:true,json:async()=>structuredClone(state)};
+      if(url==='/api/learn/start') state={...state,learning:session(),learning_notice:null,actions_paused:true};
+      else if(url==='/api/learn/cancel') state={...state,learning:null,learning_notice:null,actions_paused:false};
+      else if(url==='/api/learn/arm') state={...state,learning:{...state.learning,stage:'waiting'}};
+      else if(url==='/api/learn/confirm') state={...state,learning:null,learning_notice:null,actions_paused:true};
+      else throw Error(`Unexpected mutation: ${url}`);
+      return {ok:true,json:async()=>({ok:true})};
+    }};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'static/app.js'),'utf8'),context);
+  const flush=async()=>{for(let i=0;i<20;i++) await Promise.resolve();};
+  await flush();
+  const refresh=async()=>{const entry=[...timers.entries()].find(([,v])=>v.delay===1000);assert.ok(entry,'poll scheduled');timers.delete(entry[0]);await entry[1].fn();await flush();};
+  return {el,calls,session,button,set:patch=>{state={...state,...patch};},refresh};
+}
+
+test('browser controller learns without decoder setup and exposes progress, diagnostics and retry',async()=>{
+  const h=await harness();
+  await h.el('button-grid').children[0].click();
+  await h.el('learn-start').click();
+  assert.equal(h.el('learning-dialog').open,true);
+  assert.match(h.el('learning-instruction').textContent,/Press the physical button once/);
+  assert.equal(h.el('webhook-test').disabled,true);
+  assert.deepEqual(h.calls.filter(c=>c.method==='POST').map(c=>c.url),['/api/learn/start']);
+  for(const [stage,title] of [['receiving','Transmission detected'],['analyzing','Checking the captured signal']]) {
+    h.set({learning:{...h.session(),stage,diagnostics:{packets:1,pulses:144,bytes:1441,candidates:1,replays:2}}});await h.refresh();
+    assert.equal(h.el('learning-instruction').textContent,title);
+    assert.match(h.el('learning-diagnostics').textContent,/pulses: 144/);
+    assert.equal(h.el('learning-confirm').hidden,true);
+  }
+  h.set({learning:null,actions_paused:true,learning_notice:{...h.session(),stage:'unsupported',message:'Measured candidates did not decode consistently.'}});await h.refresh();
+  assert.equal(h.el('learning-dialog').open,true,'failure must not silently close');
+  assert.match(h.el('learning-description').textContent,/did not decode/);
+  assert.equal(h.el('learning-retry').disabled,true,'wait for capture cleanup');
+  h.set({actions_paused:false});await h.refresh();
+  await h.el('learning-retry').click();
+  assert.match(h.el('learning-count').textContent,/0 of 3/);
+  assert.equal(h.el('learning-retry').hidden,true);
+  assert.equal(h.calls.at(-2).url,'/api/learn/start');
+  assert.equal(h.calls.at(-2).body.button_id,h.button.id);
+  h.set({learning:{...h.session(),stage:'ready',presses:3,message:'Three captures verified.'}});await h.refresh();
+  assert.equal(h.el('learning-confirm').hidden,false);
+  await h.el('learning-confirm').click();
+  assert.equal(h.el('learning-dialog').open,false);
+  assert.equal(h.el('webhook-test').disabled,true,'restoration remains suppressed');
+  assert.equal(h.calls.some(c=>c.url==='/api/settings' || c.url.endsWith('/test')),false);
+});
+
+test('reopened browser shows useful terminal failures and cannot retry before restoration',async()=>{
+  const h=await harness(); // No selected editor: status controls must still update.
+  for(const [stage,title] of [['receiver_unavailable','Receiver unavailable'],['timeout','No completed capture'],['inconsistent','Captures did not agree']]) {
+    h.set({learning_notice:{...h.session(),stage,message:`Explanation for ${stage}`},actions_paused:true});await h.refresh();
+    assert.equal(h.el('learning-instruction').textContent,title);
+    assert.equal(h.el('learning-retry').disabled,true);
+    assert.equal(h.el('learning-expiry').textContent,'');
+    assert.equal(h.el('learning-confirm').hidden,true);
+  }
+  await h.el('learning-cancel').click();
+  assert.equal(h.el('learning-dialog').open,false);
+  assert.equal(h.calls.at(-2).url,'/api/learn/cancel');
+});

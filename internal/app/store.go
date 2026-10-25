@@ -49,8 +49,15 @@ func OpenStore(path string) (*Store, Config, error) {
 	} else if e = json.Unmarshal([]byte(raw), &c); e != nil {
 		return fail(fmt.Errorf("configuration is invalid: %w", e))
 	}
+	oldSchema := c.SchemaVersion
+	migrateConfig(&c)
 	if e = validateConfig(c); e != nil {
 		return fail(e)
+	}
+	if oldSchema != c.SchemaVersion {
+		if e = s.Save(c); e != nil {
+			return fail(e)
+		}
 	}
 	return s, c, nil
 }

@@ -1,6 +1,6 @@
 # RF Button Manager
 
-Receive 433.92 MHz remote-control buttons with a native Linux service, learn decoded
+Receive 433.92 MHz remote-control buttons with a native Linux service, learn supported
 signals in a browser, and assign each button an HTTP webhook. Reception and actions
 continue when the browser is closed. No MQTT broker, Docker container or cloud
 account is required. This application receives signals; it does not transmit RF or
@@ -27,16 +27,19 @@ synthetic RF data and demonstrate the actual application, not physical receiver 
 - Native supervision of `rtl_433`, USB rediscovery and bounded restart backoff.
 - Loopback binding and a management token by default.
 
-Learning requires a working `rtl_433` decoder for the remote. Unsupported protocols,
-rolling codes and unstable frames cannot be learned reliably by simply pressing a
-button. The existing `Switch433` flex specification must be copied from the verified
-ZORIN setup; analyzer guesses are not treated as a working configuration.
+Learning is entirely browser-driven: choose **Learn**, press/release the button,
+verify three separate presses, then **Confirm and save**. Existing decoders are
+reused. For supported 16–64 bit fixed-code OOK/PWM signals, the application captures
+pulses, obtains measured candidates from rtl_433, and validates them by replay.
+A suggestion alone is never saved. Other protocols, rolling/encrypted codes,
+ambiguous captures and changing identities receive an explicit failure. This is
+not universal RF learning. See [the learning workflow](docs/LEARNING.md).
 
 ## Requirements and supplied binary
 
 The supplied package targets Linux x86_64. Native installation needs systemd,
 udev, the existing `rtl_433` executable (initial target 23.11), and a supported
-RTL-SDR with a verified decoder for the intended remote. Runtime state belongs on
+RTL-SDR and a remote using a supported signal format. Runtime state belongs on
 reliable internal storage. A browser is the management client; no Node server,
 Go compiler, Docker container or MQTT broker is required to install the binary.
 
@@ -59,7 +62,8 @@ without overwriting extracted source, follow the [developer guide](docs/DEVELOPM
 
 ## Build and verify from source
 
-Build on Linux with **Go 1.27.3**, Git and Make. The embedded frontend needs no Node
+Build on Linux with **Go 1.27.3**, Git and Make. The frontend controller tests
+in `make check` additionally use Node.js 20 or later (no npm packages). The embedded frontend needs no Node
 build or network-hosted assets. Tests with the race detector require a C compiler;
 the release executable uses pure-Go SQLite and is built with `CGO_ENABLED=0`.
 
@@ -70,6 +74,9 @@ make check
 make build
 ./bin/rf-button-manager --version
 ```
+
+`rtl_433` is also needed for the offline pulse replay integration tests (CI installs
+it). Those tests never open USB; without it they report a skip.
 
 `make test` runs uncached race-enabled tests with a two-minute timeout per package.
 Use `make test TEST_PACKAGES=./internal/receiver` for a targeted check, or override
@@ -104,12 +111,14 @@ Demo mode explicitly labels simulated receiver data, generates synthetic
 `Switch433` events every five seconds and disables all real webhook execution.
 It cannot verify your radio, decoder or Home Assistant installation.
 
-1. Open Settings, select the receiver serial if available, and enter the exact
-   verified flex decoder or supported protocol IDs. Save and check receiver status.
+1. Check receiver status. Select its unique serial in Settings if necessary.
+   Normal learning does not require custom decoder settings.
 2. Add a remote with six buttons and two columns.
-3. Select **A ON**, choose **Learn**, and press the matching physical button once.
+3. Select **A ON**, choose **Learn**, wait for the receiver-ready instruction,
+   and briefly press/release the matching physical button once.
 4. Inspect the received candidate. Release the button, arm the next capture, and
-   repeat until three separate presses match. Confirm the mapping.
+   repeat until three separate presses match. Confirm and save the mapping and
+   validated profile. Keep actions disabled until deliberate action testing.
 5. Add the endpoint's origin to Settings, for example `http://127.0.0.1:8123`.
 6. Save the button webhook, normally a POST to
    `http://127.0.0.1:8123/api/webhook/YOUR_PRIVATE_WEBHOOK_ID`.

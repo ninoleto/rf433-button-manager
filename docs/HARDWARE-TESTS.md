@@ -1,13 +1,20 @@
 # Physical hardware acceptance gate
 
-**Status: NOT RUN on ZORIN.** This checklist deliberately distinguishes physical
+**Browser capture update: physical learning remains pending.** The operator's
+2026-10-25 baseline confirms the 0.1 service installation/authentication/configuration
+persistence and receiver sample acquisition after one receiver-only reconnect.
+That is not a completed physical decoding, webhook or port/hub recovery matrix.
+The rows below require their full listed evidence; no row passes from a build.
+
+This checklist deliberately distinguishes physical
 evidence from unit tests with fake sysfs entries or fake decoder processes. Do not
 mark a row passed based on simulation, a successful build or a working web GUI.
 
 Record app commit/version, binary SHA-256, ZORIN OS/kernel, `rtl_433` version,
 receiver VID/PID/serial, exact decoder specification, sample JSON and timestamps.
-Keep webhook credentials out of reports. Obtain approval before installation,
-stopping existing receiver jobs, changing Home Assistant or rebooting the server.
+Keep webhook credentials out of reports. Existing authorization covers this
+application's update. Obtain separate approval before stopping another receiver
+owner, reconnecting hardware, changing Home Assistant or rebooting the server.
 
 Use a harmless, observable Home Assistant action for acceptance. Keep its existing
 automation unchanged unless an explicit change is separately approved. Observe
@@ -17,6 +24,8 @@ prove that the desired physical state changed.
 | Scenario | Procedure | Required evidence | Result |
 | --- | --- | --- | --- |
 | Baseline ownership | Start manager after the approved handover | One owned `rtl_433`, correct serial, connected status, existing Docker services unchanged | NOT RUN |
+| Browser capture cancellation | Cancel during capture/analysis and after a candidate | Normal reception restored; one live owner; previous mapping unchanged; no learning-time webhook | NOT RUN |
+| Browser unsupported/mismatch | Send an unsupported or different signal in an agreed test | Visible explanation, retry/diagnostics, no provisional profile saved | NOT RUN |
 | Six-button mapping | Learn A/B/C ON and OFF with three separate presses each | Six stable unique identifiers, expected raw JSON, no learning-time actions | NOT RUN |
 | Unrelated signal | Transmit a different remote/button during learning | Candidate inspection/mismatch prevents silent acceptance; no webhook | NOT RUN |
 | Duplicate mapping | Try learning a saved button onto another button | Conflict shown; previous mapping retained | NOT RUN |

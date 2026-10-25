@@ -13,10 +13,12 @@ import (
 )
 
 type Config struct {
-	Binary      string
-	Serial      string
-	FlexDecoder string
-	Protocols   []int
+	Binary        string
+	Serial        string
+	FlexDecoder   string
+	Protocols     []int
+	Profiles      []DecoderProfile
+	CapturePulses bool
 }
 
 type Status struct {
@@ -33,8 +35,9 @@ type device struct {
 }
 
 type record struct {
-	data []byte
-	err  error
+	data   []byte
+	err    error
+	stderr bool
 }
 
 type process interface {
@@ -55,11 +58,11 @@ var errMissing = errors.New("receiver is disconnected")
 // are reported as status and retried with capped exponential backoff. Callbacks
 // run serially and must return promptly. They must not call Run recursively.
 // A nil callback is allowed. No physical hardware validation is implied by this API.
-func Run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Status)) error {
+func Run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Status), onPulse ...func(PulsePacket)) error {
 	if !platformSupported {
 		return errors.New("native RTL-SDR supervision is supported only on Linux")
 	}
-	return run(ctx, cfg, onJSON, onStatus, defaultRuntime())
+	return run(ctx, cfg, onJSON, onStatus, defaultRuntime(), onPulse...)
 }
 
 func validate(cfg Config) error {
@@ -75,6 +78,14 @@ func validate(cfg Config) error {
 	for _, id := range cfg.Protocols {
 		if id < 1 || id > 10000 {
 			return errors.New("protocol IDs must be positive integers")
+		}
+	}
+	if len(cfg.Profiles) > 16 {
+		return errors.New("too many learned decoder profiles")
+	}
+	for _, profile := range cfg.Profiles {
+		if err := profile.Validate(true); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -96,6 +107,12 @@ func arguments(cfg Config, dev device) []string {
 	}
 	if cfg.FlexDecoder != "" {
 		args = append(args, "-X", cfg.FlexDecoder)
+	}
+	for _, profile := range cfg.Profiles {
+		args = append(args, "-X", profile.FlexDecoder)
+	}
+	if cfg.CapturePulses {
+		args = append(args, "-w", "OOK:-")
 	}
 	return args
 }
@@ -125,7 +142,7 @@ func selectDevice(devices []device, serial string) (device, error) {
 	return matches[0], nil
 }
 
-func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Status), rt runtime) error {
+func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Status), rt runtime, onPulse ...func(PulsePacket)) error {
 	if err := validate(cfg); err != nil {
 		return err
 	}
@@ -152,6 +169,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 	var out <-chan record
 	var exited <-chan error
 	var started, heartbeat, nextAttempt time.Time
+	var pulses pulseAssembler
 	backoff := rt.initialBackoff
 	stop := func() {
 		if child != nil {
@@ -159,6 +177,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 			child = nil
 		}
 		out, exited = nil, nil
+		pulses = pulseAssembler{}
 	}
 	defer stop()
 	failure := func(message string) {
@@ -197,6 +216,21 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 			if rec.err != nil {
 				failure(rec.err.Error())
 				continue
+			}
+			if cfg.CapturePulses {
+				packet, consumed := pulses.feed(rec.data)
+				if consumed {
+					if packet != nil {
+						heartbeat = time.Now()
+						emit("connected", "receiver is acquiring samples", current.serial)
+						for _, callback := range onPulse {
+							if callback != nil {
+								callback(*packet)
+							}
+						}
+					}
+					continue
+				}
 			}
 			kind := classify(rec.data)
 			if kind == ignored {
