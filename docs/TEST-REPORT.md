@@ -34,6 +34,14 @@ webhook behavior and existing suppression/concurrency checks; they must run in t
 normal host before deployment. Playwright/browser rendering and all physical
 learning/webhook/USB recovery tests remain pending. No new physical PASS is claimed.
 
+Clean-build evidence: a separate `--no-local` clone of `65f9f02265fdb486dcff2f5808f4410c7533ccfd`
+built successfully with the documented `make build` command and Go 1.27.3. The
+static Linux amd64 executable reports `0.2.0-dev`; its SHA-256 is
+`88e5cce534d4f6cbbe3ec718107ba4754a5597dbc4ff009dc3631275668ee4b8`. It matches the development-checkout build exactly,
+and the clean clone's tracked worktree remained unchanged. The inherited history
+and outgoing source were checked for private runtime artifacts and high-confidence
+credential patterns; none were found by those checks. Publication remains pending.
+
 The one-time host update helper runs full `make check` before deployment and takes
 a stopped state snapshot because schema 2 requires matching old data for a 0.1
 rollback. The current session cannot write the home checkout, use sudo, or start

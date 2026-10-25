@@ -21,6 +21,9 @@ receiver transitions are included. Two frontend-controller scenarios pass with
 an in-memory DOM/API adapter. Vet, module checksums, shell/deployment/history tests
 and JavaScript syntax pass. These are software tests and synthetic RF evidence.
 
+A separate clean clone of `65f9f02265fdb486dcff2f5808f4410c7533ccfd` reproduced the
+static development executable byte-for-byte; see TEST-REPORT for its SHA-256.
+
 The full suite reaches an existing HTTP test and is blocked by denied loopback
 sockets. Browser rendering tests and physical learning remain pending. The existing
 home checkout and system service are read-only from this agent session; the update
