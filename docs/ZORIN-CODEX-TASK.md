@@ -1,5 +1,14 @@
 # Ready-to-paste local Codex continuation task
 
+**Continuation note, 2026-10-25:** The operator has explicitly authorized this
+application's reviewed installation/configuration. That session authorization
+supersedes the older STOP/reconfirmation wording below for the same scope.
+Ask before stopping a competing receiver owner or physical USB participation;
+do not alter unrelated services. If host execution is unavailable, provide scoped
+manual commands and continue independent development. Public publication is
+authorized only after installation, agreed testing and documentation are complete.
+See PROGRESS.md and TEST-REPORT.md for current evidence and outstanding blockers.
+
 Continue RF Button Manager from the supplied 0.1.0-dev source/binary package.
 Read README.md, docs/ARCHITECTURE.md, docs/PROGRESS.md, docs/OPERATIONS.md and
 docs/HARDWARE-TESTS.md before acting. The package contains a standalone Git bundle

@@ -47,9 +47,40 @@ analyzer capture; no guessed decoder has been enabled.
 ## Outstanding external gates
 
 - Exact final Switch433 decoder and real JSON samples from ZORIN.
-- Read-only server inspection and production deployment approval.
+- Full host inspection and completed deployment. Application-owned installation
+  and configuration were explicitly authorized in the 2026-10-25 continuation;
+  receiver handover, physical tests and unrelated changes remain separate.
 - New GitHub repository creation/push (connected tool currently has no repository-create operation).
 - Actual receiver, port/hub, reboot and Home Assistant tests.
 
-Next on-server task: [ZORIN-CODEX-TASK.md](ZORIN-CODEX-TASK.md). This begins read-only;
-installation and receiver handover require the user's explicit approval.
+Continuation instructions: [ZORIN-CODEX-TASK.md](ZORIN-CODEX-TASK.md). Existing
+scope authorization supersedes its older request to reconfirm installation.
+
+## 2026-10-25 continuation: documentation and reproducibility
+
+- Existing extracted source and binary verified; original archive retained.
+- Original bundle restored in a temporary development checkout: five commits,
+  ending at `2643e783e9b95ad2ebb6635e70d55fe440800f60`. Extracted source matched.
+- Existing home workspace is read-only in this agent environment. No host install,
+  system configuration, receiver handover or webhook call has been performed.
+- Read-only visible evidence: Zorin OS 18.1, Linux x86_64, rtl_433 23.11, internal
+  disk space available, one visible Realtek RTL2838 device. Full host ownership,
+  LAN binding and physical validation remain pending operator-run host checks.
+- Architecture/API/operations expanded; configuration, security, contribution,
+  developer extension and release guides added. Source build/install requirements
+  and physical versus simulated evidence are explicitly separated.
+- Safe bundle-history restoration added and tested with edited/untracked files
+  and tags; existing repositories are refused rather than reset. Installer now
+  refuses known foreign rtl_433, rtl_tcp and rtl_test processes, without stopping
+  them. Read-only inspection reports blocked host visibility explicitly.
+- Checksum-verified temporary Go 1.27.3 toolchain and pinned modules used for
+  development only. Static build reproduced the supplied executable SHA-256.
+- CLI/receiver race tests and 16 non-socket application tests passed (34 total).
+  Full `make check` is blocked by denied loopback sockets in eight HTTP-server
+  tests. Vet, deployment/history checks and JS syntax checks passed. See TEST-REPORT.
+- Authenticated GitHub identity verified as `ninoleto`; repository lookup returned
+  404. No repository creation, push or GitHub-hosted CI run is claimed. Publication
+  waits for the authorized installation/testing gates and full host verification.
+
+Local continuation helpers and pending-work details are kept outside public source;
+never commit host reports, runtime files, private configuration or captures.

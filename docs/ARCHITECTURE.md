@@ -1,6 +1,7 @@
 # RF Button Manager architecture
 
-Status: implementation in progress; no ZORIN access or hardware validation yet.
+Status: development implementation. Physical acceptance is tracked separately in
+[HARDWARE-TESTS.md](HARDWARE-TESTS.md); software tests do not establish USB reliability.
 
 ## Decisions
 
@@ -64,3 +65,131 @@ Unsupported or rolling-code protocols; incorrect flex timings; RF collisions and
 false decodes; nonunique USB serials; decoder hangs without USB removal; slow webhook
 destinations; uncertain HTTP outcomes; power-loss/disk-full storage failures; local
 network management credential exposure. Tests and explicit limits document each.
+
+## Source map and change boundaries
+
+| Source | Responsibility and entry points |
+| --- | --- |
+| `cmd/rf-button-manager/main.go` | CLI validation, token creation, data lock, startup/shutdown, receiver configuration reload |
+| `internal/receiver/receiver.go` | `Run`, device selection, argv construction, JSON classification, recovery state machine |
+| `internal/receiver/linux.go` | Compatible USB ID table, sysfs enumeration, subprocess pipes and process groups |
+| `internal/receiver/unsupported.go` | Non-Linux guard |
+| `internal/app/model.go` | JSON models, defaults, `Signature`, configuration/webhook validation, overlap checks |
+| `internal/app/engine.go` | CRUD, learning, persistence coordination, debounce, suppression and bounded events |
+| `internal/app/store.go` | SQLite initialization, configuration replacement and event retention |
+| `internal/app/webhook.go` | Delivery, safe DNS/dialing, deadlines, bounded concurrency |
+| `internal/app/http.go` | Routes, authentication, browser-origin checks and strict JSON decoding |
+| `internal/webui/embed.go` | Embeds `static/` into the executable |
+| `internal/webui/static/` | HTML, CSS and vanilla JS with one-second authenticated state polling |
+| `internal/webui/ui.test.cjs` | Optional browser integration tests against an isolated demo process |
+| `deploy/`, `scripts/` | Native installation, inspection, recovery and release tooling |
+| `.github/workflows/ci.yml` | Pinned-toolchain Linux tests, vet, formatting and build |
+
+## Complete processing path
+
+```mermaid
+flowchart TD
+    USB[RTL-SDR receiver] --> RTL[Owned rtl_433 child]
+    RTL --> Classify[Classify JSON stdout]
+    Classify -->|sample statistics| Status[Acquisition status]
+    Classify -->|RF frame| Receive[App.Receive and event history]
+    Receive --> Learn{Learning active?}
+    Learn -->|yes| Capture[Three separately armed matching captures]
+    Capture --> Confirm[Explicit confirmation; mapping saved disabled]
+    Learn -->|no| Match[Normalize per button and compare signature]
+    Match --> Debounce[Sliding silence interval]
+    Debounce --> Gate[Enabled, configured, storage healthy, suppression ended]
+    Gate --> Slots[One pending request per button; eight globally]
+    Slots --> HTTP[One allowlisted GET or POST attempt]
+    HTTP --> Result[Accepted, HTTP error, or outcome unknown]
+    Browser[Authenticated GUI or API] --> Config[Validated SQLite configuration]
+    Config --> Match
+    Config --> RTL
+```
+
+`main.run` validates the listener, creates the private data directory, takes a
+nonblocking `flock` on `instance.lock`, loads/creates the token, opens the store and
+constructs `App`. A second process using that directory fails. SIGINT/SIGTERM
+cancel reception, shut down HTTP, cancel pending actions and close storage. The
+systemd unit's `KillMode=control-group` additionally contains descendants.
+The embedded frontend is an ordinary API client; RF actions never rely on a tab.
+
+## Receiver lifecycle details
+
+Discovery includes every ID in `rtlUSBIDs`; the supplied udev rule grants access
+only to `0bda:2832` and `0bda:2838`. Discovery support is not a permission grant.
+Without a configured serial, exactly one compatible receiver is required. Its
+nonempty serial is preferred over an index; index `0` is used only for a singleton
+without a serial. A factory serial such as `00000001` is not globally unique.
+
+The child command is built as separate arguments, not passed through a shell:
+
+```text
+rtl_433 -c /dev/null -d :SERIAL -D quit -f 433.92M \
+  -F json -F log:/dev/stderr -M stats:1:10 \
+  [-R 0] [-R PROTOCOL_ID ...] [-X EXACT_FLEX_SPECIFICATION]
+```
+
+`-R 0` is added when explicit protocols or a flex decoder are configured. With
+both empty, rtl_433 uses its built-in defaults; this does not establish Switch433
+support. The manager never inherits another program's config file.
+
+Discovery runs every second. USB paths, bus numbers and device numbers are only
+in-memory incarnation observations, never persisted selectors. Removal, changed
+incarnation or ambiguity stops the child before reacquisition. Recovery starts
+with a one-second delay, doubles up to 30 seconds and resets after one stable
+minute. A missing sample heartbeat for 45 seconds causes a restart. Ordinary RF
+silence does not. `recovering` means a child is starting; `connected` requires
+recognized statistics or RF JSON, not simply successful process creation.
+
+Stdout carries JSON; stderr is drained independently and a bounded sanitized last
+diagnostic is available on child failure. It never enters learning. Scanner lines
+are limited to 256 KiB; RF application input to 64 KiB. Shutdown sends SIGTERM to
+the dedicated process group, waits two seconds, then escalates to SIGKILL if
+necessary. Parent-death signaling adds containment. None of this substitutes for
+physical reconnect evidence.
+
+## Concurrency and consistency
+
+`App.mu` protects configuration and bookkeeping. Mutations clone, validate and
+save configuration before exposing it. `actionGate` makes learning wait for
+already-running requests, then excludes new dispatches. An epoch invalidates
+stale scheduled work across configuration edits and learning transitions. A
+request that has already reached a destination cannot be undone.
+
+Learning lasts 90 seconds, needs three explicit captures separated by at least
+750 ms of candidate silence, and saves only after confirmation and overlap checks.
+Cancel/expiry preserve the previous mapping. Startup suppresses RF actions for
+two seconds; exiting learning adds one second. Per-button sliding debounce is
+700 ms by default. Pending requests, debounce timestamps and learning are not
+durable queues; nothing is replayed after a restart.
+
+Each button gets one pending action slot and there are eight globally. Busy
+presses are rejected and logged. Dispatch rechecks configuration epoch, learning,
+enabled state and storage health, records intent, then makes one HTTP attempt.
+See [CONFIGURATION.md](CONFIGURATION.md) for identity and operator details.
+
+## Storage contract
+
+SQLite uses one connection, WAL, `synchronous=FULL` and a 5,000 ms busy timeout.
+The `configuration` table contains one JSON value (`id=1`), while `events` stores
+JSON with monotonic IDs. Logical configuration has `schema_version=1`. There are
+at most 500 stored events and 150 recent events in API state. Raw event data over
+8 KiB is omitted from history. This is operational history, not an unlimited audit
+archive of every RF transmission.
+
+Configuration, mappings, token and bounded history persist. Receiver status,
+learning, action slots and debounce timestamps do not. Logical restore validates
+the whole configuration, disables all restored actions and clears their
+`last_received` values; it does not restore the token or event archive. Corrupt
+configuration is rejected instead of replaced. A configuration/event write error
+sets `storage_error` and pauses actions until the fault is fixed and the service
+restarted. Never directly edit SQLite; use the API or a stopped-state restore.
+
+## Scope limits
+
+One receiver, fixed 433.92 MHz reception, static identities, HTTP GET/POST actions,
+one administrative credential, no per-user roles, no TLS server, no action queue
+and no automatic retries. RF is unauthenticated/replayable. HTTP 2xx establishes
+acceptance by an endpoint, not a physical outcome. See [DEVELOPMENT.md](DEVELOPMENT.md)
+for extension examples and [RELEASING.md](RELEASING.md) for release gates.

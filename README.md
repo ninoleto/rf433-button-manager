@@ -32,7 +32,32 @@ rolling codes and unstable frames cannot be learned reliably by simply pressing 
 button. The existing `Switch433` flex specification must be copied from the verified
 ZORIN setup; analyzer guesses are not treated as a working configuration.
 
-## Build and verify
+## Requirements and supplied binary
+
+The supplied package targets Linux x86_64. Native installation needs systemd,
+udev, the existing `rtl_433` executable (initial target 23.11), and a supported
+RTL-SDR with a verified decoder for the intended remote. Runtime state belongs on
+reliable internal storage. A browser is the management client; no Node server,
+Go compiler, Docker container or MQTT broker is required to install the binary.
+
+After verifying the outer archive's published SHA-256 and extracting into a fresh
+directory, enter `rf-button-manager` and run:
+
+```sh
+sha256sum -c SHA256SUMS
+test -x bin/rf-button-manager || chmod u+x bin/rf-button-manager
+./bin/rf-button-manager --version
+bash scripts/inspect-zorin.sh
+bash scripts/install.sh --binary "$PWD/bin/rf-button-manager"
+```
+
+The packaged `SHA256SUMS` covers the binary; the outer archive checksum covers the
+complete package. Review the dry run and receiver ownership, then follow
+[installation](#install-on-zorin). Use the supplied executable; rebuilding is only
+needed for development or an intentional source change. To attach bundled history
+without overwriting extracted source, follow the [developer guide](docs/DEVELOPMENT.md).
+
+## Build and verify from source
 
 Build on Linux with **Go 1.27.3**, Git and Make. The embedded frontend needs no Node
 build or network-hosted assets. Tests with the race detector require a C compiler;
@@ -65,8 +90,9 @@ the build machine. Runtime decoding still uses an installed `rtl_433` executable
 ```
 
 Open `http://127.0.0.1:8787` and enter the token from
-`rf-data/management.token`. Keep the token private. A missing receiver or missing
-decoder is shown in the interface rather than silently replaced with demo data.
+`rf-data/management.token`. Keep the token private. A missing receiver is reported;
+demo data is never substituted automatically. Without explicit decoder settings,
+rtl_433 uses its default protocols, which does not prove Switch433 support.
 
 For an interface preview without radio hardware, use a **separate** data directory:
 
@@ -115,8 +141,8 @@ sudo bash scripts/install.sh --binary "$PWD/bin/rf-button-manager" --apply
 The installer creates only RF Button Manager's service, service account, state
 directory, executable and narrowly scoped USB permissions. It does not install
 packages, modify kernel modules, stop competing receiver services, or change Docker
-and Home Assistant. Replug the receiver once after initial installation to apply
-the new USB permissions.
+and Home Assistant. If initial USB permissions have not applied, arrange a
+receiver-only reconnect with its operator. Never reset hubs or other devices.
 
 From Windows, keep the default private listener and forward it through SSH:
 
@@ -136,10 +162,15 @@ strict same-origin checks reject an HTTPS frontend backed by loopback HTTP.
 ## Project documentation
 
 - [Architecture and technical risks](docs/ARCHITECTURE.md)
-- [API contract](docs/API.md)
+- [Receiver configuration and three-press learning](docs/CONFIGURATION.md)
+- [API contract and authenticated examples](docs/API.md)
 - [Installation, upgrades, backups and troubleshooting](docs/OPERATIONS.md)
 - [Physical hardware release gate](docs/HARDWARE-TESTS.md)
 - [Persistent implementation progress](docs/PROGRESS.md)
+- [Clean builds and developer extension examples](docs/DEVELOPMENT.md)
+- [Contributing and forking](CONTRIBUTING.md)
+- [Security and private configuration](SECURITY.md)
+- [Publication and release procedures](docs/RELEASING.md)
 
 ## License and dependencies
 

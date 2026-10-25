@@ -1,5 +1,32 @@
 # Verification report — 2026-10-25
 
+## Continuation evidence (separate from original package report below)
+
+The original package's report below describes its earlier isolated run. It is not
+a new successful full-suite or hardware result from the continuation environment.
+
+Verified in the continuation:
+
+- Original ZIP SHA-256: `fa8d873a3c54ea31e676411e76ebf72716cad372f7df8b143c2353acedcb9fec`.
+- Supplied executable checksum/version and source agreement with bundled main.
+- Official temporary Go 1.27.3 toolchain checksum and all pinned module checksums.
+- Static amd64 build reproduced the supplied executable SHA-256:
+  `dddc9ce0479a46193d6c258d7354221f9284cc87ba105de9f681e09a6cf1f144`.
+- 2 CLI and 16 receiver race-enabled tests, plus 16 application tests that do not
+  create network listeners: 34 top-level tests passed. Full-suite HTTP-server
+  checks are blocked by `socket: operation not permitted`, not reported passed.
+- `go vet ./...`, deployment dry-run/argument tests, all three known competing
+  decoder guards, bundle restoration preserving edits/untracked files/tags,
+  shell syntax, JavaScript syntax and whitespace checks passed.
+
+Pending: full `make check` in a normal host execution environment; rerun of the
+optional browser suite; host service installation/LAN access/auth/persistence;
+working decoder verification; all physical learning/webhook/USB/reboot tests;
+public repository creation/push and GitHub CI. A staged development checkout is
+not the installed service. No physical test row changes to PASS based on this work.
+
+## Original package verification record
+
 Build: RF Button Manager 0.1.0-dev, Linux amd64, Go 1.27.3.
 Environment: isolated development workspace, not ZORIN.
 

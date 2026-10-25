@@ -2,8 +2,9 @@
 
 ## Deployment boundary
 
-This repository does not include proof of operation on ZORIN. Obtain approval for
-the concrete install plan before applying it to that production server. First run
+Use the test records to distinguish observed deployment from unperformed physical
+checks. Apply a reviewed concrete plan only within the operator's authorization;
+existing authorization for that scope does not require a redundant confirmation. Run
 `scripts/inspect-zorin.sh`; it reads system details, `rtl_433` version/help, supported
 USB IDs/serials, process names and config filenames. It does not open the receiver,
 read webhook configurations, install packages or stop anything. Review the output
@@ -14,9 +15,20 @@ on ZORIN before migrating it. Do not publish webhook IDs, authorization headers 
 other secrets in a GitHub issue. The old analyzer trace contains guesses and is not
 a substitute for the final working decoder. If a test script currently owns the
 receiver, agree on its handover before stopping it. The installer deliberately
-refuses to kill a competing `rtl_433` process.
+refuses competing `rtl_433`, `rtl_tcp` and `rtl_test` processes outside its own unit.
+Inspect other SDR/RF software and actual USB file-descriptor ownership too; a
+process-name check alone cannot identify every possible receiver owner. A sandbox
+that hides host processes cannot establish that the receiver is free.
 
 ## Installed files
+
+The supplied binary needs no compiler. Verify the archive and internal binary
+checksum, architecture, free space on `/var/lib`, existing rtl_433 version,
+receiver owners, serial uniqueness and port availability first. A restricted
+shell may expose USB sysfs while hiding host processes/network/systemd; such a
+check cannot establish exclusive receiver ownership. Use an authorized host
+terminal for those checks. Do not repair sudo ownership or weaken host security
+to work around an agent sandbox. A dry run never installs packages or opens USB.
 
 | Path | Purpose | Upgrade / uninstall behavior |
 | --- | --- | --- |
@@ -112,6 +124,19 @@ whole service process group on shutdown. `PrivateDevices=no` is intentional: a
 private device namespace would hide the receiver and hot-plug nodes. Do not add a
 static `DeviceAllow` entry with a USB minor number that changes after reconnect.
 
+After a configured restart, inspect `systemctl show rf-button-manager.service`
+for `MainPID`, `ControlGroup`, `ActiveState` and `NRestarts`. Verify one decoder
+child's parent PID and service cgroup without publishing full arguments. Check
+the authenticated receiver state over at least a heartbeat interval. An enabled
+unit and stable HTTP process do not establish sample acquisition; `connected`
+requires statistics/RF JSON. Real decoding requires a known physical press.
+Keep actions disabled until deliberately tested with the operator.
+
+A specific LAN bind depends on that address being assigned at startup and staying
+assigned. If DHCP changes it or boot networking is late, inspect the application
+journal and its startup retries; do not claim reboot validation from `is-enabled`.
+Changing host network allocation is outside this installer.
+
 ## Backups and restore
 
 Use **Backup** in the authenticated GUI for a consistent logical configuration
@@ -139,6 +164,15 @@ Keep backups outside the application's state directory. The above command replac
 an existing same-named archive; choose a fresh dated filename when retaining history.
 
 ## Upgrade and rollback
+
+For a full-state restore, stop only this service, preserve its current entire
+state directory at a fresh private location, and restore the matching archive
+under `/var/lib` with numeric ownership and private permissions. Restore the
+matching environment file separately if needed; it is outside the state archive.
+Verify the restored `rfbutton` ownership and installed binary/schema compatibility
+before starting. Do not overlay only `manager.db` over live WAL/SHM files. A
+full-state snapshot restores the token it contains and may restore enabled actions;
+plan the first start accordingly. GUI logical restore instead disables actions.
 
 1. Read the new release notes and export a configuration backup. Take a stopped
    state-directory snapshot when a schema migration is involved.
