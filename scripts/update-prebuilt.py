@@ -64,6 +64,18 @@ class API:
             raise RuntimeError(f'Application {path} returned HTTP {status}')
         return data
 
+    def wait_ready(self, seconds=40):
+        # The operator may have just restarted the service after a receiver
+        # terminal test. Wait for its listener without changing any service.
+        deadline = time.monotonic() + seconds
+        while True:
+            try:
+                return self.get('/api/state')
+            except (OSError, URLError):
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('Application is not reachable; start rf-button-manager.service and retry')
+                time.sleep(1)
+
 class Update:
     def __init__(self, package, root=Path('/'), proc=Path('/proc')):
         self.package = package
@@ -111,7 +123,7 @@ class Update:
         self.token = (self.state / 'management.token').read_bytes()
         self.environment = self.env.read_bytes()
         self.api = API(address, self.token.decode().strip())
-        before = self.api.get('/api/state')
+        before = self.api.wait_ready()
         if before.get('learning') or before.get('actions_paused'):
             raise RuntimeError('Close learning in the GUI and wait for normal reception before updating')
         if any(b['enabled'] for r in before['remotes'] for b in r['buttons']):

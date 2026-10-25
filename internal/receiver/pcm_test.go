@@ -49,11 +49,11 @@ func TestPCMRejectsAmbiguousRepeats(t *testing.T) {
 		`["{24}aabbcc","{24}aabbcc","{24}aabbdd"]`,
 		`["{24}aabbcc","{24}aabbcc","{16}1234","{16}1234"]`,
 	} {
-		if repeatedPCMWidth([]json.RawMessage{json.RawMessage(`{"codes":` + codes + `}`)}) != 0 {
+		if repeatedFrameWidth([]json.RawMessage{json.RawMessage(`{"codes":` + codes + `}`)}) != 0 {
 			t.Fatal("ambiguous code accepted")
 		}
 	}
-	if repeatedPCMWidth([]json.RawMessage{json.RawMessage(`{"codes":["{16}1234","{24}aabbcc","{24}aabbcc","{20}12345"]}`)}) != 24 {
+	if repeatedFrameWidth([]json.RawMessage{json.RawMessage(`{"codes":["{16}1234","{24}aabbcc","{24}aabbcc","{20}12345"]}`)}) != 24 {
 		t.Fatal("incomplete prefix/suffix hid an unambiguous repeated frame")
 	}
 }

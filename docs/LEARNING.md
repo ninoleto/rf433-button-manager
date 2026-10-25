@@ -16,7 +16,7 @@ If no live decoder identifies a button, the app replays captured pulses through
 existing decoders and saved profiles before asking rtl_433 for timing candidates.
 
 When those decoders cannot identify a capture, automatic profile discovery supports
-**fixed-code OOK PWM, PPM or gap-delimited NRZ PCM, 16–64 bits**, at the application's fixed 433.92 MHz frequency.
+**fixed-code OOK PWM, PPM or gap-delimited NRZ PCM, 12–64 bits**, at the application's fixed 433.92 MHz frequency.
 It requires at least two matching RF frames across the captured recording
 (including separate packet/JSON records) and the same identity across three
 separately armed physical presses. A continuous hold cannot supply three presses.
@@ -61,7 +61,7 @@ Each armed window is **20 seconds total, including capture and analysis**. Ignor
 traffic cannot restart that deadline or the 180-second session deadline. At most
 40 recordings are analyzed per window, with one worker and at least 500 ms between
 analysis starts. Every analysis has a ten-second limit and is cancelled at the
-window deadline. FSK and bursts shorter than 16 pulses do not consume analysis
+window deadline. FSK and bursts shorter than 12 pulses do not consume analysis
 attempts. Unsupported captures return to waiting. Even if the analysis limit is
 reached, live decoded button events can still be accepted before the deadline.
 Ordinary packets never arm the next window;
@@ -135,7 +135,7 @@ another USB selector. See [CAPTURE-INVESTIGATION.md](CAPTURE-INVESTIGATION.md) f
 the 0.2.0 diagnostic failure and the actual 23.11 IQ-stream regression evidence.
 
 When needed, `-A -R 0` produces PWM/PPM timing candidates. The parser accepts only measured
-numeric `m=OOK_PWM` or `m=OOK_PPM` plus `s,l,r,g,t,y` values within bounds. Probe replay requires 16–64
+numeric `m=OOK_PWM` or `m=OOK_PPM` plus `s,l,r,g,t,y` values within bounds. Probe replay requires 12–64
 bits and at least two matching frames across the replay output. Multiple distinct eligible codes are rejected.
 An accepted candidate is narrowed to its exact measured bit count, replayed again,
 and then used unchanged for the second and third presses. The saved flex decoder
@@ -143,6 +143,21 @@ uses `repeats>=1`, allowing normal operation when a press yields one JSON row;
 learning still verifies repeated frames across each recording. Legacy `repeats>=2`
 profiles remain valid and keep their existing identity. A profile is not persisted
 until final confirmation and overlap validation succeed.
+
+When histogram suggestions are missing, `internal/receiver/pwm.go` also derives
+bounded sync-PWM candidates from the recorded mark clusters. Adjacent short jitter
+bins are merged; data marks must have separated widths, with at least two observed
+long separators before the final gap. The reset threshold is placed beyond the
+recorded gaps because sync marks delimit rows. At most four PWM candidates are
+added; these are replayed unchanged through rtl_433, never decoded by an app-side
+bit slicer. The original eight-candidate/ten-second limits still apply.
+
+For every modulation, the learner determines the repeated complete row width
+before excluding partial prefix/suffix rows. Repetition within a JSON record takes
+precedence over a fragment occurring once in each packet. Conflicting codes of
+the selected width and competing in-record repeated widths reject the capture.
+A single complete frame cannot establish an automatic profile. Twelve-bit codes
+are eligible, with the same three separately armed presses and confirmation gate.
 
 For PCM fallback, `internal/receiver/pcm.go` measures the timing grid rather than
 requiring rtl_433's histogram analyzer to recognize every possible run length.
@@ -168,7 +183,7 @@ PCM is a restricted NRZ fallback, not universal waveform matching or FSK discove
 Profile IDs/models derive from a hash of canonical timing and framing, not an RF
 button code. Different buttons can share a profile. Runtime normalization retains
 the exact model and code; shorter delimiter rows can be excluded only after the
-profile bit count has been fixed. Existing custom decoder behavior is preserved.
+profile bit count has been fixed. Explicit custom decoders with an exact `bits=N` setting receive the same exact-width normalization when their model matches; unbounded custom decoders retain the strict all-codes identity check.
 
 ## Ownership, limits and cleanup
 

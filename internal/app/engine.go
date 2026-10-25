@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.3.2-dev"
+const Version = "0.3.3-dev"
 
 type App struct {
 	mu                                  sync.Mutex
@@ -468,6 +468,11 @@ func (a *App) Receive(raw []byte) {
 	}
 	_ = json.Unmarshal(raw, &envelope)
 	a.recordCaptureEventLocked(raw)
+	var normalizeErr error
+	raw, normalizeErr = receiver.NormalizeConfiguredFlex(raw, a.config.Settings.FlexDecoder)
+	if normalizeErr != nil {
+		return
+	}
 	for _, profile := range a.config.DecoderProfiles {
 		if envelope.Model == profile.Model {
 			normalized, e := receiver.NormalizeProfile(raw, profile)

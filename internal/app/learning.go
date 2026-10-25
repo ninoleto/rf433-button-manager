@@ -184,9 +184,9 @@ func (a *App) ReceivePulse(generation uint64, packet receiver.PulsePacket) {
 		}
 		return
 	}
-	// A short burst cannot contain a supported 16-bit generic code. Count it
-	// without consuming analysis work or resetting the release timer.
-	if packet.Pulses > 0 && packet.Pulses < 16 {
+	// Skip very short bursts in generic discovery without consuming analysis
+	// work or resetting the release timer. Decoded events use a separate path.
+	if packet.Pulses > 0 && packet.Pulses < 12 {
 		l.Diagnostics.RejectedPackets++
 		l.Diagnostics.RejectionCode = "short_burst"
 		l.Diagnostics.RejectionReason = "Pulse burst too short for generic code discovery; still listening for decoded events"

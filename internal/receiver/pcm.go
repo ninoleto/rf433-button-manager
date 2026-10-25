@@ -136,11 +136,13 @@ func measuredPCMTimings(capture []byte) []string {
 	return out
 }
 
-// PCM replay can include incomplete prefix/suffix rows. A frame length is usable
-// only if exactly one complete code repeats and no different code of that same
-// length occurs. This does not truncate, repair, or synthesize a received code.
-func repeatedPCMWidth(frames []json.RawMessage) int {
+// repeatedFrameWidth identifies a repeated complete row before discarding edge
+// fragments. In-record repetition outranks fragments repeated once per packet.
+// Different codes at the selected width, or two in-record repeated widths,
+// remain ambiguous and are rejected.
+func repeatedFrameWidth(frames []json.RawMessage) int {
 	counts := map[int]map[string]int{}
+	strong := map[int]bool{}
 	for _, raw := range frames {
 		var event struct {
 			Codes []string `json:"codes"`
@@ -148,23 +150,32 @@ func repeatedPCMWidth(frames []json.RawMessage) int {
 		if json.Unmarshal(raw, &event) != nil {
 			return 0
 		}
+		local := map[string]int{}
 		for _, code := range event.Codes {
 			m := codePattern.FindStringSubmatch(code)
 			if m == nil {
 				return 0
 			}
 			bits, _ := strconv.Atoi(m[1])
-			if bits < 16 || bits > 64 || len(m[2]) != (bits+3)/4 {
+			if bits < 12 || bits > 64 || len(m[2]) != (bits+3)/4 {
 				continue
 			}
+			code = strings.ToLower(code)
 			if counts[bits] == nil {
 				counts[bits] = map[string]int{}
 			}
-			counts[bits][strings.ToLower(code)]++
+			counts[bits][code]++
+			local[code]++
+			if local[code] >= 2 {
+				strong[bits] = true
+			}
 		}
 	}
 	chosen := 0
 	for bits, codes := range counts {
+		if len(strong) > 0 && !strong[bits] {
+			continue
+		}
 		for _, count := range codes {
 			if count < 2 {
 				continue

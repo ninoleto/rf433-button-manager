@@ -72,8 +72,8 @@ func profileWithRepeats(timing string, bits, repeats int) (DecoderProfile, error
 	if err != nil {
 		return DecoderProfile{}, err
 	}
-	if bits < 16 || bits > 64 {
-		return DecoderProfile{}, errors.New("automatic fixed-code learning supports 16–64 bit codes")
+	if bits < 12 || bits > 64 {
+		return DecoderProfile{}, errors.New("automatic fixed-code learning supports 12–64 bit codes")
 	}
 	key := fmt.Sprintf("%s,bits=%d,repeats>=%d", canonical, bits, repeats)
 	hash := sha256.Sum256([]byte(key))
@@ -132,7 +132,7 @@ func repeatedCode(raw []byte, bits int, minimum ...int) (string, int, error) {
 			continue
 		}
 		n, _ := strconv.Atoi(match[1])
-		if n < 16 || n > 64 || (bits != 0 && n != bits) {
+		if n < 12 || n > 64 || (bits != 0 && n != bits) {
 			continue
 		}
 		if len(match[2]) != (n+3)/4 {
@@ -175,6 +175,46 @@ func NormalizeProfile(raw []byte, profile DecoderProfile) ([]byte, error) {
 	}
 	// Keep only the exact validated identity. No analyzer output reaches this path.
 	return json.Marshal(map[string]any{"model": model, "codes": []string{code}})
+}
+
+// NormalizeConfiguredFlex uses only an explicitly configured exact bit length.
+// It never guesses a width from a single live event or changes another decoder.
+func NormalizeConfiguredFlex(raw []byte, spec string) ([]byte, error) {
+	name, bits := "", 0
+	seen := map[string]bool{}
+	for _, part := range strings.Split(spec, ",") {
+		key, value, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok || (key != "n" && key != "bits") {
+			continue
+		}
+		if seen[key] {
+			return raw, nil // Preserve opaque/custom syntax; do not guess its bounds.
+		}
+		seen[key] = true
+		if key == "n" {
+			name = value
+		} else {
+			bits, _ = strconv.Atoi(value)
+		}
+	}
+	if name == "" || bits < 12 || bits > 64 {
+		return raw, nil
+	}
+	var obj map[string]json.RawMessage
+	if json.Unmarshal(raw, &obj) != nil {
+		return nil, errors.New("invalid RF JSON")
+	}
+	var model string
+	_ = json.Unmarshal(obj["model"], &model)
+	if model != name {
+		return raw, nil
+	}
+	code, _, err := repeatedCode(raw, bits, 1)
+	if err != nil {
+		return nil, err
+	}
+	obj["codes"], _ = json.Marshal([]string{code})
+	return json.Marshal(obj)
 }
 
 // rtl_433 can emit repeated frames in separate pulse packets/JSON records.

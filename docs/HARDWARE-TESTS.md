@@ -1,5 +1,10 @@
 # Physical hardware acceptance gate
 
+**0.3.3-dev:** operator terminal tests confirm live decoding of two separate
+switches with measured settings. Updated GUI learning, physical webhook effects
+and receiver recovery remain pending. The future Amazon remote has not been
+tested. Offline replay and local HTTP tests are recorded in TEST-REPORT.md.
+
 **0.3.0-dev: physical validation pending.** Real upstream recordings have been
 replayed successfully, including software learning, persistence and a localhost
 webhook. These tests do not prove operation with the operator's remote or the new

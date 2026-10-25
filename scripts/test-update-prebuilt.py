@@ -27,6 +27,14 @@ class FakeAPI:
         return (200, self.get(path)) if authenticated and self.token == 'fixture-token' else (401, None)
 
 class UpdateTests(unittest.TestCase):
+    def test_listener_startup_wait_and_auth_failure(self):
+        api = updater.API('127.0.0.1:8787', 'fixture-token')
+        with patch.object(api, 'get', side_effect=[updater.URLError('starting'), {'ready': True}]), patch.object(updater.time, 'sleep'):
+            self.assertEqual(api.wait_ready(), {'ready': True})
+        with patch.object(api, 'get', side_effect=RuntimeError('Application /api/state returned HTTP 401')):
+            with self.assertRaisesRegex(RuntimeError, '401'):
+                api.wait_ready()
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

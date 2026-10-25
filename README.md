@@ -28,7 +28,7 @@ synthetic RF data and demonstrate the actual application, not physical receiver 
 
 Learning is entirely browser-driven: choose **Learn**, press/release the button,
 verify three separate presses, then **Confirm and save**. Button events decoded by rtl_433 are learned directly, including common
-EV1527, PT2262 and HT680 event formats. For supported 16–64 bit fixed-code OOK PWM/PPM/PCM signals, the application captures
+EV1527, PT2262 and HT680 event formats. For supported 12–64 bit fixed-code OOK PWM/PPM/PCM signals, the application captures
 pulses, derives measured timing candidates, and validates them with rtl_433 replay.
 A suggestion alone is never saved. Unrecognized traffic is ignored within a bounded press window. Rolling/encrypted
 codes and ambiguous or changing identities cannot be saved as fixed buttons. This is

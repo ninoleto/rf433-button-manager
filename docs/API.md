@@ -279,7 +279,7 @@ capture rejection counts have different meanings and must not be combined.
 They never include credentials or raw IQ data. Profile timing and decoded identities
 may identify a remote; treat full state and diagnostics as private. There is no
 public pulse-injection endpoint or unauthenticated capture control. Profile limits
-are 16 profiles, fixed-code OOK_PWM/OOK_PPM/OOK_PCM (NRZ), 16–64 bits, with exact measured timings and
+are 16 profiles, fixed-code OOK_PWM/OOK_PPM/OOK_PCM (NRZ), 12–64 bits, with exact measured timings and
 repeated frames. See LEARNING.md for resource bounds and validation semantics.
 
 ## Learning in 0.3.0-dev

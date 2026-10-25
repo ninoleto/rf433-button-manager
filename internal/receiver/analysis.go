@@ -120,6 +120,13 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 		frameCount := 0
 		for _, frame := range frames {
 			normalized := []byte(frame)
+			if profile == nil {
+				var e error
+				normalized, e = NormalizeConfiguredFlex(frame, request.Config.FlexDecoder)
+				if e != nil {
+					return nil, e
+				}
+			}
 			if profile != nil {
 				var e error
 				normalized, e = NormalizeProfile(frame, *profile)
@@ -242,6 +249,12 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 		seen[timing] = true
 		timings = append(timings, timing)
 	}
+	for _, timing := range measuredPWMTimings(request.Capture) {
+		if !seen[timing] {
+			seen[timing] = true
+			timings = append(timings, timing)
+		}
+	}
 	// The upstream histogram heuristic can miss NRZ packets with only a subset
 	// of run lengths present. Measure a small candidate set, but leave all bit
 	// decoding and repeated-code proof to rtl_433 replay of the unchanged data.
@@ -263,27 +276,21 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 		if pcm && accepted != nil && !strings.Contains(accepted.FlexDecoder, "m=OOK_PCM,") {
 			continue // Preserve a proven PWM/PPM decoder before the PCM fallback.
 		}
-		frames, _, e := replay([]string{"-R", "0", "-X", "n=RFB-Probe," + timing + ",bits>=16,bits<=64,repeats>=1"})
+		frames, _, e := replay([]string{"-R", "0", "-X", "n=RFB-Probe," + timing + ",bits>=12,bits<=64,repeats>=1"})
 		if e != nil {
 			return result, replayFailure()
 		}
 		code := ""
-		bits := 0
-		if pcm {
-			bits = repeatedPCMWidth(frames)
-			if bits == 0 {
-				continue
-			}
+		bits := repeatedFrameWidth(frames)
+		if bits == 0 {
+			continue
 		}
 		frameCount := 0
 		valid := len(frames) > 0
 		for _, frame := range frames {
-			width := 0
-			if pcm {
-				width = bits
-				if matchingFrameCount(frame, width) == 0 {
-					continue
-				}
+			width := bits
+			if matchingFrameCount(frame, width) == 0 {
+				continue
 			}
 			next, n, e := repeatedCode(frame, width, 1)
 			if e != nil || (code != "" && next != code) {

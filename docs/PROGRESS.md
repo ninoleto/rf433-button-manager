@@ -1,5 +1,22 @@
 # Project progress
 
+## 2026-10-25: two-switch learning repair (0.3.3-dev)
+
+Direct operator tests established live decoding for two separate switches using
+measured rtl_433 PWM settings. The six-button Amazon remote has not arrived and
+is not part of this evidence. The installed app could not learn these signals.
+
+The update adds bounded measured sync-PWM discovery when the analyzer says no
+clue, permits validated 12–64 bit profiles, selects repeated complete rows before
+excluding edge fragments, and normalizes explicit exact-width custom decoders.
+Existing profiles, mappings, token and receiver settings remain compatible.
+
+Private recordings now pass the production learning path, three software-armed
+observations, saved database reload, two simultaneous decoder profiles and correct
+isolated local webhook routing with repeated packets. This is offline evidence;
+0.3.3 installation, physical GUI learning and real webhook effects on ZORIN are
+pending. Source does not contain private codes, recordings or preset timings.
+
 ## 2026-10-25: recorded PCM discovery regression fixed (0.3.2-dev)
 
 An operator-exported 0.3.1 recording contains 52 packets (50 FSK, two OOK),

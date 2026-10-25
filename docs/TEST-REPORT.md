@@ -1,5 +1,49 @@
 # Verification report — 2026-10-25
 
+## 0.3.3-dev: measured PWM learning and partial-row correction
+
+Validation: isolated Linux x86_64, Go 1.27.3 and unmodified upstream rtl_433
+23.11 compiled without USB backends. No production service, USB receiver or real
+webhook destination was accessed from this environment.
+
+- Verified archive/source baseline 0.3.2. User terminal output independently proves
+  live decoding of a first switch and a separate front-door switch using measured
+  PWM settings. This does not prove the GUI update is installed or accepted.
+- Added automatic measured sync-PWM candidates without per-device timing presets,
+  12-bit profile support and exact-width normalization for explicitly bounded
+  custom decoders. Existing profile hashes/schema remain compatible.
+- Private replay regression: 23 cases (five first-switch analyzer cases, thirteen
+  front-door analyzer cases, five original app pulse-export cases). Every case
+  passed automatic discovery and reuse of its group's first learned profile.
+  Analyzer cases use the encoded pulse patterns embedded in the supplied logs;
+  these are quantized representations, not original IQ. One case combines two
+  successive packets from one analyzer burst; it is not an independent press.
+- Full production app regression using those private recordings: three separately
+  armed software observations per switch, explicit save, disabled actions,
+  database reopen, two concurrent profiles, and correct local HTTP routing with
+  repeated events 100 ms apart. No real Home Assistant URL was used.
+- Synthetic regression covers 12/16-bit discovery, jitter, another full code,
+  incomplete rows, conflicting full codes, competing repeated widths, strict
+  FSK exclusion and preservation of existing PCM/PPM behavior.
+- Full Go race suite and vet, four frontend controller checks, deployment/history
+  checks, five updater tests, and four checksum-pinned upstream IQ examples
+  (EV1527, PT2262, Akhan, HT680) passed. Module verification passed.
+- Optional full Chromium harness was not run: the browser download returned an
+  invalid/truncated archive. The browser controller checks above did run.
+- Private RF files and identifiers are excluded from Git, history and packages.
+  Existing third-party notices are reused: go.mod, go.sum and Go 1.27.3 are unchanged.
+
+Operator acceptance still required: install this version, learn each physical
+switch in the GUI, verify saved matching and deliberately test its real webhook.
+Physical USB recovery and the not-yet-arrived Amazon remote remain untested.
+
+Private regressions can be repeated with `RFB_PRIVATE_CAPTURE_DIR` pointing to a
+local directory containing `regression.json`: an array of objects with `Name`,
+`Code`, and `Files` (relative `.ook` recording paths). The app integration test
+uses the first two groups and the first three files in each. Never add this private
+directory or manifest to a public commit or release.
+
+
 ## 0.3.2-dev: actual recording reproduces a missing PCM learning path
 
 - Private operator export: 52 complete packets, two OOK and 50 FSK; no decoded

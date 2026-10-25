@@ -51,6 +51,16 @@ The service's `-c /dev/null` decoder invocation intentionally does not inherit
 unrelated `rtl_433` configurations. Use **Learn** for supported signals; existing
 advanced decoder settings are preserved. See [LEARNING.md](LEARNING.md).
 
+## Updating after direct receiver tests
+
+Let the terminal rtl_433/rtl_test command finish, then run
+`bash scripts/check-receiver-owners.sh` from the update package. It refuses a known
+competing receiver process without stopping it. If the app was stopped for that
+test, start only `rf-button-manager.service`, then run the prebuilt updater. The
+updater briefly waits for the existing listener before reading authenticated
+state; it still requires disabled actions and backs up stopped application data.
+No Go installation or receiver reconnect is needed for this update.
+
 ## Start, stop and access
 
 ```sh
