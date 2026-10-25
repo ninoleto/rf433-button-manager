@@ -33,6 +33,14 @@ Confirmation requires three separately armed captures; see LEARNING.md.
 - POST /api/buttons/{id}/clear -> clears mapping+action, disables button
 - POST /api/buttons/{id}/test -> {ok:true} (test saved action; blocked in learning)
 - POST /api/learn/start {button_id,identity_fields:[string]} -> Learning
+- POST /api/inspect/start {} -> Learning with `inspect_only:true`, no button ID
+  required. Shares the bounded capture/three-arm workflow and webhook suppression.
+- GET /api/inspect/result -> RF-only inspection report for the active/retained
+  inspection dialog: candidate, matched observations, candidate profile and limits.
+  Requires authentication. Download before closing the dialog. No configuration,
+  webhook URL/header or management token fields are included.
+  Inspection uses `/api/learn/arm`, `/api/learn/cancel` and `/api/learn/capture`;
+  `/api/learn/confirm` rejects inspection sessions and cannot persist a mapping.
 - POST /api/learn/arm {} -> Learning (arm next independent capture after release)
 - POST /api/learn/confirm {} -> {ok:true}
 - POST /api/learn/cancel {} -> {ok:true}

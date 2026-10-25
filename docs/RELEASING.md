@@ -2,7 +2,7 @@
 
 ## Development versus stable
 
-`0.2.0-dev` is a development build. A public source repository or green automated
+Versions labeled `-dev` are development builds. A public source repository or green automated
 CI does not establish receiver compatibility, physical learning, Home Assistant
 behavior, USB recovery, soak or reboot behavior. Publish a development prerelease
 only with those limitations clearly listed. A stable release requires applicable
@@ -12,6 +12,12 @@ require the server operator. Development source publication need not claim any
 such validation, but must satisfy the publication authorization's prerequisites.
 
 ## Before public publication
+
+Include [COMPATIBILITY.md](COMPATIBILITY.md) and the model-specific community
+report template. Never advertise "all Amazon buttons" or infer compatibility
+from a frequency/chipset label alone. Distinguish operator reports, raw-recording
+software tests and untested devices. The signal inspector cannot promise a code
+for an undecoded, encrypted or out-of-band transmission.
 
 1. Inspect current changes, branches/tags and all outgoing history. Preserve the
    imported five-commit development history; do not replace it with a single source

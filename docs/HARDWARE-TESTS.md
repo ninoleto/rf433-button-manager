@@ -1,5 +1,11 @@
 # Physical hardware acceptance gate
 
+**0.3.4-dev, operator report 2026-10-25:** all three currently available home
+buttons work and webhook handling is reported good. Product model/revision names
+and independent destination traces are not supplied. Record this as operator
+acceptance for those three devices, not universal Amazon compatibility or a USB
+recovery pass. The new 0.3.5 inspection view still needs its live browser check.
+
 **0.3.3-dev:** operator terminal tests confirm live decoding of two separate
 switches with measured settings. Updated GUI learning, physical webhook effects
 and receiver recovery remain pending. The future Amazon remote has not been

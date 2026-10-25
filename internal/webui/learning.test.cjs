@@ -38,6 +38,7 @@ async function harness() {
       calls.push({url,method:options.method,body:options.body?JSON.parse(options.body):null});
       if(url==='/api/state') return {ok:true,json:async()=>structuredClone(state)};
       if(url==='/api/learn/start') state={...state,learning:session(),learning_notice:null,actions_paused:true};
+      else if(url==='/api/inspect/start') state={...state,learning:{...session(),button_id:'',inspect_only:true},learning_notice:null,actions_paused:true};
       else if(url==='/api/learn/cancel') state={...state,learning:null,learning_notice:null,actions_paused:false};
       else if(url==='/api/learn/arm') state={...state,learning:{...state.learning,stage:'waiting'}};
       else if(url==='/api/learn/confirm') state={...state,learning:null,learning_notice:null,actions_paused:true};
@@ -190,4 +191,36 @@ test('webhook editor rejects unsafe URLs without saving and preserves explicit o
   h.el('webhook-url').value='http://ha.example.test:80/api/webhook/synthetic';
   await h.el('button-editor').emit('submit');
   assert.equal(h.calls.filter(c=>c.method==='PUT').at(-1).body.allow_webhook_origin,'http://ha.example.test:80');
+});
+
+test('signal inspector works without a remote and cannot accidentally save a button',async()=>{
+  const h=await harness();
+  h.set({remotes:[]});await h.refresh();
+  await h.el('inspect-open').click();
+  assert.equal(h.el('learning-title').textContent,'Inspect signal');
+  assert.equal(h.el('inspection-result').hidden,false);
+  assert.equal(h.el('inspect-open').disabled,true);
+  assert.match(h.el('learning-target').textContent,/without creating a remote/);
+  const session={...h.session(),button_id:'',inspect_only:true,stage:'captured',presses:1,candidate:'{"model":"Synthetic","codes":["{12}a69"]}',profile:{flex_decoder:'n=Synthetic,m=OOK_PWM,s=100,l=300,r=10000,bits=12'}};
+  h.set({learning:session});await h.refresh();
+  assert.match(h.el('inspection-code').textContent,/\{12\}a69/);
+  assert.match(h.el('inspection-verification').textContent,/1 of 3/);
+  assert.match(h.el('inspection-decoder').textContent,/bits=12/);
+  assert.equal(h.el('learning-confirm').hidden,true);
+  h.set({learning:{...session,stage:'ready',presses:3}});await h.refresh();
+  assert.equal(h.el('learning-confirm').textContent,'Finish inspection');
+  assert.match(h.el('learning-description').textContent,/Nothing will be saved/);
+  await h.el('learning-confirm').click();
+  assert.equal(h.el('learning-dialog').open,false);
+  assert.deepEqual(h.calls.filter(c=>c.method!=='GET').map(c=>c.url),['/api/inspect/start','/api/learn/cancel']);
+});
+
+test('failed inspection retries inspection rather than starting button learning',async()=>{
+  const h=await harness();
+  h.set({learning_notice:{...h.session(),inspect_only:true,button_id:'',stage:'press_timeout',presses:0},actions_paused:false});await h.refresh();
+  assert.equal(h.el('inspection-result').hidden,false);
+  assert.match(h.el('inspection-code').textContent,/No decoded candidate/);
+  await h.el('learning-retry').click();
+  assert.equal(h.calls.filter(c=>c.method==='POST').at(-1).url,'/api/inspect/start');
+  assert.equal(h.el('learning-title').textContent,'Inspect signal');
 });

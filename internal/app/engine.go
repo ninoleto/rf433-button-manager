@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.3.4-dev"
+const Version = "0.3.5-dev"
 
 type App struct {
 	mu                                  sync.Mutex
@@ -340,20 +340,32 @@ func (a *App) Restore(c Config) error {
 }
 
 func (a *App) StartLearning(id string, fields []string) (*Learning, error) {
+	return a.startLearning(id, fields, false)
+}
+
+func (a *App) StartInspection() (*Learning, error) {
+	return a.startLearning("", nil, true)
+}
+
+func (a *App) startLearning(id string, fields []string, inspect bool) (*Learning, error) {
 	a.actionGate.Lock()
 	defer a.actionGate.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.expireLocked()
 	if a.learning != nil || a.captureSuppressed {
-		return nil, errors.New("another button is already learning")
+		return nil, errors.New("another learning or inspection session is active")
 	}
 	b := findButton(&a.config, id)
-	if b == nil {
+	if b == nil && !inspect {
 		return nil, errors.New("button not found")
 	}
 	if len(fields) == 0 {
-		fields = b.IdentityFields
+		if inspect {
+			fields = a.config.Settings.IdentityFields
+		} else {
+			fields = b.IdentityFields
+		}
 	}
 	if e := validateFields(fields); e != nil {
 		return nil, e
@@ -362,6 +374,7 @@ func (a *App) StartLearning(id string, fields []string) (*Learning, error) {
 	a.epoch++
 	a.learningNotice = nil
 	a.learning = &Learning{SessionID: newID(), ButtonID: id, Stage: "waiting", Message: "Press the physical button once, then release it.", Required: 3, Fields: append([]string{}, fields...), expires: now.Add(90 * time.Second), armedAt: now, ExpiresAt: now.Add(90 * time.Second).UTC().Format(time.RFC3339)}
+	a.learning.InspectOnly = inspect
 	if a.captureEnabled && !a.demo {
 		l := a.learning
 		l.Automatic = true
@@ -428,6 +441,9 @@ func (a *App) ConfirmLearning() error {
 	defer a.mu.Unlock()
 	a.expireLocked()
 	l := a.learning
+	if l != nil && l.InspectOnly {
+		return errors.New("inspection cannot save a mapping; use Learn on a button")
+	}
 	if l == nil || l.Stage != "ready" || l.Presses < 3 {
 		return errors.New("three separate matching presses are required")
 	}

@@ -161,3 +161,64 @@ func TestPrivateTwoSwitchLearningToWebhookOptional(t *testing.T) {
 	}
 	t.Log("two recorded switches learned through three explicit arms, survived database reload, and each dispatched exactly one correct local webhook despite repeated RF messages")
 }
+
+func TestPrivateInspectionDiscoversCodeWithoutCreatingRemoteOptional(t *testing.T) {
+	dir := os.Getenv("RFB_PRIVATE_CAPTURE_DIR")
+	if dir == "" {
+		t.Skip("private operator recordings not supplied")
+	}
+	binary, err := exec.LookPath("rtl_433")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "regression.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var groups []struct {
+		Name, Code string
+		Files      []string
+	}
+	if err = json.Unmarshal(data, &groups); err != nil || len(groups) == 0 || len(groups[0].Files) < 3 {
+		t.Fatal("private capture manifest", err)
+	}
+	a, c := testApp(t)
+	a.captureEnabled, a.rtlBinary, a.analyzeCapture = true, binary, receiver.AnalyzeCapture
+	gen := startInspectionCapture(t, a)
+	for press := 0; press < 3; press++ {
+		raw, err := os.ReadFile(filepath.Join(dir, groups[0].Files[press]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		pulses := 0
+		for _, line := range strings.Split(string(raw), "\n") {
+			if strings.HasPrefix(line, ";ook ") {
+				_, _ = fmt.Sscanf(line, ";ook %d pulses", &pulses)
+				break
+			}
+		}
+		c.advance(1100 * time.Millisecond)
+		a.ReceivePulse(gen, receiver.PulsePacket{OOK: true, Pulses: pulses, Data: raw})
+		c.advance(1200 * time.Millisecond)
+		a.learningTick()
+		if a.learning == nil || a.learning.Presses != press+1 {
+			t.Fatal("recorded inspection failed")
+		}
+		if press < 2 {
+			if _, err = a.ArmLearning(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	report, err := a.InspectionResult()
+	if err != nil || !report.RepeatedIdentifier || report.Profile == nil || !strings.Contains(report.Candidate, groups[0].Code) {
+		t.Fatal("inspection did not report recorded code/profile", err)
+	}
+	if err = a.ConfirmLearning(); err == nil {
+		t.Fatal("inspection persisted a mapping")
+	}
+	if len(a.Backup().Remotes) != 0 || len(a.Backup().DecoderProfiles) != 0 {
+		t.Fatal("inspection changed configuration")
+	}
+	t.Log("private recordings produced a code and candidate decoder across three arms without a remote, mapping or webhook")
+}

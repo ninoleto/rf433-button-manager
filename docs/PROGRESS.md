@@ -1,5 +1,18 @@
 # Project progress
 
+## 2026-10-25: signal inspection and compatibility reporting (0.3.5-dev)
+
+All three currently available home buttons and webhook handling are now reported
+working by the operator. The future Amazon remote and other commercial models
+remain untested. Added an explicit compatibility matrix and community report form.
+
+**Inspect signal** uses the existing bounded receive/learning machinery without
+requiring or saving a remote, mapping or webhook. It displays the candidate code,
+compares three separately armed presses and exports RF-only evidence. Actions
+pause during inspection/restoration. Unknown traffic is not called encrypted or
+rolling merely because it was not decoded. Tests pass, including real offline
+recording discovery. Live inspection acceptance and publication remain pending.
+
 ## 2026-10-25: simplified webhook paste/save (0.3.4-dev)
 
 The operator reports learning works after 0.3.3. The next reported obstacle was

@@ -291,6 +291,7 @@
   function updateActionAvailability() {
     const learning = !!state.learning || !!state.actions_paused;
     const busy = mutationCount > 0;
+    $('inspect-open').disabled = learning || busy || !token;
     $('webhook-test').disabled = !!state.demo || learning || busy || editorDirty || !currentButton()?.webhook?.url;
     $('learn-start').disabled = learning || busy || editorDirty;
     $('button-save').disabled = busy || learning;
@@ -340,9 +341,10 @@
     $('learning-export').disabled = !state.rf_capture_available;
     const learning = state.learning || state.learning_notice;
     const active = !!state.learning;
+    const inspecting = !!learning?.inspect_only;
     $('learning-banner').hidden = !state.actions_paused && !active;
     $('learning-reopen').hidden = !learning;
-    $('learning-banner-text').textContent = active ? 'Learning mode · all webhook actions are paused.' : 'Restoring reception · all webhook actions remain paused.';
+    $('learning-banner-text').textContent = active ? `${inspecting ? 'Signal inspection' : 'Learning mode'} · all webhook actions are paused.` : 'Restoring reception · all webhook actions remain paused.';
     if (!learning) {
       close('learning-dialog');
       learningKey = '';
@@ -353,8 +355,11 @@
       return;
     }
     $('learning-version').textContent = state.version ? `RF Button Manager ${state.version}` : '';
+    $('learning-title').textContent = inspecting ? 'Inspect signal' : 'Learn a button';
+    $('learning-eyebrow').textContent = inspecting ? 'SIGNAL INSPECTION' : 'SIGNAL LEARNING';
+    $('inspection-result').hidden = !inspecting;
     const target = findButton(learning.button_id);
-    $('learning-target').textContent = target ? `${target.remote.name} / ${target.button.name}` : `Button ${learning.button_id}`;
+    $('learning-target').textContent = inspecting ? '433.92 MHz · inspect without creating a remote or webhook' : target ? `${target.remote.name} / ${target.button.name}` : `Button ${learning.button_id}`;
     const key = JSON.stringify([learning, state.receiver, state.receiver_mode, state.actions_paused]);
     if (key !== learningKey) {
       learningKey = key;
@@ -372,15 +377,25 @@
       $('learning-candidate').textContent = learning.candidate || '—';
       const ready = active && learning.stage === 'ready';
       const captured = active && learning.stage === 'captured';
+      if (inspecting) {
+        let identifier = learning.candidate || 'No decoded candidate yet.';
+        try { identifier = JSON.stringify(JSON.parse(learning.candidate), null, 2); } catch (_) { /* Not decoded yet. */ }
+        $('inspection-code').textContent = identifier;
+        $('inspection-verification').textContent = presses >= required ? 'The same identifier was observed on three separately armed presses. Verify it belongs to the intended button.' : `${presses} of ${required} matching presses. A first candidate is not a compatibility guarantee.`;
+        $('inspection-decoder').textContent = learning.profile?.flex_decoder || (learning.candidate ? 'Decoded by an existing rtl_433 or configured decoder.' : 'No validated decoder yet. Download the RF capture if this attempt fails.');
+      }
       $('learning-arm').hidden = !captured;
       $('learning-confirm').hidden = !ready;
+      $('learning-confirm').textContent = inspecting ? 'Finish inspection' : 'Confirm and save';
       $('learning-retry').hidden = active;
-      $('learning-cancel').textContent = active ? 'Cancel learning' : 'Close';
+      $('learning-cancel').textContent = active ? (inspecting ? 'Stop inspection' : 'Cancel learning') : 'Close';
       const titles = {preparing:'Preparing receiver', waiting:'Press the physical button once', receiving:'Transmission detected', analyzing:'Checking the captured signal', captured:'Press verified — release the button', ready:'Ready to save', receiver_unavailable:'Receiver unavailable', timeout:'Learning session timed out', no_capture:'No pulse capture', malformed_capture:'Malformed pulse capture', unsupported_modulation:'No supported modulation captured', capture_error:'Capture stream failed', unsupported:'Capture has no validated decoder', inconsistent:'Captures did not agree', capture_limit:'Capture limit reached', analysis_error:'Analysis could not finish'};
       titles.press_timeout = 'Press window timed out';
+      if (inspecting) { titles.ready = 'Three matching presses observed'; titles.captured = 'Candidate decoded — release the button'; }
       const budgetUsed = learning.automatic && learning.stage === 'waiting' && learning.window_analysis_limit > 0 && learning.window_analyses >= learning.window_analysis_limit;
       $('learning-instruction').textContent = budgetUsed ? 'Analysis budget reached' : titles[learning.stage] || 'Learning stopped';
       $('learning-description').textContent = learning.message || (ready ? 'Review the decoded data, then confirm this is the intended button.' : captured ? 'Release the button, then select Ready for next press.' : 'Keep other remotes idle. Release the button fully after each press.');
+      if (inspecting && ready) $('learning-description').textContent = 'Your code is shown below. Download the inspection report before finishing. Nothing will be saved as a button action.';
       $('learning-pause-text').textContent = active || state.actions_paused ? 'All webhook actions are paused' : 'Learning ended; previous mappings are unchanged';
       const diagnostic = learning.diagnostics || {};
       const stream = diagnostic.stream || {};
@@ -577,6 +592,18 @@
     setError('learning-error', '');
     await mutate('/learn/start', 'POST', { button_id: selectedButton, identity_fields: fields($('button-fields').value) });
   }, 'editor-error');
+  bindAction('inspect-open', async () => {
+    setError('learning-error', '');
+    await mutate('/inspect/start');
+  });
+  bindAction('inspection-export', async () => {
+    const report = await api('/inspect/result');
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2) + '\n'], {type: 'application/json'}));
+    const link = node('a'); link.href = url; link.download = 'rf-button-manager-inspection.json';
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Inspection report downloaded. RF identifiers are included; application credentials are excluded.');
+  }, 'learning-error');
   bindAction('learning-export', async () => {
     const capture = await api('/learn/capture');
     const blob = new Blob([JSON.stringify(capture, null, 2) + '\n'], {type: 'application/json'});
@@ -590,9 +617,13 @@
   bindAction('learning-retry', async () => {
     const previous = state.learning_notice;
     if (!previous) return;
-    await mutate('/learn/start', 'POST', {button_id: previous.button_id, identity_fields: previous.identity_fields});
+    if (previous.inspect_only) await mutate('/inspect/start');
+    else await mutate('/learn/start', 'POST', {button_id: previous.button_id, identity_fields: previous.identity_fields});
   }, 'learning-error');
   bindAction('learning-confirm', async () => {
+    if (state.learning?.inspect_only) {
+      await mutate('/learn/cancel'); render(); toast('Inspection finished. No mapping or webhook was changed.'); return;
+    }
     await mutate('/learn/confirm'); fillEditor(); render(); toast('RF signal saved. Review the webhook, then enable this button.');
   }, 'learning-error');
   async function cancelLearning() { await mutate('/learn/cancel'); }

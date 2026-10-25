@@ -111,6 +111,20 @@ func (a *App) Handler(token string, static fs.FS, publicOrigins ...string) http.
 		}
 		return a.StartLearning(b.ButtonID, b.Fields)
 	})
+	handle("POST /api/inspect/start", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		var body struct{}
+		if err := readJSON(w, r, &body); err != nil {
+			return nil, err
+		}
+		return a.StartInspection()
+	})
+	handle("GET /api/inspect/result", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		result, err := a.InspectionResult()
+		if err == nil {
+			w.Header().Set("Content-Disposition", `attachment; filename="rf-button-manager-inspection.json"`)
+		}
+		return result, err
+	})
 	handle("POST /api/learn/arm", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.ArmLearning() })
 	handle("POST /api/learn/confirm", func(w http.ResponseWriter, r *http.Request) (any, error) { return nil, a.ConfirmLearning() })
 	handle("POST /api/learn/cancel", func(w http.ResponseWriter, r *http.Request) (any, error) { return nil, a.CancelLearning() })

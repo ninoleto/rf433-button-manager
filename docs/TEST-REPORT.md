@@ -1,5 +1,30 @@
 # Verification report — 2026-10-25
 
+## 0.3.5-dev: signal inspector and explicit compatibility scope
+
+- Operator reports all three available home buttons and webhook handling work
+  after 0.3.4. This is operator evidence for those devices; exact product model
+  names were not supplied. It is not universal Amazon compatibility.
+- Added inspection without a remote: current rtl_433 receive/capture pipeline,
+  visible candidate identity and decoder, three separately armed observations,
+  RF-only report download and existing bounded raw pulse export. Inspection
+  cannot confirm/save a mapping. Reports explicitly mark demo mode.
+- Four new backend tests cover no-remote inspection, three-press reporting,
+  no configuration change, rejection of mapping save, suppression of enabled
+  actions/manual tests, authenticated exports without application credentials,
+  strict API bodies, failure evidence and receiver-restoration generations.
+- Private-recording regression discovers the first recorded switch from measured
+  pulses through the real rtl_433 analysis path with no remote configured. Three
+  software-armed observations yield its expected identifier and candidate profile;
+  no profile or mapping persists. This does not constitute three new physical presses.
+- Full race suite, vet, nine frontend controller tests, deployment/history and
+  five updater tests passed. Existing private/public recording regressions passed.
+  Full Chromium layout testing was not available in this environment.
+- Documentation separates native decoder support, bounded generic OOK discovery,
+  unrecognized FSK, changing/encrypted identities and out-of-band technologies.
+  Added a community compatibility-report template. GitHub publication and live
+  operator acceptance of the inspector remain pending.
+
 ## 0.3.4-dev: paste a complete webhook URL and save
 
 - Operator reports the 0.3.3 learning update works; no additional physical webhook

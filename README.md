@@ -10,6 +10,10 @@ reprogram remotes.
 reliability. Receiver recovery and the intended remote/webhook combinations must pass the [hardware acceptance matrix](docs/HARDWARE-TESTS.md)
 before this build can be called a production release.
 
+**Compatibility is model-specific.** Three home switches are operator-reported
+working; that does not establish support for every Amazon product or every
+433 MHz remote. Read the [compatibility matrix and inspection guide](docs/COMPATIBILITY.md).
+
 ![Running application in explicitly labeled demo mode](docs/screenshots/dashboard.png)
 
 [Mobile interface preview](docs/screenshots/mobile.png). These screenshots use
@@ -19,6 +23,8 @@ synthetic RF data and demonstrate the actual application, not physical receiver 
 
 - A six-button remote layout, plus additional remotes and custom button counts.
 - Learn/relearn with three separately armed matching presses and final confirmation.
+- Inspect signal without creating a remote: display the decoded identifier,
+  compare three presses, and download an RF-only inspection report/capture.
 - Global webhook suppression during learning, duplicate-mapping checks and debounce.
 - Per-button GET/POST webhooks, headers, JSON payload, timeout and explicit test action.
 - Receiver state and recent signal/action events, light/dark themes and mobile layout.

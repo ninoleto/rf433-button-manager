@@ -1,0 +1,37 @@
+name: Button compatibility report
+description: Report an exact tested button model or an undecoded capture.
+title: "[Compatibility] "
+body:
+  - type: input
+    id: product
+    attributes:
+      label: Exact button model and revision
+      description: Include a product link and its stated frequency/protocol. A retailer name alone is insufficient.
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Receiver and software versions
+      description: Receiver model, OS/architecture, app version and rtl_433 version. Do not include management tokens or webhook URLs.
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Observed outcome
+      options:
+        - Physical learning and intended webhook action verified
+        - Physical learning verified; webhook not tested
+        - Code visible in inspection; mapping not tested
+        - Traffic captured; no usable button identifier
+        - No traffic or receiver unavailable
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Reproduction and evidence
+      description: Describe separate presses, distance and result. If sharing an inspection report or RF capture, review its radio/device identifiers first. Never attach configuration backups or credentials.
+    validations:
+      required: true

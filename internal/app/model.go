@@ -68,6 +68,7 @@ type Learning struct {
 	FinishedAt          string                       `json:"finished_at,omitempty"`
 	SessionID           string                       `json:"session_id"`
 	Automatic           bool                         `json:"automatic"`
+	InspectOnly         bool                         `json:"inspect_only,omitempty"`
 	Message             string                       `json:"message"`
 	Diagnostics         receiver.LearningDiagnostics `json:"diagnostics"`
 	Profile             *receiver.DecoderProfile     `json:"profile,omitempty"`

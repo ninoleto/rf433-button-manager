@@ -1263,8 +1263,11 @@ dialog::backdrop{
 }
 @media(max-width:700px){
   .topbar{
-    padding:0 17px;
-    height:72px
+    padding:12px 17px;
+    min-height:72px;
+    height:auto;
+    flex-wrap:wrap;
+    gap:10px
   }
   .brand{
     gap:9px;
