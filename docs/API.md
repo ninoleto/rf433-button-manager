@@ -227,12 +227,36 @@ backup/rollback procedures are in [OPERATIONS.md](OPERATIONS.md).
 
 `actions_paused` stays true through capture cleanup and restoration, even when
 `learning` has become null. Do not infer action availability from the session alone.
-`learning_notice.stage` can be receiver_unavailable, timeout, unsupported,
+`learning_notice.stage` can be receiver_unavailable, timeout, no_capture,
+malformed_capture, unsupported_modulation, capture_error, unsupported,
 inconsistent, capture_limit or analysis_error; its message explains the next step.
+`unsupported` is reserved for a recording that reached analysis without a validated
+decoder/identity. It is not used for parser errors or missing input.
 Retry uses POST /api/learn/start with the previous button_id after cleanup. Cancel
 also dismisses a retained notice. The GUI provides these operations directly.
 
-Diagnostics include packets, pulses, bytes, candidates, replays, source and detail.
+`receiver_mode` and `receiver_generation` identify the currently applied receiver
+plan. Learning includes `capture_generation`, `capture_receiver`,
+`capture_receiver_at` and, on completion, `finished_at`. Capture receiver status is
+frozen on failure; top-level `receiver` can subsequently describe restored normal
+reception. Generations are process-local and restart with the application.
+
+Diagnostics include `observed_packets`, `rejected_packets`, `ook_packets`,
+`fsk_packets`, `malformed_packets`, `empty_packets`, `discarded_packets`, `packets`
+(accepted for replay), `pulses` (valid timing rows observed), `bytes` (observed
+packet bytes), `accepted_bytes`, `candidates`, `replays`, `source` and `detail`.
+Rejected and discarded categories may overlap during cleanup. `stream` contains
+`bytes`, `lines`, `json_records`, `headers`, `completed`, `pulse_rows`,
+`packet_incomplete`, `expected_pulses`, `current_rows` and `closed`. These describe
+stdout records actually read; they are not raw USB sample counts.
+`failure_code` / `failure_reason` preserve the terminal cause; `rejection_code` /
+`rejection_reason` identify the last rejected packet, including late cleanup.
+Examples include `invalid_timing`, `pulse_count_mismatch`, `missing_end`,
+`invalid_timescale`, `no_pulse_packet` and `stream_read_error`. No raw rejected line
+is echoed into the reason. Failure/cleanup metadata is persisted in `learning` and
+`learning_diagnostics` events; the active session/notice itself is not resumed
+after application restart.
+
 They never include credentials or raw IQ data. Profile timing and decoded identities
 may identify a remote; treat full state and diagnostics as private. There is no
 public pulse-injection endpoint or unauthenticated capture control. Profile limits

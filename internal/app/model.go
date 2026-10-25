@@ -62,27 +62,32 @@ type Event struct {
 	Data     json.RawMessage `json:"data,omitempty"`
 }
 type Learning struct {
-	SessionID   string                       `json:"session_id"`
-	Automatic   bool                         `json:"automatic"`
-	Message     string                       `json:"message"`
-	Diagnostics receiver.LearningDiagnostics `json:"diagnostics"`
-	Profile     *receiver.DecoderProfile     `json:"profile,omitempty"`
-	ButtonID    string                       `json:"button_id"`
-	Stage       string                       `json:"stage"`
-	Candidate   string                       `json:"candidate"`
-	Raw         json.RawMessage              `json:"raw"`
-	Presses     int                          `json:"presses"`
-	Required    int                          `json:"required"`
-	ExpiresAt   string                       `json:"expires_at"`
-	Fields      []string                     `json:"identity_fields"`
-	expires     time.Time
-	armedAt     time.Time
-	lastRF      time.Time
-	firstPulse  time.Time
-	packets     []receiver.PulsePacket
-	bytes       int
-	ctx         context.Context
-	cancel      context.CancelFunc
+	CaptureGeneration uint64                       `json:"capture_generation"`
+	CaptureReceiver   receiver.Status              `json:"capture_receiver"`
+	CaptureReceiverAt string                       `json:"capture_receiver_at"`
+	FinishedAt        string                       `json:"finished_at,omitempty"`
+	SessionID         string                       `json:"session_id"`
+	Automatic         bool                         `json:"automatic"`
+	Message           string                       `json:"message"`
+	Diagnostics       receiver.LearningDiagnostics `json:"diagnostics"`
+	Profile           *receiver.DecoderProfile     `json:"profile,omitempty"`
+	ButtonID          string                       `json:"button_id"`
+	Stage             string                       `json:"stage"`
+	Candidate         string                       `json:"candidate"`
+	Raw               json.RawMessage              `json:"raw"`
+	Presses           int                          `json:"presses"`
+	Required          int                          `json:"required"`
+	ExpiresAt         string                       `json:"expires_at"`
+	Fields            []string                     `json:"identity_fields"`
+	expires           time.Time
+	armedAt           time.Time
+	lastRF            time.Time
+	firstPulse        time.Time
+	packets           []receiver.PulsePacket
+	bytes             int
+	fskAtArm          int
+	ctx               context.Context
+	cancel            context.CancelFunc
 }
 
 var defaultFields = []string{"id", "channel", "command", "state", "button", "code", "codes"}

@@ -240,12 +240,21 @@ whether it reused a profile. **Retry learning** starts a fresh three-press attem
 after receiver restoration; it never silently saves a partial candidate. No user
 receiver command or service shutdown is needed for normal learning.
 
-No detected transmission: check the remote battery, range and antenna, then retry.
-Detected but unsupported: the capture did not meet supported fixed-code OOK/PWM
-requirements, or replay could not validate it. Inconsistent: different identities
-were received; keep other remotes idle and retry the same button. A rolling or
+No pulse capture means no usable pulse packet reached analysis; sample acquisition
+alone is not proof of a transmission. Malformed capture means parser input failed:
+retain the specific row/header/boundary reason from Diagnostics for investigation.
+FSK-only input is excluded from OOK learning and may come from another transmitter;
+it does not identify the intended remote as unsupported. Complete OOK input with
+no validated decoder is a separate replay outcome. Inconsistent means different
+identities were received; keep other remotes idle. A rolling or
 encrypted remote remains unsupported, even if several presses look superficially
 similar. Captures are temporary/private, bounded and deleted after analysis.
+
+The dialog's capture receiver snapshot is distinct from current normal reception.
+Do not infer capture success from a restored **connected** indicator. Counters and
+the original rejection survive cleanup and are stored as bounded event metadata.
+See [CAPTURE-INVESTIGATION.md](CAPTURE-INVESTIGATION.md) for the corrected 0.2.0
+failure classification. No extra live receiver or terminal capture is needed.
 
 An unsupported modulation may need a deliberate developer extension and new
 fixtures/tests; see [DEVELOPMENT.md](DEVELOPMENT.md) and [LEARNING.md](LEARNING.md).

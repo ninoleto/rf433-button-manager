@@ -11,13 +11,26 @@ import (
 )
 
 type LearningDiagnostics struct {
-	Packets    int    `json:"packets"`
-	Pulses     int    `json:"pulses"`
-	Bytes      int    `json:"bytes"`
-	Candidates int    `json:"candidates"`
-	Replays    int    `json:"replays"`
-	Source     string `json:"source"`
-	Detail     string `json:"detail"`
+	ObservedPackets  int         `json:"observed_packets"`
+	RejectedPackets  int         `json:"rejected_packets"`
+	OOKPackets       int         `json:"ook_packets"`
+	FSKPackets       int         `json:"fsk_packets"`
+	MalformedPackets int         `json:"malformed_packets"`
+	EmptyPackets     int         `json:"empty_packets"`
+	DiscardedPackets int         `json:"discarded_packets"`
+	AcceptedBytes    int         `json:"accepted_bytes"`
+	RejectionCode    string      `json:"rejection_code"`
+	RejectionReason  string      `json:"rejection_reason"`
+	FailureCode      string      `json:"failure_code"`
+	FailureReason    string      `json:"failure_reason"`
+	Stream           PulseStream `json:"stream"`
+	Packets          int         `json:"packets"`
+	Pulses           int         `json:"pulses"`
+	Bytes            int         `json:"bytes"`
+	Candidates       int         `json:"candidates"`
+	Replays          int         `json:"replays"`
+	Source           string      `json:"source"`
+	Detail           string      `json:"detail"`
 }
 
 type AnalysisRequest struct {
@@ -44,8 +57,11 @@ func analysisFailure(code, message string) error { return &LearningError{Code: c
 var errMixedIdentity = errors.New("different identities decoded in one capture")
 
 func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result AnalysisResult, err error) {
-	if len(request.Capture) == 0 || len(request.Capture) > MaxCaptureBytes || request.Signature == nil {
-		return result, analysisFailure("unsupported", "Capture was empty or exceeded supported limits. Retry with one brief press.")
+	if len(request.Capture) == 0 {
+		return result, analysisFailure("no_capture", "No pulse recording reached analysis. No remote compatibility conclusion can be made.")
+	}
+	if len(request.Capture) > MaxCaptureBytes || request.Signature == nil {
+		return result, analysisFailure("capture_error", "Capture did not meet the analysis input contract. No profile was saved.")
 	}
 	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()

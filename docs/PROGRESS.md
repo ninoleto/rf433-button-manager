@@ -1,5 +1,28 @@
 # Project progress
 
+## 2026-10-25: failed capture evidence and 23.11 stream compatibility (0.2.1-dev)
+
+The operator installed `0.2.0-dev` / `413ac5b` and reported a failed A ON browser
+attempt: unsupported with zero capture/analyzer/replay counters. Investigation
+demonstrated rejection before accounting and a receiver-status display drawn from
+restored reception. Valid FSK on the actual rtl_433 23.11 `-w OOK:-` output reproduces
+that failure, but the lost historical rejection means it cannot be attributed to
+the intended remote. See [CAPTURE-INVESTIGATION.md](CAPTURE-INVESTIGATION.md).
+
+Prepared 0.2.1-dev with separate failure categories, strict stream parsing, observed
+versus accepted counts, capture receiver provenance, queued/partial cleanup evidence
+and persistent bounded diagnostic history. FSK does not abort waiting for OOK.
+Replay validation and three-press confirmation remain required; no decoder timing
+was inferred for the operator's remote. Existing history is preserved from 413ac5b.
+
+Actual 23.11 synthetic IQ tests prove mixed JSON/OOK and FSK packet handling before
+EOF, without USB. Parser, application lifecycle/persistence and frontend regression
+tests pass; detailed verification and deployment limits are in TEST-REPORT.md.
+The live health endpoint still reports 0.2.0-dev. This session cannot write the home
+checkout or elevate privileges: the corrected update is prepared separately for
+the already-authorized application-only host helper. No new physical test or public
+publication is claimed. Earlier entries describe their respective historical builds.
+
 ## 2026-10-25: browser capture learning (0.2.0-dev)
 
 The operator verified the preceding 0.1 installation, authentication, configuration

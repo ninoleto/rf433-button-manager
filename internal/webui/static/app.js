@@ -305,7 +305,7 @@
       content.append(node('span', '', event.message || 'Received event'));
       if (event.data !== undefined && event.data !== null && event.data !== '') {
         const details = node('details');
-        details.append(node('summary', '', 'Decoded data'), node('pre', '', typeof event.data === 'string' ? event.data : JSON.stringify(event.data, null, 2)));
+        details.append(node('summary', '', event.data.diagnostics ? 'Capture diagnostics' : 'Decoded data'), node('pre', '', typeof event.data === 'string' ? event.data : JSON.stringify(event.data, null, 2)));
         content.append(details);
       }
       row.append(time, type, content); fragment.append(row);
@@ -329,7 +329,7 @@
     }
     const target = findButton(learning.button_id);
     $('learning-target').textContent = target ? `${target.remote.name} / ${target.button.name}` : `Button ${learning.button_id}`;
-    const key = JSON.stringify([learning, state.receiver, state.actions_paused]);
+    const key = JSON.stringify([learning, state.receiver, state.receiver_mode, state.actions_paused]);
     if (key !== learningKey) {
       learningKey = key;
       const presses = Number(learning.presses) || 0;
@@ -350,15 +350,26 @@
       $('learning-confirm').hidden = !ready;
       $('learning-retry').hidden = active;
       $('learning-cancel').textContent = active ? 'Cancel learning' : 'Close';
-      const titles = {preparing:'Preparing receiver', waiting:'Press the physical button once', receiving:'Transmission detected', analyzing:'Checking the captured signal', captured:'Press verified — release the button', ready:'Ready to save', receiver_unavailable:'Receiver unavailable', timeout:'No completed capture', unsupported:'Transmission detected but unsupported', inconsistent:'Captures did not agree', capture_limit:'Capture limit reached', analysis_error:'Analysis could not finish'};
+      const titles = {preparing:'Preparing receiver', waiting:'Press the physical button once', receiving:'Transmission detected', analyzing:'Checking the captured signal', captured:'Press verified — release the button', ready:'Ready to save', receiver_unavailable:'Receiver unavailable', timeout:'Learning session timed out', no_capture:'No pulse capture', malformed_capture:'Malformed pulse capture', unsupported_modulation:'No supported modulation captured', capture_error:'Capture stream failed', unsupported:'Capture has no validated decoder', inconsistent:'Captures did not agree', capture_limit:'Capture limit reached', analysis_error:'Analysis could not finish'};
       $('learning-instruction').textContent = titles[learning.stage] || 'Learning stopped';
       $('learning-description').textContent = learning.message || (ready ? 'Review the decoded data, then confirm this is the intended button.' : captured ? 'Release the button, then select Ready for next press.' : 'Keep other remotes idle. Release the button fully after each press.');
       $('learning-pause-text').textContent = active || state.actions_paused ? 'All webhook actions are paused' : 'Learning ended; previous mappings are unchanged';
       const diagnostic = learning.diagnostics || {};
+      const stream = diagnostic.stream || {};
+      const capturedReceiver = learning.capture_receiver || {};
+      const currentMode = !active && state.actions_paused ? 'restoring normal reception' : state.receiver_mode === 'learning_capture' ? 'learning capture' : 'normal reception';
       $('learning-diagnostics').textContent = [
-        `Receiver: ${state.receiver.state || 'unknown'} — ${state.receiver.message || ''}`,
+        `Capture receiver ${active ? 'during this attempt' : 'at failure'}: ${capturedReceiver.state || 'not recorded'} — ${capturedReceiver.message || ''}`,
+        `Capture plan: ${learning.capture_generation ?? 'not recorded'}; status time: ${learning.capture_receiver_at || 'not recorded'}`,
+        `Current reception: ${currentMode} — ${state.receiver.state || 'unknown'} — ${state.receiver.message || ''}`,
         `Mode: ${learning.automatic ? 'Captured pulse analysis and replay' : 'Decoded signal / demonstration'}`,
-        `Captured packets: ${diagnostic.packets || 0}; pulses: ${diagnostic.pulses || 0}; bytes: ${diagnostic.bytes || 0}`,
+        `Packet records seen: ${diagnostic.observed_packets || 0}; accepted for replay: ${diagnostic.packets || 0}; rejected: ${diagnostic.rejected_packets || 0}; outside capture window / during cleanup: ${diagnostic.discarded_packets || 0}`,
+        `Observed pulses: ${diagnostic.pulses || 0}; packet bytes: ${diagnostic.bytes || 0}; accepted bytes: ${diagnostic.accepted_bytes || 0}`,
+        `OOK packets: ${diagnostic.ook_packets || 0}; FSK packets: ${diagnostic.fsk_packets || 0}; malformed: ${diagnostic.malformed_packets || 0}; empty: ${diagnostic.empty_packets || 0}`,
+        `Stdout read: ${stream.bytes || 0} bytes / ${stream.lines || 0} lines; JSON records: ${stream.json_records || 0}; pulse headers: ${stream.headers || 0}; end boundaries: ${stream.completed || 0}`,
+        `Pulse stream: ${stream.closed ? 'closed' : 'open'}${stream.packet_incomplete ? `; incomplete packet (${stream.current_rows || 0}/${stream.expected_pulses || 0} rows)` : ''}`,
+        diagnostic.failure_code ? `Failure: ${diagnostic.failure_code} — ${diagnostic.failure_reason || ''}` : '',
+        diagnostic.rejection_code ? `Last rejection: ${diagnostic.rejection_code} — ${diagnostic.rejection_reason || ''}` : '',
         `Analyzer candidates: ${diagnostic.candidates || 0}; offline replays: ${diagnostic.replays || 0}`,
         `Decoder: ${learning.profile?.name || diagnostic.source || 'No validated profile yet'}`,
         diagnostic.detail || '',

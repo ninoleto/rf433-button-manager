@@ -1,5 +1,51 @@
 # Verification report — 2026-10-25
 
+## Capture diagnostic correction: 0.2.1-dev
+
+Prepared from the installed/home source base `413ac5b`. The operator's failed
+physical A ON attempt on 0.2.0-dev is recorded as a failure with insufficient
+diagnostics, not as proof of unsupported RF. The demonstrated accounting/status
+defects and the limit of retrospective attribution are documented in
+[CAPTURE-INVESTIGATION.md](CAPTURE-INVESTIGATION.md).
+
+Executed software checks for the correction:
+
+- **58 top-level Go tests pass with `-race -count=1`**, excluding the same eight
+  loopback-socket-dependent tests listed below. New regression coverage includes
+  FSK exclusion without aborting OOK learning, empty/JSON-only/malformed/partial
+  capture classification, cleanup evidence, cancellation, event persistence after
+  store reopen, receiver-status provenance and unmodified configuration.
+- Installed **rtl_433 23.11** processed generated unsigned-8-bit IQ input with
+  default protocol detection and `-w OOK:- -F json`. OOK produced 144 pulse rows
+  alongside decoded JSON; FSK produced a valid 144-row FSK packet on the same
+  output type. Both packets completed **before input EOF**. No USB was opened.
+- Parser regressions cover interleaved JSON/metadata, blank lines and CRLF, row
+  counts, explicit units/version, invalid and excessive durations, packet size,
+  repeated headers, missing end boundaries and incomplete flushes.
+- A fake reader/child lifecycle regression proves already-queued complete and
+  incomplete packets are counted during shutdown and are ineligible as new
+  learning candidates. The existing supervisor test still proves exclusive live
+  receiver ownership across transitions.
+- **Three frontend-controller scenarios pass** with an in-memory DOM/API adapter,
+  including distinct failure titles and capture status separate from restored
+  normal reception. These are not real browser-layout or physical RF tests.
+- Vet, formatting, JavaScript/shell syntax and deployment/history tests pass.
+  A static Linux amd64 executable builds with `make build` and reports 0.2.1-dev.
+
+The environment still prohibits loopback listening sockets, home-checkout writes
+and sudo escalation. The host update helper must run full `make check` before
+deployment; no new full-host-suite pass is claimed here. The excluded tests are
+`TestDebounceHeldButtonAndRearm`, `TestLearningSuppressesAllActionsAndTests`,
+`TestDifferentButtonsDispatchConcurrently`, `TestLearningWaitsForInFlightRequest`,
+`TestStorageFailureDisablesActions`, `TestWebhookDoesNotFollowRedirectOrRetry`,
+`TestWebhookTimeoutIsUnknownAndNotRetried`, and `TestWebhookPayloadAndHeaders`.
+
+The live `/healthz` still reports 0.2.0-dev. Application deployment/restart checks,
+real browser rendering, corrected physical learning, physical webhooks and USB
+recovery remain pending. No decoder timing, button identity or physical result was
+invented. No public repository push or GitHub CI result is claimed for this update.
+Earlier sections are historical reports for their stated versions.
+
 ## Browser learning update: 0.2.0-dev
 
 The new code was prepared from the existing imported history at `08b7fc4`.

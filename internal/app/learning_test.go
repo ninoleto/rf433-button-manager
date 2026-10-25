@@ -145,7 +145,7 @@ func TestCaptureTimeoutAndReceiverUnavailable(t *testing.T) {
 		delay time.Duration
 		stage string
 	}{
-		{"waiting", true, 21 * time.Second, "timeout"},
+		{"waiting", true, 21 * time.Second, "no_capture"},
 		{"receiver", false, 31 * time.Second, "receiver_unavailable"},
 		{"session", true, 181 * time.Second, "timeout"},
 	} {
@@ -209,9 +209,9 @@ func TestCaptureCancellationWaitsForAnalysisCleanup(t *testing.T) {
 func TestCaptureFailureBoundsAndDiagnosticNotice(t *testing.T) {
 	a, c, r := captureApp(t)
 	generation := startCapture(t, a, r.Buttons[0].ID)
-	a.ReceivePulse(generation, receiver.PulsePacket{OOK: false, Data: []byte("unsupported fsk")})
-	if a.learningNotice == nil || a.learningNotice.Stage != "unsupported" {
-		t.Fatal("unsupported capture had no explanation")
+	a.ReceivePulse(generation, receiver.PulsePacket{OOK: true, ErrorCode: "invalid_timing", Error: "Pulse row 1 contains a non-integer or negative duration", ObservedBytes: 30})
+	if a.learningNotice == nil || a.learningNotice.Stage != "malformed_capture" {
+		t.Fatal("malformed capture had no explanation")
 	}
 	_, generation = a.ReceiverPlan("rtl_433")
 	a.ReceiverPlanApplied(generation)

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.2.0-dev"
+const Version = "0.2.1-dev"
 
 type App struct {
 	mu                                  sync.Mutex
@@ -18,8 +18,10 @@ type App struct {
 	store                               *Store
 	config                              Config
 	receiver                            receiver.Status
+	receiverMode                        string
 	learning                            *Learning
 	learningNotice                      *Learning
+	terminalCapture                     *Learning // Retains cleanup evidence even after the dialog is dismissed.
 	captureEnabled                      bool
 	captureSuppressed                   bool
 	analysisActive                      bool
@@ -98,18 +100,20 @@ func (a *App) State() any {
 	defer a.mu.Unlock()
 	a.expireLocked()
 	return clone(struct {
-		Remotes         []Remote                  `json:"remotes"`
-		Settings        Settings                  `json:"settings"`
-		Receiver        receiver.Status           `json:"receiver"`
-		Learning        *Learning                 `json:"learning"`
-		Events          []Event                   `json:"events"`
-		Version         string                    `json:"version"`
-		Demo            bool                      `json:"demo"`
-		StorageError    bool                      `json:"storage_error"`
-		LearningNotice  *Learning                 `json:"learning_notice"`
-		ActionsPaused   bool                      `json:"actions_paused"`
-		DecoderProfiles []receiver.DecoderProfile `json:"decoder_profiles"`
-	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles})
+		Remotes            []Remote                  `json:"remotes"`
+		Settings           Settings                  `json:"settings"`
+		Receiver           receiver.Status           `json:"receiver"`
+		Learning           *Learning                 `json:"learning"`
+		Events             []Event                   `json:"events"`
+		Version            string                    `json:"version"`
+		Demo               bool                      `json:"demo"`
+		StorageError       bool                      `json:"storage_error"`
+		LearningNotice     *Learning                 `json:"learning_notice"`
+		ActionsPaused      bool                      `json:"actions_paused"`
+		DecoderProfiles    []receiver.DecoderProfile `json:"decoder_profiles"`
+		ReceiverMode       string                    `json:"receiver_mode"`
+		ReceiverGeneration uint64                    `json:"receiver_generation"`
+	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles, a.receiverMode, a.receiverApplied})
 }
 func findButton(c *Config, id string) *Button {
 	for ri := range c.Remotes {
@@ -123,6 +127,9 @@ func findButton(c *Config, id string) *Button {
 	return nil
 }
 func (a *App) mutate(fn func(*Config) error) error {
+	return a.mutateConfig(fn, false)
+}
+func (a *App) mutateConfig(fn func(*Config) error, restartReceiver bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.expireLocked()
@@ -142,6 +149,9 @@ func (a *App) mutate(fn func(*Config) error) error {
 	}
 	a.config = next
 	a.epoch++
+	if restartReceiver {
+		a.receiverChangedLocked()
+	}
 	return nil
 }
 func (a *App) CreateRemote(name string, columns, count int) (Remote, error) {
@@ -286,13 +296,7 @@ func (a *App) DeleteButton(id string) error {
 	})
 }
 func (a *App) UpdateSettings(s Settings) error {
-	e := a.mutate(func(c *Config) error { c.Settings = s; return nil })
-	if e == nil {
-		a.mu.Lock()
-		a.receiverChangedLocked()
-		a.mu.Unlock()
-	}
-	return e
+	return a.mutateConfig(func(c *Config) error { c.Settings = s; return nil }, true)
 }
 func (a *App) Backup() Config { a.mu.Lock(); defer a.mu.Unlock(); return clone(a.config) }
 func (a *App) Restore(c Config) error {
@@ -306,13 +310,7 @@ func (a *App) Restore(c Config) error {
 			c.Remotes[i].Buttons[j].LastReceived = ""
 		}
 	}
-	e := a.mutate(func(next *Config) error { *next = c; return nil })
-	if e == nil {
-		a.mu.Lock()
-		a.receiverChangedLocked()
-		a.mu.Unlock()
-	}
-	return e
+	return a.mutateConfig(func(next *Config) error { *next = c; return nil }, true)
 }
 
 func (a *App) StartLearning(id string, fields []string) (*Learning, error) {
@@ -348,6 +346,9 @@ func (a *App) StartLearning(id string, fields []string) (*Learning, error) {
 		l.ctx, l.cancel = context.WithCancel(a.ctx)
 		a.captureSuppressed = true
 		a.receiverChangedLocked()
+		l.CaptureGeneration = a.receiverGeneration
+		l.CaptureReceiver = receiver.Status{State: "recovering", Message: "Capture receiver plan has not started"}
+		l.CaptureReceiverAt = now.UTC().Format(time.RFC3339Nano)
 	}
 	a.eventLocked("learning", "Learning started; all webhook actions paused", id, nil)
 	return clone(a.learning), nil
@@ -366,6 +367,7 @@ func (a *App) ArmLearning() (*Learning, error) {
 	l.Stage = "waiting"
 	l.Message = "Press the same physical button once, then release it."
 	l.armedAt = a.now()
+	l.fskAtArm = l.Diagnostics.FSKPackets
 	l.firstPulse = time.Time{}
 	l.packets = nil
 	l.bytes = 0

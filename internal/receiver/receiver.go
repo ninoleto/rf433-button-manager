@@ -170,14 +170,55 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 	var exited <-chan error
 	var started, heartbeat, nextAttempt time.Time
 	var pulses pulseAssembler
+	callback := func(packet PulsePacket) {
+		for _, fn := range onPulse {
+			if fn != nil {
+				fn(packet)
+			}
+		}
+	}
 	backoff := rt.initialBackoff
 	stop := func() {
 		if child != nil {
 			child.stop()
 			child = nil
+			if cfg.CapturePulses {
+				// stop() has joined the readers. Account for their bounded queue before
+				// discarding the process. Cleanup records cannot become new candidates.
+			drain:
+				for out != nil {
+					select {
+					case rec, ok := <-out:
+						if !ok {
+							break drain
+						}
+						if rec.err != nil {
+							callback(PulsePacket{Cleanup: true, ErrorCode: "stream_read_error", Error: rec.err.Error(), Stream: pulses.snapshot()})
+						} else if !rec.stderr {
+							if packet, _ := pulses.feed(rec.data); packet != nil {
+								packet.Cleanup = true
+								callback(*packet)
+							}
+						}
+					default:
+						break drain
+					}
+				}
+				snapshot := pulses.snapshot()
+				if packet := pulses.flush(); packet != nil {
+					packet.Cleanup = true
+					callback(*packet)
+				}
+				snapshot.Closed = true
+				callback(PulsePacket{Progress: true, Final: true, Stream: snapshot})
+			}
 		}
 		out, exited = nil, nil
-		pulses = pulseAssembler{}
+		stream := pulses.snapshot()
+		stream.Active = false
+		stream.Expected = 0
+		stream.Rows = 0
+		pulses = pulseAssembler{stream: stream}
 	}
 	defer stop()
 	failure := func(message string) {
@@ -214,21 +255,28 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 				continue
 			}
 			if rec.err != nil {
+				if cfg.CapturePulses {
+					callback(PulsePacket{ErrorCode: "stream_read_error", Error: rec.err.Error(), Stream: pulses.snapshot()})
+				}
 				failure(rec.err.Error())
 				continue
 			}
 			if cfg.CapturePulses {
 				packet, consumed := pulses.feed(rec.data)
-				if consumed {
-					if packet != nil {
+				if packet != nil {
+					if packet.Error == "" && len(packet.Data) > 0 {
 						heartbeat = time.Now()
-						emit("connected", "receiver is acquiring samples", current.serial)
-						for _, callback := range onPulse {
-							if callback != nil {
-								callback(*packet)
-							}
-						}
+						emit("connected", "receiver is producing pulse records", current.serial)
 					}
+					callback(*packet)
+				}
+				// Headers are immediate; periodic snapshots make partial input visible
+				// without invoking the application for every pulse row.
+				snapshot := pulses.snapshot()
+				if packet != nil || snapshot.Lines%64 == 0 || strings.HasPrefix(string(rec.data), ";") || (!consumed && classify(rec.data) == stats) {
+					callback(PulsePacket{Progress: true, Stream: snapshot})
+				}
+				if consumed {
 					continue
 				}
 			}

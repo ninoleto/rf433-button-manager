@@ -84,7 +84,7 @@ test('browser controller learns without decoder setup and exposes progress, diag
 
 test('reopened browser shows useful terminal failures and cannot retry before restoration',async()=>{
   const h=await harness(); // No selected editor: status controls must still update.
-  for(const [stage,title] of [['receiver_unavailable','Receiver unavailable'],['timeout','No completed capture'],['inconsistent','Captures did not agree']]) {
+  for(const [stage,title] of [['receiver_unavailable','Receiver unavailable'],['timeout','Learning session timed out'],['no_capture','No pulse capture'],['malformed_capture','Malformed pulse capture'],['unsupported_modulation','No supported modulation captured'],['capture_error','Capture stream failed'],['inconsistent','Captures did not agree']]) {
     h.set({learning_notice:{...h.session(),stage,message:`Explanation for ${stage}`},actions_paused:true});await h.refresh();
     assert.equal(h.el('learning-instruction').textContent,title);
     assert.equal(h.el('learning-retry').disabled,true);
@@ -94,4 +94,20 @@ test('reopened browser shows useful terminal failures and cannot retry before re
   await h.el('learning-cancel').click();
   assert.equal(h.el('learning-dialog').open,false);
   assert.equal(h.calls.at(-2).url,'/api/learn/cancel');
+});
+
+test('failure diagnostics retain capture evidence separately from restored reception',async()=>{
+  const h=await harness();
+  h.set({receiver_mode:'normal',receiver:{state:'connected',message:'Restored samples'},learning_notice:{...h.session(),stage:'malformed_capture',capture_generation:7,capture_receiver:{state:'error',message:'Capture pipe failed'},capture_receiver_at:'2026-01-01T00:00:00Z',diagnostics:{observed_packets:1,packets:0,rejected_packets:1,pulses:12,bytes:321,malformed_packets:1,failure_code:'invalid_timing',failure_reason:'Pulse row 13 contains a non-integer or negative duration',stream:{bytes:400,lines:20,json_records:1,headers:1,completed:1,closed:true}}}});
+  await h.refresh();
+  const text=h.el('learning-diagnostics').textContent;
+  assert.match(text,/Capture receiver at failure: error — Capture pipe failed/);
+  assert.match(text,/Current reception: normal reception — connected — Restored samples/);
+  assert.match(text,/Packet records seen: 1; accepted for replay: 0; rejected: 1/);
+  assert.match(text,/Observed pulses: 12; packet bytes: 321/);
+  assert.match(text,/Stdout read: 400 bytes \/ 20 lines; JSON records: 1/);
+  assert.match(text,/Failure: invalid_timing — Pulse row 13/);
+  assert.match(text,/Pulse stream: closed/);
+  assert.equal(h.el('learning-instruction').textContent,'Malformed pulse capture');
+  assert.equal(h.el('learning-confirm').hidden,true);
 });

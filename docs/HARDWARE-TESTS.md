@@ -1,6 +1,11 @@
 # Physical hardware acceptance gate
 
-**Browser capture update: physical learning remains pending.** The operator's
+**0.2.1-dev capture correction: physical learning remains pending.** The operator
+reported an unsuccessful A ON attempt on installed 0.2.0-dev / 413ac5b. Its generic
+unsupported notice and zero counters were faulty diagnostics, not evidence that
+the remote is unsupported. The correction has software/synthetic-IQ evidence only;
+see [CAPTURE-INVESTIGATION.md](CAPTURE-INVESTIGATION.md). No new physical test is
+claimed for this correction. The operator's
 2026-10-25 baseline confirms the 0.1 service installation/authentication/configuration
 persistence and receiver sample acquisition after one receiver-only reconnect.
 That is not a completed physical decoding, webhook or port/hub recovery matrix.

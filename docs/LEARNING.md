@@ -52,14 +52,25 @@ The browser may be closed; a server timer still expires and cleans up learning.
 | Waiting for transmission | Samples are available; briefly press/release the intended button. |
 | Transmission detected | Pulses arrived; release and allow RF silence before analysis. |
 | Checking captured signal | rtl_433 is replaying a private recording; do not press again yet. |
-| Detected but unsupported | No supported, replay-validated interpretation exists. No mapping/profile changed. |
+| No pulse capture | No usable pulse recording reached analysis. Decoded JSON or a sample heartbeat alone is not capture proof. |
+| Malformed pulse capture | A header, timing row, count or packet boundary was invalid. Diagnostics retain the specific parser rejection; no compatibility conclusion is made. |
+| No supported modulation captured | Only FSK packets were observed in the armed window. They may be unrelated traffic; the intended remote has not been identified. |
+| Capture has no validated decoder | Complete OOK input reached replay, but no supported interpretation passed validation. This is different from an empty or malformed stream. |
+| Capture stream failed | Reading stdout failed or a line exceeded its limit. Inspect the retained stream error. |
 | Inconsistent captures | Different identities or ambiguous frames appeared. Keep other remotes idle and retry the same button. |
-| Capture limit / timeout | No transmission, prolonged RF activity, or a resource limit prevented completion. Retry a brief press. |
+| Capture limit / session timeout | Prolonged RF activity, the overall session deadline, or a resource limit prevented completion. |
 | Ready to save | Three separate captures agree. Review and confirm; actions stay disabled. |
 
-Diagnostics show receiver status, packets/pulses/bytes, candidate/replay counts,
-decoder source and failure detail. Raw IQ, tokens and webhook configuration are
-not included. Decoded identifiers can still identify a remote: review before sharing.
+Diagnostics separately show the capture receiver's last observed status and the
+current reception status/mode. After failure, current **connected** can describe
+restored normal reception. It does not prove the failed capture succeeded.
+Observed packets/pulses/bytes are counted before rejection, separately from packets
+accepted for replay. Stdout bytes/lines, JSON records, headers, end boundaries,
+incomplete rows, modulation and rejection counts explain where input stopped.
+The original failure reason remains fixed while late cleanup evidence is added.
+Bounded metadata is saved in event history, including when the dialog is dismissed.
+Raw IQ, tokens and webhook configuration are not included. Decoded identifiers in
+other state fields can still identify a remote: review before sharing.
 
 ## Capture, analysis and validation
 
@@ -81,10 +92,16 @@ flowchart TD
     Capture -->|Cancel, failure or timeout| Restore
 ```
 
-The live process uses `-w OOK:-` alongside JSON output. The parser separates actual
-`;ook ... ;end` pulse records from decoded events. Learning does not count live
-JSON as capture proof. A quiet interval closes each press recording. The application
-replays it with `rtl_433 -r PRIVATE_FILE`, never another USB selector.
+The live process uses `-w OOK:-` alongside JSON output. In rtl_433 23.11 this output
+includes **both OOK and FSK** packets. The parser separates complete JSON objects,
+stream metadata, and `;ook N pulses` / `;fsk N pulses` packets ending in `;end`.
+Version 1, an explicit 1us timescale, matching row counts and bounded integer timing
+pairs are required; malformed input is never repaired by guessing units or timings.
+Valid FSK traffic is counted and excluded while OOK learning continues to wait.
+Learning does not count live JSON as capture proof. A quiet interval closes each
+press recording. The application replays it with `rtl_433 -r PRIVATE_FILE`, never
+another USB selector. See [CAPTURE-INVESTIGATION.md](CAPTURE-INVESTIGATION.md) for
+the 0.2.0 diagnostic failure and the actual 23.11 IQ-stream regression evidence.
 
 When needed, `-A -R 0` produces timing candidates. The parser accepts only measured
 numeric `m=OOK_PWM,s,l,r,g,t,y` values within bounds. Probe replay requires 16–64
@@ -115,6 +132,7 @@ private `/tmp` is on internal storage; captures are not written to the backup di
 | Continuous RF activity per capture | 6 seconds |
 | Quiet interval between capture and analysis / rearming | 1 second |
 | One press recording | 32 packets, 256 KiB total; 4,096 pulse pairs per packet |
+| Session stream | 2 MiB / 128 observed packet records, checked at progress callbacks |
 | Offline analysis | 10 seconds total, 2 seconds per child |
 | Child output | 512 KiB stdout, 128 KiB stderr; bounded individual lines |
 | Distinct analyzer candidates | 8 |
@@ -130,6 +148,10 @@ Cancel, timeout, receiver loss and failure request restoration of the normal
 receiver plan. All webhook execution remains suppressed until the old capture
 child and the replay worker have finished cleanup. Existing enabled actions are
 preserved and may resume after restoration; newly learned actions stay disabled.
+The stopped child's already-read queue is drained for diagnostics. Partial packets
+produce a specific missing-boundary rejection. Data read during shutdown is never
+eligible as a new candidate. Counts describe records read by the supervisor, not
+unread bytes still in OS or device buffers when a child is terminated.
 
 ## Storage and upgrade compatibility
 
