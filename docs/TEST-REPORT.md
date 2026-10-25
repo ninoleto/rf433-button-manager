@@ -12,12 +12,22 @@ Verified in the continuation:
 - Official temporary Go 1.27.3 toolchain checksum and all pinned module checksums.
 - Static amd64 build reproduced the supplied executable SHA-256:
   `dddc9ce0479a46193d6c258d7354221f9284cc87ba105de9f681e09a6cf1f144`.
+  A second build from a clean `--no-local` clone of commit
+  `266a97fa04b729ef0d6fe2ecb8871ec022576f4d` produced the same hash. Dependency
+  download/verification, formatting, vet, deployment checks, build and version
+  commands passed there, and the tracked worktree remained clean.
 - 2 CLI and 16 receiver race-enabled tests, plus 16 application tests that do not
   create network listeners: 34 top-level tests passed. Full-suite HTTP-server
   checks are blocked by `socket: operation not permitted`, not reported passed.
 - `go vet ./...`, deployment dry-run/argument tests, all three known competing
   decoder guards, bundle restoration preserving edits/untracked files/tags,
   shell syntax, JavaScript syntax and whitespace checks passed.
+- 37 local Markdown links and 26 shell/Python/JSON code snippets checked for
+  target existence/syntax. API examples were reviewed against handler/model code;
+  the existing in-process authentication/strict-JSON tests passed without sockets.
+- Original historical blobs and outgoing source reviewed for private artifacts
+  and high-confidence credential patterns; none found by those checks. Existing
+  screenshots were visually reviewed and contain explicitly synthetic demo data.
 
 Pending: full `make check` in a normal host execution environment; rerun of the
 optional browser suite; host service installation/LAN access/auth/persistence;

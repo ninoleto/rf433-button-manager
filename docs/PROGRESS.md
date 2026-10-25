@@ -75,6 +75,8 @@ scope authorization supersedes its older request to reconfirm installation.
   them. Read-only inspection reports blocked host visibility explicitly.
 - Checksum-verified temporary Go 1.27.3 toolchain and pinned modules used for
   development only. Static build reproduced the supplied executable SHA-256.
+  A separate clean clone of `266a97fa04b729ef0d6fe2ecb8871ec022576f4d` reproduced
+  that checksum too, with no tracked-file changes from the build.
 - CLI/receiver race tests and 16 non-socket application tests passed (34 total).
   Full `make check` is blocked by denied loopback sockets in eight HTTP-server
   tests. Vet, deployment/history checks and JS syntax checks passed. See TEST-REPORT.
