@@ -20,8 +20,8 @@ software tests and untested devices. The signal inspector cannot promise a code
 for an undecoded, encrypted or out-of-band transmission.
 
 1. Inspect current changes, branches/tags and all outgoing history. Preserve the
-   imported five-commit development history; do not replace it with a single source
-   dump. Do not force-push or overwrite an existing repository.
+   complete imported development history (20 commits in the 0.3.6-dev bundle).
+   Do not replace it with a source dump, force-push or overwrite an existing repository.
 2. Scan tracked files and historical blobs for credentials, private configuration,
    databases/WAL files, backups, RF captures and production screenshots. Review
    suspected matches privately, reporting only paths and categories. `.gitignore`
@@ -99,9 +99,9 @@ sha256sum bin/rf-button-manager > dist/BINARY-SHA256SUMS
 ```
 
 For a ZIP package with an internal `SHA256SUMS`, run checksum verification from
-its documented root. State exactly which files it covers; the supplied 0.1.0-dev
-manifest covers the executable, while the outer ZIP checksum covers the entire
-archive. Hash the completed outer archive separately and publish that SHA-256.
+its documented root. The 0.3.6-dev `SHA256SUMS` covers every included file except
+itself, including the source bundle and release metadata. The outer ZIP checksum
+covers the entire archive. Hash the completed archive and publish that SHA-256.
 Test extraction/checksums/version from a new directory. No Go compiler is needed
 by binary-package consumers.
 
@@ -114,6 +114,61 @@ prerelease on GitHub and visibly retain `-dev` (or another prerelease identifier
 Release notes include supported architecture, toolchain, binary/archive hashes,
 changes, installation instructions, schema compatibility, actual test evidence
 and all remaining hardware limits. Do not fabricate a stable release date.
+
+## Publish the existing 0.3.6-dev package
+
+The immutable package and tag are separate from later documentation on `main`:
+
+| Item | Expected value |
+| --- | --- |
+| Tag | `v0.3.6-dev` |
+| Packaged commit | `f9b496f3387cd357c1270c28566c97d26cb48dd8` |
+| ZIP | `rf-button-manager-0.3.6-dev-linux-amd64.zip` |
+| ZIP SHA-256 | `4a55d123df03763ac79f0a6795e3118d65e0d3ac899126a22d8796f466b7df13` |
+| Executable SHA-256 | `f7c4fad9f61a21918bfc7adef756c8a5a421fd8760b8669b7425df98aaafd66f` |
+
+Verify the original ZIP, extract freshly, verify its `SHA256SUMS`, clone its bundle
+with `--branch main` and compare HEAD and `release.json` before publication. Do not
+repackage it with newer docs or point its tag at the docs commit. Scan the ZIP's
+contents as well as every outgoing historical blob, commit message and screenshot.
+The checked-in screenshots are historical synthetic demo images, not production.
+
+After checking existing remote refs and completing review, create the tag only
+if absent; if present, verify its peeled commit and preserve it. Example for a new tag:
+
+```sh
+git tag -a v0.3.6-dev f9b496f3387cd357c1270c28566c97d26cb48dd8 \
+  -m 'RF Button Manager 0.3.6-dev: packaged development release'
+git push origin main refs/tags/v0.3.6-dev
+git ls-remote origin refs/heads/main refs/tags/v0.3.6-dev 'refs/tags/v0.3.6-dev^{}'
+gh run list --repo ninoleto/rf-button-manager \
+  --commit f9b496f3387cd357c1270c28566c97d26cb48dd8
+```
+
+The workflow runs on tag pushes as well as branch pushes. Inspect the exact
+release-commit run and its jobs with `gh run view RUN_ID --repo
+ninoleto/rf-button-manager`. It must finish with `success` **before** uploading
+the ZIP. Also verify CI for the final `main` commit; a passing documentation commit
+alone does not validate the packaged release. If CI fails, keep the asset unpublished
+and report the failing step; do not move the immutable release tag to hide failure.
+
+Write reviewed release notes to a local file. For a confirmed absent release,
+after the release-commit CI succeeds:
+
+```sh
+gh release create v0.3.6-dev /path/to/rf-button-manager-0.3.6-dev-linux-amd64.zip \
+  --repo ninoleto/rf-button-manager --verify-tag --prerelease \
+  --title 'RF Button Manager 0.3.6-dev' --notes-file /path/to/release-notes.md
+```
+
+Do not overwrite an existing release asset. Download the published ZIP into a new
+directory and verify its hash, the remote tag/commit, public visibility and
+prerelease flag. Notes must include Linux amd64/runtime prerequisites, checksum
+and installation/upgrade links, schema-2 compatibility, the three operator-tested
+home button/webhook assignments and accepted interface, plus unverified physical
+multi-tuner, USB/hub recovery, soak and broader compatibility. No universal Amazon
+button support is claimed. The ZIP's older documentation and conservative
+`hardware_validation` metadata are retained; current notes explain newer evidence.
 
 ## Upgrade/rollback/uninstall
 

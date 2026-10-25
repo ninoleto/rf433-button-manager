@@ -1,4 +1,102 @@
-# Verification report — 2026-10-25
+# Verification reports
+
+## 0.3.6-dev publication verification — 2026-10-25 UTC
+
+This is a fresh publication review; version-specific records below describe
+earlier runs and must not be read as newly executed checks.
+
+### Provenance and public-data review
+
+- Original ZIP SHA-256 verified:
+  `4a55d123df03763ac79f0a6795e3118d65e0d3ac899126a22d8796f466b7df13`.
+  Every entry in its `SHA256SUMS` passed after fresh extraction.
+- `git clone --branch main` restored a complete 20-commit bundle at
+  `f9b496f3387cd357c1270c28566c97d26cb48dd8`; bundle verification and
+  `git fsck --full` passed. All 100 packaged tracked files match that commit.
+- A separate clean bundle clone built with Go 1.27.3 and `make build` reproduced
+  the supplied executable byte-for-byte: SHA-256
+  `f7c4fad9f61a21918bfc7adef756c8a5a421fd8760b8669b7425df98aaafd66f`.
+  It reports `0.3.6-dev`; the build left tracked files unchanged.
+- Gitleaks 8.30.1 reviewed the full imported history, package, commit metadata,
+  executable printable strings and all 287 distinct historical blobs. One finding
+  in the filename-free blob scan was the `modernc.org/token` dependency checksum
+  in `go.sum`, reviewed as a false positive. No credential was found by these scans.
+- Reviewed every historical path and both image blobs. No database, token,
+  production configuration, private RF recording or production screenshot is
+  included. The two pulse fixtures are synthetic; both screenshots visibly show
+  demo mode. Test URLs use loopback or invented/example destinations. Such review
+  reduces disclosure risk; automated scanning is not proof that all secrets are detectable.
+
+### Checks performed and environment limits
+
+Linux amd64; Go 1.27.3, Node.js 22.23.3, Python 3.12.3, Git 2.43.0,
+Make 4.3, Bash 5.2, GCC 13.3 and rtl_433 23.11. Verified cached modules were used;
+no runtime host package, service or receiver configuration was changed.
+
+- `go mod download`, `go mod verify` and `gofmt` verification passed.
+- Full `make check` was attempted. CLI and receiver race-test packages passed,
+  but the application package stopped at
+  `TestButtonDestinationApprovalIsAuthenticatedAtomicAndDoesNotSend` because
+  `httptest` could not open a loopback socket (`operation not permitted`).
+  This is a blocked full-suite result, not a pass.
+- A separate `go test -race -count=1 -timeout=2m -v -skip REGEX ./internal/app`
+  passed 46 top-level tests. The regex excluded the 14 socket-dependent cases
+  listed below; one additional optional private-recording test skipped because
+  its input was deliberately not supplied.
+- `make vet test-ui test-deploy build` passed: static analysis, JS syntax/controller
+  suite, shell syntax and deployment/history checks, five simulated updater tests,
+  static build and `--version`. These tests use temporary state/fake processes.
+- `scripts/fetch-rf-testdata.py` verified all four pinned public IQ files. Explicit
+  `rtl_433 -c /dev/null -r FILE -F json` replay produced 5 EV1527, 14 PT2262,
+  4 Akhan and 9 HT680 decoded records. Only counts were retained in the review log.
+  This separate replay is not the socket-dependent end-to-end test or new RF reception.
+- Documentation links, shell/Python/JSON example syntax and `git diff --check`
+  were checked. Optional Chromium rendering and private-recording regressions
+  were not rerun; no physical test was performed.
+
+The exact excluded application tests were:
+
+```text
+TestButtonDestinationApprovalIsAuthenticatedAtomicAndDoesNotSend
+TestCaptureRealReplayPersistenceAndProfileReuse
+TestDebounceHeldButtonAndRearm
+TestDifferentButtonsDispatchConcurrently
+TestExactConfigured12BitFlexLearnsFragmentsAndRoutesOnce
+TestInspectionPausesActionsAndExportsOnlyAuthenticatedRFData
+TestLearningSuppressesAllActionsAndTests
+TestLearningWaitsForInFlightRequest
+TestPrivateTwoSwitchLearningToWebhookOptional
+TestRecordedRemoteEndToEnd
+TestStorageFailureDisablesActions
+TestWebhookDoesNotFollowRedirectOrRetry
+TestWebhookPayloadAndHeaders
+TestWebhookTimeoutIsUnknownAndNotRetried
+```
+
+### Publication and operator evidence
+
+Existing GitHub connector and CLI credentials identify `ninoleto`. The repository
+was absent from the authenticated owner's inventory and was created **public** at
+<https://github.com/ninoleto/rf-button-manager>. Native Git/SSH network access was
+unavailable in this execution environment. The approved HTTPS transport reached
+GitHub, which rejected the atomic main/tag push because the OAuth credential lacks
+`workflow` scope for `.github/workflows/ci.yml`. Remote discovery confirmed no main
+or release tag; the Actions API returned zero runs. No release was created or ZIP
+uploaded. The complete history and documentation remain prepared locally.
+
+Minimum next step: in a normal authenticated host terminal, run
+`gh auth refresh --hostname github.com --scopes workflow` for the existing account,
+then resume publication using [RELEASING.md](RELEASING.md). Recheck remote refs,
+preserve any work that appeared meanwhile, push the reviewed main and original-commit
+tag, and require successful CI for the exact packaged commit before uploading.
+Also verify CI for the final documentation commit. Do not remove CI, rewrite the
+imported history or move the tag to get around the missing permission.
+
+The operator reports three tested home button assignments and webhooks and accepts
+the latest interface within available testing. Physical multi-tuner, USB/hub
+recovery, soak and broader compatibility remain unverified. No universal Amazon
+button support or production readiness is claimed. The running installation and
+unrelated services were left untouched throughout this publication review.
 
 ## 0.3.6-dev: receiver selector, source indicator and saved-fragment guard
 

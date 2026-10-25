@@ -40,7 +40,12 @@ do not require real webhook tests. Learning waits for current requests and block
 new dispatches, but cannot undo requests already delivered. Suppression continues
 until capture analysis and receiver transitions have cleaned up. Learning uses
 private bounded pulse files, deleted after offline analysis. One replay child has
-file input only; it never opens the receiver. Raw captures are not API downloads.
+file input only; it never opens the receiver. Authenticated
+`GET /api/learn/capture` downloads the most recent bounded in-memory pulse/decoded
+recording; `GET /api/inspect/result` exports RF-only inspection evidence. These
+exclude application credentials and webhook settings, but can contain private
+radio identifiers from the intended transmitter or nearby devices. Review before
+sharing; they are neither anonymized nor original IQ recordings.
 
 ## Secret handling and rotation
 

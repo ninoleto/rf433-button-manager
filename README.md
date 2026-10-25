@@ -1,28 +1,28 @@
 # RF Button Manager
 
-Receiver selection: use **Settings → Receiver device** to choose one connected
-RTL-SDR by unique serial. The dashboard identifies the active tuner and shows
-decoded RF activity. See [receiver selection and limitations](docs/RECEIVERS.md)
-for multiple tuners, duplicate serials and preservation of existing mappings.
-
 Receive 433.92 MHz remote-control buttons with a native Linux service, learn supported
 signals in a browser, and assign each button an HTTP webhook. Reception and actions
 continue when the browser is closed. No MQTT broker, Docker container or cloud
 account is required. This application receives signals; it does not transmit RF or
 reprogram remotes.
 
-**Development build.** Automated software tests do not establish physical USB
+**0.3.6-dev development build.** See [releases](https://github.com/ninoleto/rf-button-manager/releases)
+and the [publication/verification record](docs/TEST-REPORT.md) for availability.
+Automated software tests do not establish physical USB
 reliability. Receiver recovery and the intended remote/webhook combinations must pass the [hardware acceptance matrix](docs/HARDWARE-TESTS.md)
 before this build can be called a production release.
 
-**Compatibility is model-specific.** Three home switches are operator-reported
-working; that does not establish support for every Amazon product or every
+**Compatibility is model-specific.** The operator tested three assigned home buttons
+and their webhooks, and accepted the latest interface within the testing available.
+Physical multi-tuner selection, USB/hub recovery, soak and broader compatibility
+remain unverified. This does not establish support for every Amazon product or every
 433 MHz remote. Read the [compatibility matrix and inspection guide](docs/COMPATIBILITY.md).
 
 ![Running application in explicitly labeled demo mode](docs/screenshots/dashboard.png)
 
-[Mobile interface preview](docs/screenshots/mobile.png). These screenshots use
-synthetic RF data and demonstrate the actual application, not physical receiver tests.
+[Mobile interface preview](docs/screenshots/mobile.png). These historical 0.1.0-dev
+screenshots use synthetic demo data; they illustrate the interface but do not show
+every current control or establish physical receiver behavior.
 
 ## What it provides
 
@@ -36,6 +36,11 @@ synthetic RF data and demonstrate the actual application, not physical receiver 
 - Persistent SQLite configuration and authenticated configuration backup/restore.
 - Native supervision of `rtl_433`, USB rediscovery and bounded restart backoff.
 - Loopback binding and a management token by default.
+
+Use **Settings → Receiver device** to choose one connected RTL-SDR by unique serial.
+The dashboard identifies the active tuner and shows decoded RF activity. See
+[receiver selection and limitations](docs/RECEIVERS.md) for multiple tuners,
+duplicate serials and preservation of existing mappings.
 
 Learning is entirely browser-driven: choose **Learn**, press/release the button,
 verify three separate presses, then **Confirm and save**. Button events decoded by rtl_433 are learned directly, including common
@@ -53,8 +58,21 @@ RTL-SDR and a remote using a supported signal format. Runtime state belongs on
 reliable internal storage. A browser is the management client; no Node server,
 Go compiler, Docker container or MQTT broker is required to install the binary.
 
-After verifying the outer archive's published SHA-256 and extracting into a fresh
-directory, enter `rf-button-manager` and run:
+The prepared package is `rf-button-manager-0.3.6-dev-linux-amd64.zip`; use the
+supplied archive or the release asset once published. Its SHA-256 is
+`4a55d123df03763ac79f0a6795e3118d65e0d3ac899126a22d8796f466b7df13`.
+Verify before extracting into a fresh directory:
+
+```sh
+printf '%s  %s\n' \
+  4a55d123df03763ac79f0a6795e3118d65e0d3ac899126a22d8796f466b7df13 \
+  rf-button-manager-0.3.6-dev-linux-amd64.zip | sha256sum -c -
+rfb_extract_dir=$(mktemp -d)
+unzip rf-button-manager-0.3.6-dev-linux-amd64.zip -d "$rfb_extract_dir"
+cd "$rfb_extract_dir/rf-button-manager"
+```
+
+Then verify the package and review the installation plan:
 
 ```sh
 sha256sum -c SHA256SUMS
@@ -90,12 +108,15 @@ this update does not overwrite your existing development checkout.
 
 ## Build and verify from source
 
-Build on Linux with **Go 1.27.3**, Git and Make. The frontend controller tests
+Build on Linux with **Go 1.27.3**, Git, Make, Bash and Python 3.12. The frontend controller tests
 in `make check` additionally use Node.js 20 or later (no npm packages). The embedded frontend needs no Node
 build or network-hosted assets. Tests with the race detector require a C compiler;
 the release executable uses pure-Go SQLite and is built with `CGO_ENABLED=0`.
 
 ```sh
+git clone https://github.com/ninoleto/rf-button-manager.git
+cd rf-button-manager
+export GOTOOLCHAIN=local
 go mod download
 go mod verify
 make check
@@ -209,6 +230,7 @@ strict same-origin checks reject an HTTPS frontend backed by loopback HTTP.
 - [Physical hardware release gate](docs/HARDWARE-TESTS.md)
 - [Persistent implementation progress](docs/PROGRESS.md)
 - [Clean builds and developer extension examples](docs/DEVELOPMENT.md)
+- [Project rules for coding agents](AGENTS.md)
 - [Contributing and forking](CONTRIBUTING.md)
 - [Security and private configuration](SECURITY.md)
 - [Publication and release procedures](docs/RELEASING.md)

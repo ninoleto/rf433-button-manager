@@ -27,11 +27,11 @@ traffic even when the intended button was not received.
 
 | Evidence | What has been checked |
 | --- | --- |
-| Three switches at the original operator's home, 2026-10-25 | Operator reports all three work and webhook entry/delivery is good after 0.3.4. Commercial model/revision identifiers were not supplied, so these are not a purchase recommendation or named-model guarantee. |
+| Three assigned buttons at the original operator's home | Operator tested all three and their webhooks and accepted the latest interface within available testing for 0.3.6-dev publication. Commercial model/revision identifiers were not supplied, so these are not a purchase recommendation or named-model guarantee. |
 | First-switch/front-door recordings | Private offline PWM replay, three software-armed observations, persistence and local webhook routing. Private RF IDs are not distributed. |
 | EV1527, PT2262, Akhan and HT680 example recordings | Checksum-pinned public IQ files pass software tests. This validates those recordings, not every product sharing a chipset or listing name. |
 | Future six-button Amazon remote | Not yet available for physical testing. |
-| USB hub/port recovery and wider receiver/platform combinations | Consult HARDWARE-TESTS.md; unperformed tests remain pending. |
+| Physical multi-tuner selection, USB hub/port recovery, soak and wider receiver/platform combinations | Unverified; consult HARDWARE-TESTS.md. |
 
 An honest public release describes this as a development tool for supported
 433.92 MHz buttons. Community reports should name the exact product/revision,

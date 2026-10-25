@@ -1,7 +1,8 @@
 # Contributing and forking
 
 Start with [README.md](README.md), [the developer guide](docs/DEVELOPMENT.md) and
-[the architecture](docs/ARCHITECTURE.md). Use a fork and a topic branch; preserve
+[the architecture](docs/ARCHITECTURE.md). Coding agents should also read
+[AGENTS.md](AGENTS.md). Use a fork and a topic branch; preserve
 the project's Git history. Do not force-push a shared branch or replace someone
 else's work. A source package's bundle can restore history without overwriting
 local edits using `bash scripts/restore-history.sh`.

@@ -68,7 +68,7 @@ Confirmation requires three separately armed captures; see LEARNING.md.
 - POST /api/learn/arm {} -> Learning (arm next independent capture after release)
 - POST /api/learn/confirm {} -> {ok:true}
 - POST /api/learn/cancel {} -> {ok:true}
-- PUT /api/settings -> Settings (receiver restart when changed)
+- PUT /api/settings -> Settings (owned receiver reload on every successful settings save)
 - GET /api/backup -> JSON {schema_version:2,remotes,settings,decoder_profiles}
 - POST /api/restore -> backup JSON (atomic; actions restored disabled)
 

@@ -257,8 +257,9 @@ FSK input is excluded and may come from another transmitter. Complete OOK input
 with no validated decoder, or an identity different from the verified candidate,
 is recorded and ignored while the same press window continues. The dialog says
 **Unrecognized signal ignored; waiting for your button**. This does not identify
-the intended remote as unsupported. Four analysis attempts per 20-second window
-bound background work; budget exhaustion is shown explicitly and the window is
+the intended remote as unsupported. At most 40 analysis starts per 20-second window,
+at least 500 ms apart, bound background work. Budget exhaustion is shown explicitly;
+live decoded button events remain eligible until the original deadline, which is
 never extended. A rolling or
 encrypted remote remains unsupported, even if several presses look superficially
 similar. Captures are temporary/private, bounded and deleted after analysis.
@@ -292,7 +293,7 @@ snapshot on internal storage. A rollback to 0.1 requires that matching snapshot
 as well as the old executable; retain the newer state separately. Do not edit
 SQLite or delete profiles to force an old executable to start.
 
-## Prebuilt 0.3.0 update
+## Prebuilt 0.3.x update
 
 For an existing active managed service, use `sudo python3 scripts/update-prebuilt.py`
 from an extracted binary package for a read-only preflight. Add `--apply` for the

@@ -73,15 +73,21 @@ network management credential exposure. Tests and explicit limits document each.
 | `cmd/rf-button-manager/main.go` | CLI validation, token creation, data lock, startup/shutdown, receiver configuration reload |
 | `internal/receiver/receiver.go` | `Run`, device selection, argv construction, JSON classification, recovery state machine |
 | `internal/receiver/linux.go` | Compatible USB ID table, sysfs enumeration, subprocess pipes and process groups |
+| `internal/receiver/devices.go` | Display-only inventory and validation of an explicit serial selection |
+| `internal/receiver/pulses.go`, `analysis.go`, `profiles.go`, `pwm.go`, `pcm.go` | Bounded pulse parsing, measured candidates, replay validation and immutable profile identity |
+| `internal/receiver/offline_linux.go` | File-only replay worker, output bounds, cancellation and cleanup |
 | `internal/receiver/unsupported.go` | Non-Linux guard |
 | `internal/app/model.go` | JSON models, defaults, `Signature`, configuration/webhook validation, overlap checks |
-| `internal/app/engine.go` | CRUD, learning, persistence coordination, debounce, suppression and bounded events |
+| `internal/app/engine.go` | CRUD, learning entry points, persistence coordination, debounce, suppression and bounded events |
+| `internal/app/learning.go`, `decoded_learning.go` | Capture state machine, receiver generations, background analysis and decoded-event identities |
+| `internal/app/inspection.go`, `capture_export.go` | RF-only report/capture exports without configuration or webhook fields |
 | `internal/app/store.go` | SQLite initialization, configuration replacement and event retention |
 | `internal/app/webhook.go` | Delivery, safe DNS/dialing, deadlines, bounded concurrency |
 | `internal/app/http.go` | Routes, authentication, browser-origin checks and strict JSON decoding |
 | `internal/webui/embed.go` | Embeds `static/` into the executable |
 | `internal/webui/static/` | HTML, CSS and vanilla JS with one-second authenticated state polling |
 | `internal/webui/ui.test.cjs` | Optional browser integration tests against an isolated demo process |
+| `internal/webui/learning.test.cjs` | Node controller checks against an in-memory DOM/API adapter |
 | `deploy/`, `scripts/` | Native installation, inspection, recovery and release tooling |
 | `.github/workflows/ci.yml` | Pinned-toolchain Linux tests, vet, formatting and build |
 

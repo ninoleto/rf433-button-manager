@@ -1,5 +1,32 @@
 # Project progress
 
+## 0.3.6-dev public-release preparation
+
+The supplied ZIP and all internal checksums were verified. Its complete 20-commit
+bundle was cloned with `--branch main` into a fresh development checkout at
+`f9b496f3387cd357c1270c28566c97d26cb48dd8`. A separate clean clone reproduced the
+supplied binary byte-for-byte. Existing checkouts and the running application were
+preserved; no receiver access, service operation or production webhook call was made.
+
+Reviewed the source and existing guides; added root AGENTS.md and corrected
+toolchain requirements, source recovery, schema compatibility, capture-export
+security, analysis limits and release/tag instructions. Retired the obsolete
+installation task handoff. The operator tested three assigned home buttons and
+their webhooks and accepted the latest interface within available testing.
+Physical multi-tuner, USB/hub recovery, soak and broader compatibility remain
+unverified; this is development-release evidence, not production acceptance.
+
+The public repository `ninoleto/rf-button-manager` was created using existing
+authentication verified as `ninoleto`. GitHub rejected the atomic history/tag push
+because that OAuth credential lacks `workflow` scope. Neither main nor the tag
+was published, no CI run exists, and no release asset was uploaded. A credential
+permitted to publish the included workflow is required to finish. See
+[TEST-REPORT.md](TEST-REPORT.md) for exact local checks and the release gate.
+
+The dated entries below are historical reports for their stated versions, not
+current instructions or fresh verification. Current operation/development
+instructions are linked from [AGENTS.md](../AGENTS.md).
+
 ## 2026-10-25: receiver choice and inspection framing (0.3.6-dev)
 
 The operator confirms all three existing button assignments were physically

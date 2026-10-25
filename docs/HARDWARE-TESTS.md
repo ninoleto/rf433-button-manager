@@ -1,5 +1,15 @@
 # Physical hardware acceptance gate
 
+## Current acceptance boundary: 0.3.6-dev publication
+
+The operator tested three assigned home buttons and their webhooks and accepted
+the latest interface within the testing available. This is an operator report,
+not an independently repeated test or a complete pass of the matrix below.
+Physical multi-tuner selection, USB/hub recovery, soak and broader compatibility
+remain unverified. The current release is a development prerelease. Earlier
+version-specific reports below retain their original, narrower observations;
+their pending interface checks are superseded only by this limited acceptance.
+
 ## Receiver selector acceptance additions (0.3.6-dev)
 
 Pending operator execution: with two uniquely serialized tuners connected, choose
@@ -57,9 +67,9 @@ mark a row passed based on simulation, a successful build or a working web GUI.
 
 Record app commit/version, binary SHA-256, ZORIN OS/kernel, `rtl_433` version,
 receiver VID/PID/serial, exact decoder specification, sample JSON and timestamps.
-Keep webhook credentials out of reports. Existing authorization covers this
-application's update. Obtain separate approval before stopping another receiver
-owner, reconnecting hardware, changing Home Assistant or rebooting the server.
+Keep webhook credentials out of reports. Perform host/hardware checks only within
+the current operator-authorized scope. Coordinate stopping another receiver owner,
+reconnecting hardware, changing Home Assistant or rebooting the server separately.
 
 Use a harmless, observable Home Assistant action for acceptance. Keep its existing
 automation unchanged unless an explicit change is separately approved. Observe
@@ -95,6 +105,7 @@ prove that the desired physical state changed.
 | Upgrade | Apply an approved replacement binary | Existing data and token retained; one receiver process | NOT RUN |
 | Uninstall | Apply uninstall in an approved maintenance window | Only owned service/files removed; state preserved; other services untouched | NOT RUN |
 
-Release may proceed only after failures are fixed and rerun with recorded evidence.
+Stable release may proceed only after failures are fixed and rerun with recorded evidence.
+Development prereleases may disclose outstanding rows as described in [RELEASING.md](RELEASING.md).
 If a hardware topology or protocol was not tested, name that limitation in the
 release notes rather than claiming all receivers and hubs are supported.

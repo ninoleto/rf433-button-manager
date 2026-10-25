@@ -12,18 +12,37 @@ for SQLite/WAL and retained backups. No minimum RAM/CPU specification or power-l
 reliability has been established by hardware testing.
 
 Source development: **Go 1.27.3**, Git, GNU Make and Bash on Linux; a C compiler
-for `-race` tests; Python 3 for license collection and examples. The pure-Go SQLite
+for `-race` tests; Python 3.12 for checks, packaging and license collection. The pure-Go SQLite
 release build uses `CGO_ENABLED=0` and needs no SQLite development package.
 Internet access is needed for initial toolchain/module downloads; a verified
 populated cache permits later offline builds. Allow several GB for toolchain,
-modules, build cache and race instrumentation. Node/Playwright/Chromium are only
-needed for the optional browser suite, not frontend compilation.
+modules, build cache and race instrumentation. Node.js 20+ is required by
+`make check` for syntax/controller tests; Playwright/Chromium are only needed for
+the optional browser suite. Neither is a frontend compilation step. Ubuntu 24.04
+provides the reference Git 2.43, Make 4.3, Bash 5.2 and GCC 13 environment. Python
+3.12 supplies the tar extraction filter used by the release packager.
 
 ## Recover a source package's history
 
 A package can contain source files but no `.git`, plus
-`rf-button-manager.git.bundle`. Do not clone over an extracted directory or use
-`reset --hard` to attach history. From the extracted directory:
+`rf-button-manager.git.bundle`. Prefer a new checkout, preserving the extracted
+package and any older development work:
+
+```sh
+git clone --branch main /path/to/rf-button-manager/rf-button-manager.git.bundle ./rf-button-manager-dev
+cd rf-button-manager-dev
+git bundle verify /path/to/rf-button-manager/rf-button-manager.git.bundle
+git log --oneline --all --decorate
+git status --short
+```
+
+For the supplied 0.3.6-dev ZIP, HEAD must be
+`f9b496f3387cd357c1270c28566c97d26cb48dd8`; compare with the package's
+`release.json`. The bundle contains 20 commits through that version. The GitHub
+tag `v0.3.6-dev` must identify that same source; `main` may contain later documentation.
+
+Alternatively, to attach history to an extracted source tree without checking out
+over local edits, run from that extracted directory:
 
 ```sh
 bash scripts/restore-history.sh
@@ -92,7 +111,7 @@ make build
 ```
 
 `make test` uses `-race -count=1 -timeout=2m`; override `TEST_PACKAGES` to target a
-package. `make check` runs tests, vet and deployment/history shell checks. The
+package. `make check` runs tests, vet, Node controller tests and deployment/history/updater checks. The
 Go tests use temporary databases and fake receiver/process fixtures. Webhook
 tests use local ephemeral HTTP servers and require loopback socket permissions.
 They do not contact Home Assistant or acquire a real receiver. Never point a test
@@ -169,8 +188,8 @@ Frequency is currently fixed in `receiver.arguments`, not an existing setting.
 To make it configurable:
 
 1. Add a typed field to `app.Settings` and a defined default. Plan backward
-   compatibility for saved schema-1 configurations rather than interpreting an
-   absent field as a valid frequency.
+   compatibility for current schema-2 configurations and schema-1 imports rather
+   than interpreting an absent field as a valid frequency.
 2. Validate range/units in `validateSettings`; reject malformed values before
    persistence. Update backup/restore and migration tests.
 3. Pass the value through `main.runReceiver` into `receiver.Config`. Render it
