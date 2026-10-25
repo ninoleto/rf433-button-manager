@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,26 +12,43 @@ import (
 )
 
 type LearningDiagnostics struct {
-	ObservedPackets  int         `json:"observed_packets"`
-	RejectedPackets  int         `json:"rejected_packets"`
-	OOKPackets       int         `json:"ook_packets"`
-	FSKPackets       int         `json:"fsk_packets"`
-	MalformedPackets int         `json:"malformed_packets"`
-	EmptyPackets     int         `json:"empty_packets"`
-	DiscardedPackets int         `json:"discarded_packets"`
-	AcceptedBytes    int         `json:"accepted_bytes"`
-	RejectionCode    string      `json:"rejection_code"`
-	RejectionReason  string      `json:"rejection_reason"`
-	FailureCode      string      `json:"failure_code"`
-	FailureReason    string      `json:"failure_reason"`
-	Stream           PulseStream `json:"stream"`
-	Packets          int         `json:"packets"`
-	Pulses           int         `json:"pulses"`
-	Bytes            int         `json:"bytes"`
-	Candidates       int         `json:"candidates"`
-	Replays          int         `json:"replays"`
-	Source           string      `json:"source"`
-	Detail           string      `json:"detail"`
+	AnalysisAttempts int                `json:"analysis_attempts"`
+	RejectedCaptures int                `json:"rejected_captures"`
+	RecentRejections []CaptureRejection `json:"recent_rejections,omitempty"`
+	ObservedPackets  int                `json:"observed_packets"`
+	RejectedPackets  int                `json:"rejected_packets"`
+	OOKPackets       int                `json:"ook_packets"`
+	FSKPackets       int                `json:"fsk_packets"`
+	MalformedPackets int                `json:"malformed_packets"`
+	EmptyPackets     int                `json:"empty_packets"`
+	DiscardedPackets int                `json:"discarded_packets"`
+	AcceptedBytes    int                `json:"accepted_bytes"`
+	RejectionCode    string             `json:"rejection_code"`
+	RejectionReason  string             `json:"rejection_reason"`
+	FailureCode      string             `json:"failure_code"`
+	FailureReason    string             `json:"failure_reason"`
+	Stream           PulseStream        `json:"stream"`
+	Packets          int                `json:"packets"`
+	Pulses           int                `json:"pulses"`
+	Bytes            int                `json:"bytes"`
+	Candidates       int                `json:"candidates"`
+	Replays          int                `json:"replays"`
+	Source           string             `json:"source"`
+	Detail           string             `json:"detail"`
+}
+
+// CaptureRejection is bounded metadata, never a raw recording or RF identity.
+// Each analyzed rejection is also persisted individually in application history.
+type CaptureRejection struct {
+	Attempt    int    `json:"attempt"`
+	Press      int    `json:"press_window"`
+	Time       string `json:"time"`
+	Code       string `json:"code"`
+	Reason     string `json:"reason"`
+	Packets    int    `json:"packets"`
+	Bytes      int    `json:"bytes"`
+	Candidates int    `json:"candidates"`
+	Replays    int    `json:"replays"`
 }
 
 type AnalysisRequest struct {
@@ -55,6 +73,11 @@ func (e *LearningError) Error() string { return e.Message }
 func analysisFailure(code, message string) error { return &LearningError{Code: code, Message: message} }
 
 var errMixedIdentity = errors.New("different identities decoded in one capture")
+var errReplayFailed = errors.New("offline decoder process failed")
+
+func replayFailure() error {
+	return analysisFailure("analysis_error", "The offline decoder process failed or exceeded its resource limits. No decoder or mapping was saved.")
+}
 
 func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result AnalysisResult, err error) {
 	if len(request.Capture) == 0 {
@@ -81,7 +104,7 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 		args = append(args, extra...)
 		output, diagnostic, e := offlineCommand(ctx, request.Binary, args)
 		if e != nil {
-			return nil, "", e
+			return nil, "", fmt.Errorf("%w: %v", errReplayFailed, e)
 		}
 		var frames []json.RawMessage
 		for _, line := range strings.Split(output, "\n") {
@@ -135,7 +158,10 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 	if request.Selected != nil {
 		raw, e := tryProfile(*request.Selected)
 		if e != nil {
-			return result, analysisFailure("inconsistent", "This press did not decode consistently with the first capture. Use the same button, or retry learning. Changing/rolling codes are not supported.")
+			if errors.Is(e, errReplayFailed) {
+				return result, replayFailure()
+			}
+			return result, analysisFailure("inconsistent", "This capture did not match the previously verified profile. It may be unrelated traffic; the intended transmitter was not identified.")
 		}
 		result.Raw = raw
 		profile := *request.Selected
@@ -157,6 +183,8 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 					result.Profile = &profile
 					result.Diagnostics.Source = "existing remote profile"
 					return result, nil
+				} else if errors.Is(e, errReplayFailed) {
+					return result, replayFailure()
 				}
 			}
 		}
@@ -179,6 +207,8 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 		} else if errors.Is(e, errMixedIdentity) {
 			return result, analysisFailure("inconsistent", "Different button identities were decoded in one capture. Keep other remotes idle and retry one brief press. No mapping changed.")
 		}
+	} else {
+		return result, replayFailure()
 	}
 	for _, profile := range request.Config.Profiles {
 		if tried[profile.ID] {
@@ -189,6 +219,8 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 			result.Profile = &profile
 			result.Diagnostics.Source = "existing validated profile"
 			return result, nil
+		} else if errors.Is(e, errReplayFailed) {
+			return result, replayFailure()
 		}
 	}
 	_, analyzer, e := replay([]string{"-R", "0", "-A"})
@@ -207,7 +239,7 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 	}
 	result.Diagnostics.Candidates = len(timings)
 	if len(timings) == 0 || len(timings) > 8 {
-		return result, analysisFailure("unsupported", "Transmission detected, but no unambiguous supported fixed-code OOK/PWM candidate was found. Rolling/encrypted and other unsupported signals cannot be learned.")
+		return result, analysisFailure("unsupported", "No unambiguous supported fixed-code OOK/PWM candidate was found in this capture. The intended transmitter was not identified.")
 	}
 	var accepted *DecoderProfile
 	var acceptedRaw json.RawMessage
@@ -215,7 +247,7 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 	for _, timing := range timings {
 		frames, _, e := replay([]string{"-R", "0", "-X", "n=RFB-Probe," + timing + ",bits>=16,bits<=64,repeats>=2"})
 		if e != nil {
-			continue
+			return result, replayFailure()
 		}
 		code := ""
 		bits := 0
@@ -241,6 +273,9 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 		}
 		raw, e := tryProfile(profile)
 		if e != nil {
+			if errors.Is(e, errReplayFailed) {
+				return result, replayFailure()
+			}
 			continue
 		}
 		identity = code

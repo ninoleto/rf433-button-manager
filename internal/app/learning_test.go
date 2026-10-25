@@ -127,14 +127,19 @@ func TestCaptureInconsistentSignalsPreserveExistingMapping(t *testing.T) {
 		t.Fatal(err)
 	}
 	capturePress(t, a, c, generation)
-	if a.learning != nil || a.learningNotice == nil || a.learningNotice.Stage != "inconsistent" {
-		t.Fatal("missing actionable mismatch notice")
+	if a.learning == nil || a.learning.Stage != "waiting" || a.learning.Presses != 1 || a.learning.Diagnostics.RejectedCaptures != 1 || a.learning.Diagnostics.RejectionCode != "inconsistent" {
+		t.Fatal("mismatched background capture terminated learning or changed the candidate")
 	}
 	if !reflect.DeepEqual(before, a.Backup()) {
 		t.Fatal("failed attempt changed existing data")
 	}
 	if err := a.ConfirmLearning(); err == nil {
 		t.Fatal("failed attempt could be saved")
+	}
+	c.advance(21 * time.Second)
+	a.learningTick()
+	if a.learningNotice == nil || a.learningNotice.Stage != "press_timeout" || !reflect.DeepEqual(before, a.Backup()) {
+		t.Fatal("mismatch timeout did not preserve the previous mapping")
 	}
 }
 
@@ -145,7 +150,7 @@ func TestCaptureTimeoutAndReceiverUnavailable(t *testing.T) {
 		delay time.Duration
 		stage string
 	}{
-		{"waiting", true, 21 * time.Second, "no_capture"},
+		{"waiting", true, 21 * time.Second, "press_timeout"},
 		{"receiver", false, 31 * time.Second, "receiver_unavailable"},
 		{"session", true, 181 * time.Second, "timeout"},
 	} {

@@ -1,5 +1,32 @@
 # Project progress
 
+## 2026-10-25: ignore background captures within a fixed learning window (0.2.2-dev)
+
+The operator's no-button attempt on installed `9c700312` reached replay with one
+OOK capture and three excluded FSK packets, then ended at 0/3. The application
+incorrectly promoted that single recording's `unsupported` result into a terminal
+session failure. A regression reproduced the same counts and failed before the fix.
+See [BACKGROUND-LEARNING.md](BACKGROUND-LEARNING.md) for the trace and correction.
+
+Unrecognized/mismatched captures now retain rejection metadata and return to the
+same waiting window. There are four analysis attempts per window, and the unchanged
+180-second session deadline plus the fixed 20-second window deadline cannot be
+extended by RF traffic. No automatic rearming or confirmation was introduced.
+Process/receiver/stream failures remain terminal; decoder validation is unchanged.
+
+65 top-level Go tests pass with the race detector, excluding the eight existing
+HTTP-listener tests blocked by this session's socket restriction. Four frontend
+controller scenarios, vet and deployment/history checks pass. Actual installed
+rtl_433 file replay verifies background rejection followed by synthetic profile
+learning. These are software results, not compatibility evidence for the remote.
+
+The original home checkout/history/configuration/token remain preserved. A separate
+application-only update is prepared because the home/system filesystem is read-only
+and elevation is unavailable. The actual update bundle is to be checked through the
+updater's fresh clone with explicit `--branch main`; final packaging evidence is
+kept beside that bundle. Full host checks are required before deployment. No new
+physical test, public push or GitHub CI result is claimed.
+
 ## 2026-10-25: failed capture evidence and 23.11 stream compatibility (0.2.1-dev)
 
 The operator installed `0.2.0-dev` / `413ac5b` and reported a failed A ON browser

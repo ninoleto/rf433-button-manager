@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.2.1-dev"
+const Version = "0.2.2-dev"
 
 type App struct {
 	mu                                  sync.Mutex
@@ -93,6 +93,11 @@ func (a *App) setReceiverLocked(s receiver.Status) {
 func (a *App) expireLocked() {
 	if a.learning != nil && !a.now().Before(a.learning.expires) {
 		a.finishLearningLocked("timeout", "Learning timed out. No mapping changed. Retry when you are ready to press the button.")
+	}
+	if l := a.learning; l != nil && l.Automatic && (l.Stage == "waiting" || l.Stage == "receiving" || l.Stage == "analyzing") && !a.now().Before(l.armedAt.Add(learningPressWindow)) {
+		l.Diagnostics.FailureCode = "press_window_timeout"
+		l.Diagnostics.FailureReason = "The armed 20-second window expired without a verified matching press; ignored traffic did not extend it"
+		a.finishLearningLocked("press_timeout", "No matching press was verified before this press window expired. Background captures were ignored; the intended remote's compatibility remains unverified. No mapping changed.")
 	}
 }
 func (a *App) State() any {
@@ -339,6 +344,7 @@ func (a *App) StartLearning(id string, fields []string) (*Learning, error) {
 	if a.captureEnabled && !a.demo {
 		l := a.learning
 		l.Automatic = true
+		l.WindowAnalysisLimit = maxWindowAnalyses
 		l.Stage = "preparing"
 		l.Message = "Preparing the receiver for learning. All actions are paused."
 		l.expires = now.Add(180 * time.Second)
@@ -367,7 +373,10 @@ func (a *App) ArmLearning() (*Learning, error) {
 	l.Stage = "waiting"
 	l.Message = "Press the same physical button once, then release it."
 	l.armedAt = a.now()
-	l.fskAtArm = l.Diagnostics.FSKPackets
+	if l.Automatic {
+		l.WindowExpiresAt = l.armedAt.Add(learningPressWindow).UTC().Format(time.RFC3339Nano)
+		l.WindowAnalyses = 0
+	}
 	l.firstPulse = time.Time{}
 	l.packets = nil
 	l.bytes = 0

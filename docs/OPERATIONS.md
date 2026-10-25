@@ -243,10 +243,13 @@ receiver command or service shutdown is needed for normal learning.
 No pulse capture means no usable pulse packet reached analysis; sample acquisition
 alone is not proof of a transmission. Malformed capture means parser input failed:
 retain the specific row/header/boundary reason from Diagnostics for investigation.
-FSK-only input is excluded from OOK learning and may come from another transmitter;
-it does not identify the intended remote as unsupported. Complete OOK input with
-no validated decoder is a separate replay outcome. Inconsistent means different
-identities were received; keep other remotes idle. A rolling or
+FSK input is excluded and may come from another transmitter. Complete OOK input
+with no validated decoder, or an identity different from the verified candidate,
+is recorded and ignored while the same press window continues. The dialog says
+**Unrecognized signal ignored; waiting for your button**. This does not identify
+the intended remote as unsupported. Four analysis attempts per 20-second window
+bound background work; budget exhaustion is shown explicitly and the window is
+never extended. A rolling or
 encrypted remote remains unsupported, even if several presses look superficially
 similar. Captures are temporary/private, bounded and deleted after analysis.
 
@@ -255,6 +258,8 @@ Do not infer capture success from a restored **connected** indicator. Counters a
 the original rejection survive cleanup and are stored as bounded event metadata.
 See [CAPTURE-INVESTIGATION.md](CAPTURE-INVESTIGATION.md) for the corrected 0.2.0
 failure classification. No extra live receiver or terminal capture is needed.
+The follow-up correction for early termination after an undecodable background
+capture is documented in [BACKGROUND-LEARNING.md](BACKGROUND-LEARNING.md).
 
 An unsupported modulation may need a deliberate developer extension and new
 fixtures/tests; see [DEVELOPMENT.md](DEVELOPMENT.md) and [LEARNING.md](LEARNING.md).

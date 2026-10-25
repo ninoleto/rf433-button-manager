@@ -160,11 +160,18 @@ stale scheduled work across configuration edits and learning transitions. A
 request that has already reached a destination cannot be undone.
 
 Automatic learning has a 180-second session limit, 30 seconds to acquire the
-receiver, 20 seconds to detect a transmission per armed press, and a 6-second
+receiver, a fixed 20-second window per armed press including analysis, and a 6-second
 continuous RF activity limit. It captures until one second of RF silence, replays
 measured candidates, and requires three separately armed matching presses plus
 confirmation. The demo retains its 90-second decoded-event path. Cancel/failure/
 timeout preserve previous mappings. A timer drives cleanup even with no browser.
+Unrecognized or mismatched recordings return to waiting in that same window, with
+per-capture rejection metadata. They never reset deadlines, advance press count,
+overwrite the verified candidate, or rearm learning. Four analysis attempts per
+window bound background-driven work; after exhaustion the remaining time is idle
+listening/accounting only. Analysis receives a context clipped to the original
+window deadline, and late results cannot become candidates. Receiver/decoder-process
+failure remains terminal. See [BACKGROUND-LEARNING.md](BACKGROUND-LEARNING.md).
 
 The receiver plan carries a generation. The supervisor cancels and waits for the
 old live process before applying a replacement. An acknowledgement from an older

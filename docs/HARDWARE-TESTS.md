@@ -1,5 +1,13 @@
 # Physical hardware acceptance gate
 
+**0.2.2-dev background correction: no new physical pass.** The operator started
+learning on 0.2.1-dev / `9c700312` without pressing a button; an undecodable background
+OOK recording incorrectly ended the session. That software failure is reproduced
+and corrected in [BACKGROUND-LEARNING.md](BACKGROUND-LEARNING.md). Compatibility
+with the intended remote remains unverified until the installed correction completes
+the GUI workflow with the operator. Synthetic IQ/replay/regression tests are not
+physical button or USB evidence.
+
 **0.2.1-dev capture correction: physical learning remains pending.** The operator
 reported an unsuccessful A ON attempt on installed 0.2.0-dev / 413ac5b. Its generic
 unsupported notice and zero counters were faulty diagnostics, not evidence that

@@ -118,6 +118,38 @@ func TestMixedDecodedCaptureFailsBeforeCandidateDiscovery(t *testing.T) {
 	}
 }
 
+func TestOfflineProcessFailureIsNotAnUnrecognizedCapture(t *testing.T) {
+	profile, err := profileFromTiming("m=OOK_PWM,s=400,l=1200,r=10004,g=1204,t=320,y=0", 24)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"default", "selected", "preferred", "fallback"} {
+		t.Run(mode, func(t *testing.T) {
+			// The fallback case permits the first built-in replay, then fails the
+			// stored profile's child. All others fail the very first process.
+			body := "exit 9\n"
+			if mode == "fallback" {
+				body = "for arg in \"$@\"; do [ \"$arg\" != '-X' ] || exit 9; done\nexit 0\n"
+			}
+			request := AnalysisRequest{Binary: writeScript(t, body), Capture: syntheticCapture(t), Signature: replaySignature}
+			switch mode {
+			case "selected":
+				request.Selected = &profile
+			case "preferred":
+				request.Config.Profiles = []DecoderProfile{profile}
+				request.PreferredIDs = []string{profile.ID}
+			case "fallback":
+				request.Config.Profiles = []DecoderProfile{profile}
+			}
+			result, err := AnalyzeCapture(context.Background(), request)
+			var failure *LearningError
+			if !errors.As(err, &failure) || failure.Code != "analysis_error" || result.Profile != nil {
+				t.Fatalf("process failure misclassified: %+v %v", result, err)
+			}
+		})
+	}
+}
+
 func TestPWMRejectsMixedCodesAndUnsafeParameters(t *testing.T) {
 	for _, spec := range []string{"n=name,m=OOK_PPM,s=400,l=1200,r=10004", "n=name,m=OOK_PWM,s=400,l=1200,r=10004,decode_uart", "n=name,m=OOK_PWM,s=400,l=1200,r=10004,s=500", "n=name,m=OOK_PWM,s=400,l=1200,r=99999999"} {
 		if _, err := canonicalTiming(spec); err == nil {

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -8,6 +9,16 @@ import (
 
 	"github.com/ninoleto/rf-button-manager/internal/receiver"
 )
+
+const learningPressWindow = 20 * time.Second
+const maxWindowAnalyses = 4
+
+func waitingMessage(l *Learning) string {
+	if l.WindowAnalyses >= maxWindowAnalyses {
+		return "Background traffic used this window's analysis budget. No further signal will be accepted in this window. Cancel or wait for timeout, then retry."
+	}
+	return "Unrecognized signal ignored; waiting for your button"
+}
 
 // EnableCaptureLearning installs one bounded worker. The production supervisor
 // uses ReceiverPlan/ReceiverPlanApplied to serialize changes of the live child.
@@ -93,6 +104,7 @@ func (a *App) SetReceiverFor(generation uint64, s receiver.Status) {
 		if s.State == "connected" && l.Stage == "preparing" {
 			l.Stage = "waiting"
 			l.armedAt = a.now()
+			l.WindowExpiresAt = l.armedAt.Add(learningPressWindow).UTC().Format(time.RFC3339Nano)
 			l.Message = "Receiver ready. Press the physical button once, then release it."
 		} else if s.State != "connected" {
 			l.Diagnostics.Detail = s.Message
@@ -161,7 +173,7 @@ func (a *App) ReceivePulse(generation uint64, packet receiver.PulsePacket) {
 	}
 	if !packet.OOK {
 		if l.Stage == "waiting" {
-			l.Message = "FSK traffic was detected and excluded from OOK learning. Still waiting for a supported OOK capture; this traffic may be from another device."
+			l.Message = waitingMessage(l)
 		}
 		return
 	}
@@ -170,6 +182,11 @@ func (a *App) ReceivePulse(generation uint64, packet receiver.PulsePacket) {
 	l.lastRF = now
 	if (l.Stage != "waiting" && l.Stage != "receiving") || now.Before(l.armedAt) {
 		l.Diagnostics.DiscardedPackets++
+		return
+	}
+	if l.WindowAnalyses >= maxWindowAnalyses {
+		l.Diagnostics.DiscardedPackets++
+		l.Message = waitingMessage(l)
 		return
 	}
 	if l.Stage == "waiting" && !previous.IsZero() && now.Sub(previous) < time.Second {
@@ -242,6 +259,10 @@ func (a *App) observeCaptureLocked(l *Learning, p receiver.PulsePacket) {
 
 // Persist only bounded diagnostics, never pulse content or webhook configuration.
 func captureEvidence(l *Learning) json.RawMessage {
+	diagnostics := l.Diagnostics
+	// Rejections have individual history events; don't duplicate the bounded ring
+	// into every lifecycle event and exceed the history payload limit.
+	diagnostics.RecentRejections = nil
 	raw, _ := json.Marshal(struct {
 		SessionID   string                       `json:"session_id"`
 		Generation  uint64                       `json:"capture_generation"`
@@ -249,8 +270,39 @@ func captureEvidence(l *Learning) json.RawMessage {
 		ReceiverAt  string                       `json:"capture_receiver_at"`
 		FinishedAt  string                       `json:"finished_at"`
 		Diagnostics receiver.LearningDiagnostics `json:"diagnostics"`
-	}{l.SessionID, l.CaptureGeneration, l.CaptureReceiver, l.CaptureReceiverAt, l.FinishedAt, l.Diagnostics})
+	}{l.SessionID, l.CaptureGeneration, l.CaptureReceiver, l.CaptureReceiverAt, l.FinishedAt, diagnostics})
 	return raw
+}
+
+func (a *App) rejectCaptureLocked(l *Learning, rejection receiver.CaptureRejection) {
+	rejection.Time = a.now().UTC().Format(time.RFC3339Nano)
+	if len(rejection.Code) > 64 {
+		rejection.Code = rejection.Code[:64]
+	}
+	if len(rejection.Reason) > 512 {
+		rejection.Reason = rejection.Reason[:512]
+	}
+	l.Diagnostics.RejectedCaptures++
+	l.Diagnostics.RejectionCode = rejection.Code
+	l.Diagnostics.RejectionReason = rejection.Reason
+	l.Diagnostics.RecentRejections = append(l.Diagnostics.RecentRejections, rejection)
+	if len(l.Diagnostics.RecentRejections) > 8 {
+		l.Diagnostics.RecentRejections = l.Diagnostics.RecentRejections[len(l.Diagnostics.RecentRejections)-8:]
+	}
+	raw, _ := json.Marshal(struct {
+		SessionID string                    `json:"session_id"`
+		Rejection receiver.CaptureRejection `json:"rejection"`
+	}{l.SessionID, rejection})
+	a.eventLocked("learning_capture", "Capture rejected: "+rejection.Code+"; no press confirmed", l.ButtonID, raw)
+}
+
+func (a *App) continueLearningLocked(l *Learning) {
+	l.Stage = "waiting"
+	l.Message = waitingMessage(l)
+	l.packets = nil
+	l.bytes = 0
+	l.firstPulse = time.Time{}
+	// Do not change armedAt, expires, lastRF, the verified candidate or its profile.
 }
 
 func (a *App) finishLearningLocked(stage, message string) {
@@ -304,22 +356,6 @@ func (a *App) learningTick() {
 		a.mu.Unlock()
 		return
 	case "waiting":
-		if now.Sub(l.armedAt) > 20*time.Second {
-			switch {
-			case l.Diagnostics.Stream.Active:
-				l.Diagnostics.FailureCode = "missing_end"
-				l.Diagnostics.FailureReason = "A pulse header/timing rows arrived, but no complete ;end boundary was received"
-				a.finishLearningLocked("malformed_capture", "Pulse capture did not complete its packet boundary. No decoder was tested; see Diagnostics.")
-			case l.Diagnostics.FSKPackets > l.fskAtArm:
-				l.Diagnostics.FailureCode = "unsupported_modulation"
-				l.Diagnostics.FailureReason = l.Diagnostics.RejectionReason
-				a.finishLearningLocked("unsupported_modulation", "Only FSK packets were observed during this attempt; no OOK recording reached analysis. They may be unrelated traffic. The intended remote has not been identified.")
-			default:
-				l.Diagnostics.FailureCode = "no_pulse_packet"
-				l.Diagnostics.FailureReason = "No complete OOK pulse packet was received during the armed capture window"
-				a.finishLearningLocked("no_capture", "No pulse packet was captured. Sample acquisition or decoded JSON alone does not establish capture success. No decoder was tested.")
-			}
-		}
 		a.mu.Unlock()
 		return
 	case "receiving":
@@ -344,6 +380,9 @@ func (a *App) learningTick() {
 		a.mu.Unlock()
 		return
 	}
+	l.WindowAnalyses++
+	l.Diagnostics.AnalysisAttempts++
+	rejection := receiver.CaptureRejection{Attempt: l.Diagnostics.AnalysisAttempts, Press: l.Presses + 1, Packets: len(l.packets), Bytes: l.bytes}
 	l.packets = nil
 	l.Stage = "analyzing"
 	l.Message = "Analyzing the captured transmission and replaying decoder candidates. No decoder has been saved yet."
@@ -367,20 +406,35 @@ func (a *App) learningTick() {
 			}
 		}
 	}
-	id, ctx, analyze := l.SessionID, l.ctx, a.analyzeCapture
+	id, analyze := l.SessionID, a.analyzeCapture
+	ctx, cancel := context.WithTimeout(l.ctx, min(10*time.Second, l.armedAt.Add(learningPressWindow).Sub(now)))
 	a.analysisActive = true
 	a.mu.Unlock()
 	result, err := analyze(ctx, request)
+	contextErr := ctx.Err()
+	cancel()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.analysisActive = false
 	a.releaseCaptureSuppressionLocked()
 	a.expireLocked()
 	l = a.learning
-	if a.closed || l == nil || l.SessionID != id || ctx.Err() != nil {
+	rejection.Replays = result.Diagnostics.Replays
+	rejection.Candidates = result.Diagnostics.Candidates
+	if err != nil {
+		rejection.Code, rejection.Reason = "analysis_error", "Capture analysis failed"
+		var failure *receiver.LearningError
+		if errors.As(err, &failure) {
+			rejection.Code, rejection.Reason = failure.Code, failure.Message
+		}
+	}
+	if a.closed || l == nil || l.SessionID != id {
 		if notice := a.terminalCapture; notice != nil && notice.SessionID == id {
 			notice.Diagnostics.Replays += result.Diagnostics.Replays
 			notice.Diagnostics.Candidates += result.Diagnostics.Candidates
+			if err != nil {
+				a.rejectCaptureLocked(notice, rejection)
+			}
 			a.eventLocked("learning_diagnostics", "Analysis cleanup completed; attempted replay counts retained", notice.ButtonID, captureEvidence(notice))
 		}
 		return
@@ -388,27 +442,46 @@ func (a *App) learningTick() {
 	l.Diagnostics.Replays += result.Diagnostics.Replays
 	l.Diagnostics.Candidates += result.Diagnostics.Candidates
 	l.Diagnostics.Source = result.Diagnostics.Source
+	if contextErr != nil {
+		if rejection.Code == "" {
+			rejection.Code, rejection.Reason = "analysis_error", "Capture analysis was cancelled or exceeded its deadline"
+		}
+		a.rejectCaptureLocked(l, rejection)
+		a.finishLearningLocked("analysis_error", "Capture analysis was cancelled or exceeded its deadline. No mapping changed.")
+		return
+	}
 	if err != nil {
+		a.rejectCaptureLocked(l, rejection)
 		var failure *receiver.LearningError
 		if errors.As(err, &failure) {
-			a.finishLearningLocked(failure.Code, failure.Message)
+			if failure.Code == "unsupported" || failure.Code == "inconsistent" {
+				a.continueLearningLocked(l)
+			} else {
+				a.finishLearningLocked(failure.Code, failure.Message)
+			}
 		} else {
 			a.finishLearningLocked("analysis_error", "Capture analysis failed. Retry learning; no mapping changed.")
 		}
 		return
 	}
+	fields = l.Fields
 	if result.Profile != nil {
-		l.Fields = []string{"codes"}
+		fields = []string{"codes"}
 	}
-	signature, err := Signature(result.Raw, l.Fields)
+	signature, err := Signature(result.Raw, fields)
 	if err != nil {
-		a.finishLearningLocked("unsupported", "Transmission detected, but no stable button identity was decoded. No mapping changed.")
+		rejection.Code, rejection.Reason = "unsupported", "No stable button identity was decoded from this capture"
+		a.rejectCaptureLocked(l, rejection)
+		a.continueLearningLocked(l)
 		return
 	}
 	if l.Candidate != "" && l.Candidate != signature {
-		a.finishLearningLocked("inconsistent", "Separate presses produced different signals. Use the same button and keep other remotes idle. Changing, rolling or encrypted codes are not supported; no mapping changed.")
+		rejection.Code, rejection.Reason = "inconsistent", "This capture did not match the verified button identity; it may be unrelated traffic"
+		a.rejectCaptureLocked(l, rejection)
+		a.continueLearningLocked(l)
 		return
 	}
+	l.Fields = append([]string(nil), fields...)
 	l.Candidate = signature
 	l.Raw = append([]byte(nil), result.Raw...)
 	l.Profile = result.Profile

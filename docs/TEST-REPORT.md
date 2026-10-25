@@ -1,5 +1,50 @@
 # Verification report — 2026-10-25
 
+## Background capture correction: 0.2.2-dev
+
+Base: installed/home source `9c700312b10be4506a1d1550c0b5c2282af0333d`.
+The premature terminal failure was reproduced before the change with four packet
+records, three exclusions, one accepted capture, zero analyzer candidates, two
+replays and zero presses. The same regression now stays waiting and keeps its
+original deadlines. See [BACKGROUND-LEARNING.md](BACKGROUND-LEARNING.md).
+
+Executed in the development checkout:
+
+- **65 top-level Go tests passed with `-race -count=1`**, excluding the same eight
+  socket-dependent tests listed in the 0.2.1 section below. A current loopback socket
+  creation probe returned `EPERM`; no new full-host-suite pass is claimed.
+- Background FSK and undecodable OOK expire with zero presses; repeated background
+  traffic cannot exceed four analysis attempts in an armed window. Deadline and
+  verified candidate/profile remain unchanged after rejection.
+- Matching traffic cannot automatically open subsequent windows or save a mapping.
+  Mismatched traffic can be followed by the intended matching capture in the same
+  manually armed window. Three windows and explicit confirmation remain necessary.
+- Actual installed rtl_433 23.11 file replay rejects a synthetic single-pulse OOK
+  recording with zero candidates/two replays, then learns an existing synthetic PWM
+  fixture through profile discovery and three separately armed matching captures.
+  Additional background input fails the selected profile without ending learning.
+  The resulting mapping is saved disabled. No USB was opened.
+- Late successful analysis after the press deadline cannot increment presses.
+  Actual offline process exits remain terminal with default, selected, preferred
+  and fallback profiles. Existing strict-decoder, cancellation, receiver ownership,
+  persistence and overlap tests continue to pass.
+- **Four frontend-controller tests** pass, including rejection evidence, visible
+  fixed-window time, analysis budget exhaustion and no automatic API rearming.
+  These use the actual controller with a DOM/API adapter, not a real browser.
+- Vet, JavaScript/shell syntax, installer safeguards and history restoration pass.
+
+Packaging must verify the actual distributed bundle with `git clone --branch main`,
+check the selected commit, run the available checks and build the executable from
+that fresh checkout. The one-time helper's verification-only mode makes this path
+testable without home/system writes. Its normal deployment path still requires full
+`make check` on the host before any installation. The bundle/build hashes and final
+fresh-clone verification are recorded in the adjacent private update manifest/report.
+
+Live health still reports 0.2.1-dev. This session has not deployed the correction.
+Physical compatibility, successful GUI learning of the actual remote, webhook effects,
+USB recovery, public publication and GitHub CI all remain unverified for this update.
+Earlier sections document their respective historical versions.
+
 ## Capture diagnostic correction: 0.2.1-dev
 
 Prepared from the installed/home source base `413ac5b`. The operator's failed

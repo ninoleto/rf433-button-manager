@@ -305,7 +305,7 @@
       content.append(node('span', '', event.message || 'Received event'));
       if (event.data !== undefined && event.data !== null && event.data !== '') {
         const details = node('details');
-        details.append(node('summary', '', event.data.diagnostics ? 'Capture diagnostics' : 'Decoded data'), node('pre', '', typeof event.data === 'string' ? event.data : JSON.stringify(event.data, null, 2)));
+        details.append(node('summary', '', event.data.diagnostics || event.kind === 'learning_capture' ? 'Capture diagnostics' : 'Decoded data'), node('pre', '', typeof event.data === 'string' ? event.data : JSON.stringify(event.data, null, 2)));
         content.append(details);
       }
       row.append(time, type, content); fragment.append(row);
@@ -351,7 +351,9 @@
       $('learning-retry').hidden = active;
       $('learning-cancel').textContent = active ? 'Cancel learning' : 'Close';
       const titles = {preparing:'Preparing receiver', waiting:'Press the physical button once', receiving:'Transmission detected', analyzing:'Checking the captured signal', captured:'Press verified — release the button', ready:'Ready to save', receiver_unavailable:'Receiver unavailable', timeout:'Learning session timed out', no_capture:'No pulse capture', malformed_capture:'Malformed pulse capture', unsupported_modulation:'No supported modulation captured', capture_error:'Capture stream failed', unsupported:'Capture has no validated decoder', inconsistent:'Captures did not agree', capture_limit:'Capture limit reached', analysis_error:'Analysis could not finish'};
-      $('learning-instruction').textContent = titles[learning.stage] || 'Learning stopped';
+      titles.press_timeout = 'Press window timed out';
+      const budgetUsed = learning.automatic && learning.stage === 'waiting' && learning.window_analysis_limit > 0 && learning.window_analyses >= learning.window_analysis_limit;
+      $('learning-instruction').textContent = budgetUsed ? 'Analysis budget reached' : titles[learning.stage] || 'Learning stopped';
       $('learning-description').textContent = learning.message || (ready ? 'Review the decoded data, then confirm this is the intended button.' : captured ? 'Release the button, then select Ready for next press.' : 'Keep other remotes idle. Release the button fully after each press.');
       $('learning-pause-text').textContent = active || state.actions_paused ? 'All webhook actions are paused' : 'Learning ended; previous mappings are unchanged';
       const diagnostic = learning.diagnostics || {};
@@ -371,6 +373,8 @@
         diagnostic.failure_code ? `Failure: ${diagnostic.failure_code} — ${diagnostic.failure_reason || ''}` : '',
         diagnostic.rejection_code ? `Last rejection: ${diagnostic.rejection_code} — ${diagnostic.rejection_reason || ''}` : '',
         `Analyzer candidates: ${diagnostic.candidates || 0}; offline replays: ${diagnostic.replays || 0}`,
+        `Captures analyzed: ${diagnostic.analysis_attempts || 0}; captures rejected: ${diagnostic.rejected_captures || 0}; this window: ${learning.window_analyses || 0}/${learning.window_analysis_limit || 0} analysis attempts`,
+        ...(diagnostic.recent_rejections || []).map(r => `Capture ${r.attempt}, press window ${r.press_window}: ${r.code} — ${r.reason}; packets: ${r.packets}; bytes: ${r.bytes}; candidates: ${r.candidates}; replays: ${r.replays}`),
         `Decoder: ${learning.profile?.name || diagnostic.source || 'No validated profile yet'}`,
         diagnostic.detail || '',
       ].filter(Boolean).join('\n');
@@ -378,7 +382,10 @@
     }
     const expiry = new Date(learning.expires_at).getTime();
     const seconds = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
-    $('learning-expiry').textContent = active && Number.isFinite(expiry) ? `Session limit: ${seconds}s` : '';
+    const windowExpiry = new Date(learning.window_expires_at).getTime();
+    const windowSeconds = Math.max(0, Math.ceil((windowExpiry - Date.now()) / 1000));
+    const waiting = ['waiting', 'receiving', 'analyzing'].includes(learning.stage);
+    $('learning-expiry').textContent = active && Number.isFinite(expiry) ? `${waiting && Number.isFinite(windowExpiry) ? `Press window: ${windowSeconds}s · ` : ''}Session limit: ${seconds}s` : '';
     learningWasActive = true;
     if (!$('login-dialog').open && !$('confirm-dialog').open) show('learning-dialog');
   }

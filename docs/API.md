@@ -227,11 +227,11 @@ backup/rollback procedures are in [OPERATIONS.md](OPERATIONS.md).
 
 `actions_paused` stays true through capture cleanup and restoration, even when
 `learning` has become null. Do not infer action availability from the session alone.
-`learning_notice.stage` can be receiver_unavailable, timeout, no_capture,
-malformed_capture, unsupported_modulation, capture_error, unsupported,
-inconsistent, capture_limit or analysis_error; its message explains the next step.
-`unsupported` is reserved for a recording that reached analysis without a validated
-decoder/identity. It is not used for parser errors or missing input.
+`learning_notice.stage` can be receiver_unavailable, timeout, press_timeout,
+no_capture, malformed_capture, capture_error, capture_limit or analysis_error;
+its message explains the next step. Since 0.2.2, `unsupported` and `inconsistent`
+analysis results are capture rejections: the active session returns to `waiting`,
+retains its candidate/profile, and does not create a terminal notice or count a press.
 Retry uses POST /api/learn/start with the previous button_id after cleanup. Cancel
 also dismisses a retained notice. The GUI provides these operations directly.
 
@@ -256,6 +256,24 @@ Examples include `invalid_timing`, `pulse_count_mismatch`, `missing_end`,
 is echoed into the reason. Failure/cleanup metadata is persisted in `learning` and
 `learning_diagnostics` events; the active session/notice itself is not resumed
 after application restart.
+
+Automatic learning includes `window_expires_at`, `window_analyses` and
+`window_analysis_limit` (4). The 20-second window starts at initial receiver
+readiness or an explicit successful `/api/learn/arm`; it covers receiving and
+analysis as well as waiting. Ignored traffic never moves it or `expires_at`.
+After four analyses, waiting continues without more analysis until cancel/timeout.
+`press_timeout` has `failure_code=press_window_timeout`. The overall 180-second
+session timeout remains independent, including time spent awaiting browser input.
+
+Diagnostics add `analysis_attempts`, `rejected_captures` and `recent_rejections`
+(at most 8). Each rejection contains `attempt`, `press_window`, `time`, `code`,
+`reason`, `packets`, `bytes`, `candidates` and `replays`. Every unsuccessful analysis
+is individually stored in a `learning_capture` event with `session_id` and a
+`rejection` object. It contains no raw waveform, token or decoded RF identity.
+The recent rejection ring is omitted from aggregate lifecycle events to avoid
+duplicating it and exceeding the event payload limit. The existing 500-event
+retention/150-event state view still applies. Packet rejection counts and analyzed
+capture rejection counts have different meanings and must not be combined.
 
 They never include credentials or raw IQ data. Profile timing and decoded identities
 may identify a remote; treat full state and diagnostics as private. There is no

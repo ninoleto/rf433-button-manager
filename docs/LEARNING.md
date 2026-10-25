@@ -45,6 +45,23 @@ Cancel preserves the previous mapping. Failed attempts retain a visible explanat
 after normal reception is restored. It starts a new attempt with zero captures.
 The browser may be closed; a server timer still expires and cleans up learning.
 
+The channel can contain unrelated traffic before you press anything. FSK packets
+are excluded. A complete OOK recording that yields no validated decoder, no stable
+identity, or an identity different from the first verified press is recorded and
+skipped. The dialog says **Unrecognized signal ignored; waiting for your button**.
+It stays in the same armed window and retains any previously verified candidate.
+This does not identify the ignored transmitter as the intended remote, or establish
+that the intended remote uses changing, rolling or encrypted codes.
+
+Each armed window is **20 seconds total, including capture and analysis**. Ignored
+traffic cannot restart that deadline or the 180-second session deadline. At most
+four recordings are analyzed per window (at most twelve over three successful
+windows); every analysis also has its existing ten-second limit and is cancelled
+at the window deadline. If the four attempts are exhausted, the GUI says the budget
+is used and no more signals can be accepted in that window. Cancel or wait for its
+timeout before deliberately retrying. Ordinary packets never arm the next window;
+only **Ready for next press** does so after a verified capture.
+
 | Visible state | Meaning / next step |
 | --- | --- |
 | Preparing receiver | The manager is changing its own receiver process to capture mode. Wait. |
@@ -54,10 +71,11 @@ The browser may be closed; a server timer still expires and cleans up learning.
 | Checking captured signal | rtl_433 is replaying a private recording; do not press again yet. |
 | No pulse capture | No usable pulse recording reached analysis. Decoded JSON or a sample heartbeat alone is not capture proof. |
 | Malformed pulse capture | A header, timing row, count or packet boundary was invalid. Diagnostics retain the specific parser rejection; no compatibility conclusion is made. |
-| No supported modulation captured | Only FSK packets were observed in the armed window. They may be unrelated traffic; the intended remote has not been identified. |
-| Capture has no validated decoder | Complete OOK input reached replay, but no supported interpretation passed validation. This is different from an empty or malformed stream. |
+| Unrecognized signal ignored; waiting for your button | FSK was excluded or a complete OOK recording failed replay/identity validation. The same window remains open; no press was counted. |
+| Analysis budget reached | Four recordings used this window's analysis budget. Further traffic is counted but not analyzed; cancel or wait for timeout. |
+| Press window timed out | No matching press was verified within the original 20-second window. Diagnostics retain ignored-capture evidence; compatibility remains unverified. |
 | Capture stream failed | Reading stdout failed or a line exceeded its limit. Inspect the retained stream error. |
-| Inconsistent captures | Different identities or ambiguous frames appeared. Keep other remotes idle and retry the same button. |
+| Inconsistent capture (diagnostic) | Ambiguous frames or another identity were ignored; the previously verified candidate is retained. Keep other remotes idle. |
 | Capture limit / session timeout | Prolonged RF activity, the overall session deadline, or a resource limit prevented completion. |
 | Ready to save | Three separate captures agree. Review and confirm; actions stay disabled. |
 
@@ -69,6 +87,10 @@ accepted for replay. Stdout bytes/lines, JSON records, headers, end boundaries,
 incomplete rows, modulation and rejection counts explain where input stopped.
 The original failure reason remains fixed while late cleanup evidence is added.
 Bounded metadata is saved in event history, including when the dialog is dismissed.
+Each unsuccessful analysis has its own `learning_capture` event with the attempt
+number, press window, rejection code/reason, packet/byte counts and replay/candidate
+counts. The dialog also retains the eight most recent analyzed rejections. Packet
+exclusions (such as FSK) and unsuccessful analyses are separate counters.
 Raw IQ, tokens and webhook configuration are not included. Decoded identifiers in
 other state fields can still identify a remote: review before sharing.
 
@@ -84,6 +106,8 @@ flowchart TD
     Analyze --> Proof[Replay candidate; repeated consistent fixed code; exact bit length]
     Existing -->|Valid identity| Match[Compare with previous separate presses]
     Proof --> Match
+    Existing -->|Unrecognized capture; time/work budget remains| Capture
+    Match -->|Does not match verified identity; window remains| Capture
     Match -->|Fewer than three| Arm[Browser: Ready for next press]
     Arm --> Capture
     Match -->|Three match| Confirm[Browser: Confirm and save]
@@ -128,12 +152,13 @@ private `/tmp` is on internal storage; captures are not written to the backup di
 | --- | --- |
 | Overall automatic session | 180 seconds |
 | Receiver preparation | 30 seconds |
-| Waiting per armed press | 20 seconds |
+| Armed press window, including analysis | 20 seconds; rejected captures never extend it |
 | Continuous RF activity per capture | 6 seconds |
 | Quiet interval between capture and analysis / rearming | 1 second |
 | One press recording | 32 packets, 256 KiB total; 4,096 pulse pairs per packet |
 | Session stream | 2 MiB / 128 observed packet records, checked at progress callbacks |
 | Offline analysis | 10 seconds total, 2 seconds per child |
+| Analysis attempts | 4 per armed window; at most 12 per three-window session |
 | Child output | 512 KiB stdout, 128 KiB stderr; bounded individual lines |
 | Distinct analyzer candidates | 8 |
 | Saved profiles | 16 |
@@ -152,6 +177,11 @@ The stopped child's already-read queue is drained for diagnostics. Partial packe
 produce a specific missing-boundary rejection. Data read during shutdown is never
 eligible as a new candidate. Counts describe records read by the supervisor, not
 unread bytes still in OS or device buffers when a child is terminated.
+An unrecognized/mismatched recording only returns to waiting; it does not restore
+the receiver or unpause actions. Malformed stream input, receiver loss, process/
+storage failures and hard resource limits remain errors, not candidate evidence.
+Offline process failures are distinguished from successful replays with no decode,
+including replay through a previously selected profile.
 
 ## Storage and upgrade compatibility
 

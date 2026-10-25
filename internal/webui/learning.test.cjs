@@ -84,7 +84,7 @@ test('browser controller learns without decoder setup and exposes progress, diag
 
 test('reopened browser shows useful terminal failures and cannot retry before restoration',async()=>{
   const h=await harness(); // No selected editor: status controls must still update.
-  for(const [stage,title] of [['receiver_unavailable','Receiver unavailable'],['timeout','Learning session timed out'],['no_capture','No pulse capture'],['malformed_capture','Malformed pulse capture'],['unsupported_modulation','No supported modulation captured'],['capture_error','Capture stream failed'],['inconsistent','Captures did not agree']]) {
+  for(const [stage,title] of [['receiver_unavailable','Receiver unavailable'],['timeout','Learning session timed out'],['press_timeout','Press window timed out'],['no_capture','No pulse capture'],['malformed_capture','Malformed pulse capture'],['unsupported_modulation','No supported modulation captured'],['capture_error','Capture stream failed'],['inconsistent','Captures did not agree']]) {
     h.set({learning_notice:{...h.session(),stage,message:`Explanation for ${stage}`},actions_paused:true});await h.refresh();
     assert.equal(h.el('learning-instruction').textContent,title);
     assert.equal(h.el('learning-retry').disabled,true);
@@ -94,6 +94,24 @@ test('reopened browser shows useful terminal failures and cannot retry before re
   await h.el('learning-cancel').click();
   assert.equal(h.el('learning-dialog').open,false);
   assert.equal(h.calls.at(-2).url,'/api/learn/cancel');
+});
+
+test('unrecognized traffic keeps the same press window visible with bounded analysis',async()=>{
+  const h=await harness();
+  const windowExpiry=new Date(Date.now()+20000).toISOString();
+  const waiting={...h.session(),window_expires_at:windowExpiry,window_analyses:1,window_analysis_limit:4,message:'Unrecognized signal ignored; waiting for your button',diagnostics:{analysis_attempts:1,rejected_captures:1,recent_rejections:[{attempt:1,press_window:1,code:'unsupported',reason:'No candidate in this recording',packets:1,bytes:72,candidates:0,replays:2}]}};
+  h.set({learning:waiting,actions_paused:true});await h.refresh();
+  assert.equal(h.el('learning-description').textContent,waiting.message);
+  assert.match(h.el('learning-count').textContent,/0 of 3/);
+  assert.match(h.el('learning-expiry').textContent,/Press window: \d+s · Session limit:/);
+  assert.match(h.el('learning-diagnostics').textContent,/Capture 1, press window 1: unsupported/);
+  assert.equal(h.el('learning-confirm').hidden,true);
+  assert.equal(h.el('learning-arm').hidden,true);
+  assert.equal(h.el('learning-retry').hidden,true);
+  h.set({learning:{...waiting,window_analyses:4,message:'Background traffic used this window’s analysis budget.'}});await h.refresh();
+  assert.equal(h.el('learning-instruction').textContent,'Analysis budget reached');
+  assert.equal(h.el('learning-confirm').hidden,true);
+  assert.equal(h.calls.some(c=>c.method==='POST'),false,'polling must never automatically rearm or confirm');
 });
 
 test('failure diagnostics retain capture evidence separately from restored reception',async()=>{

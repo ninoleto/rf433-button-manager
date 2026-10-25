@@ -54,22 +54,20 @@ func TestCaptureFailuresDistinguishEvidence(t *testing.T) {
 			a, c, r := captureApp(t)
 			before := a.Backup()
 			generation := startCapture(t, a, r.Buttons[0].ID)
-			stage, code := "no_capture", "no_pulse_packet"
+			stage, code := "press_timeout", "press_window_timeout"
 			switch kind {
 			case "JSON_only":
 				a.ReceivePulse(generation, receiver.PulsePacket{Progress: true, Stream: receiver.PulseStream{Bytes: 120, Lines: 1, JSONRecords: 1}})
 			case "FSK_only":
 				a.ReceivePulse(generation, syntheticFSK(t))
-				stage, code = "unsupported_modulation", "unsupported_modulation"
 			case "partial_packet":
 				a.ReceivePulse(generation, receiver.PulsePacket{Progress: true, Stream: receiver.PulseStream{Bytes: 90, Lines: 6, Headers: 1, PulseRows: 1, Active: true, Expected: 2, Rows: 1}})
-				stage, code = "malformed_capture", "missing_end"
 			case "malformed_packet":
 				a.ReceivePulse(generation, receiver.PulsePacket{OOK: true, Pulses: 1, ObservedBytes: 53, ErrorCode: "invalid_timing", Error: "Pulse row 2 contains a non-integer or negative duration"})
 				stage, code = "malformed_capture", "invalid_timing"
 			case "empty_packet":
 				a.ReceivePulse(generation, receiver.PulsePacket{OOK: true, ObservedBytes: 20, ErrorCode: "empty_packet", Error: "Pulse packet ended without any timing rows"})
-				code = "empty_packet"
+				stage, code = "no_capture", "empty_packet"
 			case "read_error":
 				a.ReceivePulse(generation, receiver.PulsePacket{ErrorCode: "stream_read_error", Error: "rtl_433 stdout exceeded the safe line size or became unreadable"})
 				stage, code = "capture_error", "stream_read_error"
