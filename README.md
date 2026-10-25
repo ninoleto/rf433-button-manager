@@ -75,7 +75,7 @@ been tested by the project owner. Broader hardware support and long-term reliabi
 still need testing. Read the [test report](docs/TEST-REPORT.md) and
 [hardware test plan](docs/HARDWARE-TESTS.md) for the evidence and remaining work.
 
-[Download 0.3.6-dev](https://github.com/ninoleto/rf-button-manager/releases/tag/v0.3.6-dev)
+[Download 0.3.6-dev](https://github.com/ninoleto/rf433-manager/releases/tag/v0.3.6-dev)
 · [Install](#requirements-and-supplied-binary)
 · [Developer guide](docs/DEVELOPMENT.md)
 · [Instructions for AI coding agents](AGENTS.md)
@@ -180,8 +180,8 @@ build or network-hosted assets. Tests with the race detector require a C compile
 the release executable uses pure-Go SQLite and is built with `CGO_ENABLED=0`.
 
 ```sh
-git clone https://github.com/ninoleto/rf-button-manager.git
-cd rf-button-manager
+git clone https://github.com/ninoleto/rf433-manager.git
+cd rf433-manager
 export GOTOOLCHAIN=local
 go mod download
 go mod verify
