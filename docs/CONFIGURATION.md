@@ -56,7 +56,7 @@ receiver. Never persist bus/device numbers or hub ports. Duplicate serials requi
 deliberate resolution; this application does not rewrite EEPROM serials.
 
 Preserve any existing verified custom decoder and explicit protocol selection.
-New fixed-code OOK/PWM profiles are added separately; ordinary Settings updates do
+New fixed-code OOK PWM/PPM profiles are added separately; ordinary Settings updates do
 not remove them. Normal learning needs no decoder string, terminal history search,
 configuration-file edit or receiver command. The browser workflow captures and
 validates supported signals internally. It does not inherit arbitrary configuration
@@ -131,7 +131,7 @@ or recovery through untested USB ports/hubs. Record these separately with an ope
 Each matching frame advances a silence timer. A new action needs a gap at least
 `debounce_ms` since the prior matching frame. Default 700 ms; range 100–60,000 ms.
 Held bursts keep extending the interval. Distinct presses faster than the interval
-can be suppressed. Automatic learning requires one second of RF silence and explicit arming between
+can be suppressed. Automatic learning requires a release interval and explicit arming between
 captures. The synthetic demo retains the older 750 ms decoded-event interval.
 
 Add an origin in Settings, save a button GET/POST webhook, and test only in an

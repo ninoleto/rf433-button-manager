@@ -22,8 +22,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y rtl-433
       - name: Verify formatting
         run: test -z "$(gofmt -l cmd internal)"
+      - name: Fetch checksum-pinned public remote recordings
+        run: python3 scripts/fetch-rf-testdata.py /tmp/rfb-rf-tests
       - name: Test race safety and static analysis
-        run: make check
+        run: RFB_RF_TESTDATA=/tmp/rfb-rf-tests make check
       - name: Build native executable
         run: make build
       - name: Smoke check binary

@@ -5,7 +5,7 @@
 Runtime: Linux x86_64 for the supplied binary, systemd/udev for the supplied
 installer, an independently installed `/usr/bin/rtl_433` (initial integration
 target 23.11), a compatible RTL-SDR, antenna and supported 433.92 MHz remote, USB
-permissions, and a browser for management. The browser can derive supported fixed-code OOK/PWM profiles internally;
+permissions, and a browser for management. The browser can derive supported fixed-code OOK PWM/PPM profiles internally;
 other protocols need a working existing decoder or an explicit developer extension. No Go, Node, Docker, MQTT or cloud account is needed to
 install the packaged binary. Keep state on reliable internal storage with space
 for SQLite/WAL and retained backups. No minimum RAM/CPU specification or power-loss
@@ -225,3 +225,24 @@ not evidence for a physical remote or a default decoder configuration.
 adapter using Node.js 20+ and no external modules. It covers capture progress,
 failure persistence, retry gating and confirmation. It does not establish real
 browser layout; the separate Playwright suite remains the rendering check.
+
+## Reproducing remote compatibility checks
+
+Install upstream rtl_433 for file replay. The supported reference for these checks
+is 23.11. `python3 scripts/fetch-rf-testdata.py /tmp/rfb-rf-tests` fetches four
+checksum-pinned public IQ recordings; `RFB_RF_TESTDATA=/tmp/rfb-rf-tests make check`
+runs the normal suite plus recorded-remote integration. No USB device is opened.
+See TEST-REPORT.md for provenance, tested flow and the physical-test distinction.
+
+To add an already-decoded remote format, add a narrowly justified identity alias
+in `internal/app/decoded_learning.go`, plus positive and different-button tests.
+Never identify a button by RSSI, timestamp or sensor measurements. For an unknown
+pulse format, extend the measured profile parser and replay tests; do not insert
+unverified timing constants into runtime configuration. `generic_learning_test.go`
+shows separate-packet PPM repetition tests. Keep timeout, ambiguity, cancellation,
+overlap and webhook-suppression tests passing when extending learning.
+
+The package updater is deliberately independent of Git checkout state and Go.
+`python3 scripts/test-update-prebuilt.py` tests dispatch and rollback with temporary
+files and simulated systemd/API responses. It must fail if only the source or
+package binary is updated while the HTTP service still reports an older version.

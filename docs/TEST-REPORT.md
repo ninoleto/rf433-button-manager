@@ -1,5 +1,52 @@
 # Verification report — 2026-10-25
 
+## 0.3.0-dev: direct rtl_433 learning and PWM/PPM discovery
+
+Validation environment: isolated Linux x86_64 build machine, Go 1.27.3,
+rtl_433 **23.11**, file replay only. The test decoder was compiled without USB
+backends; it is not shipped as a replacement for the server's rtl_433.
+
+Passed in this environment:
+
+- Full Go race suite, including HTTP tests, and `go vet`.
+- Four frontend controller tests against the actual JavaScript and HTML IDs.
+- Ten real Chromium headless-browser checks: token login, remote editing, unsaved
+  edits, three-press demo learning, escaped labels, mocked capture/diagnostic states,
+  settings/backup/restore, duplicate-remote reset, desktop/mobile themes and logout.
+  Browser checks use a real isolated demo service, not USB or physical RF.
+- Deployment/history tests and four isolated prebuilt-update tests: apply dispatch,
+  real temporary-file replacement/backup, wrong-live-version rollback, and checksum refusal.
+- Four real upstream IQ recordings decoded by rtl_433: EV1527 (Akhan event),
+  PT2262 (Generic-Remote event), Akhan, and HT680. Each follows three explicitly
+  armed presses, disabled confirmation, persisted configuration loaded into a new
+  app instance, then one localhost test webhook despite repeated RF frames.
+- Automatic synthetic PWM discovery and measured PPM discovery; PPM repeats in one
+  packet and in six separate packets. Saved profile replay, single-frame runtime
+  normalization, and legacy `repeats>=2` profile compatibility.
+- Short background bursts do not consume analysis attempts. Unrecognized traffic
+  cannot extend the press deadline. A live decoded button interrupts background
+  replay, and the cancelled replay cannot overwrite the accepted identity.
+
+Reproduce recording tests without touching a receiver:
+
+```sh
+python3 scripts/fetch-rf-testdata.py /tmp/rfb-rf-tests
+RFB_RF_TESTDATA=/tmp/rfb-rf-tests make check
+```
+
+The fetch script pins `merbanan/rtl_433_tests` commit
+`1aa8c29d6b9383739d1aeed495dbc5069b704392`, source paths and SHA-256 hashes.
+Recordings remain upstream; they are not embedded in this project's release.
+Their repeated replay simulates separate presses for software integration; it is
+not evidence of three new physical presses, radio range, USB reliability, or the
+operator's new Amazon switch. Local test webhooks never contact Home Assistant.
+
+ZORIN deployment, real operator learning, intended webhook execution and physical
+USB recovery remain pending for this version. No GitHub CI result is claimed.
+The sections below preserve evidence for earlier versions; their older limits do
+not describe the current learning contract in [LEARNING.md](LEARNING.md).
+
+
 ## Background capture correction: 0.2.2-dev
 
 Base: installed/home source `9c700312b10be4506a1d1550c0b5c2282af0333d`.

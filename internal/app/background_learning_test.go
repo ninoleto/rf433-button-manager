@@ -72,8 +72,8 @@ func TestBackgroundOnlyExpiresWithoutPressesAndWithBoundedWork(t *testing.T) {
 			if calls > maxWindowAnalyses {
 				t.Fatal("analysis work exceeded the window budget", calls)
 			}
-			if kind == "analysis_budget" && (calls != 4 || !strings.Contains(a.learning.Message, "analysis budget") || a.learning.WindowAnalyses != 4) {
-				t.Fatal("budget exhaustion not visible")
+			if kind == "analysis_budget" && (calls != 6 || strings.Contains(a.learning.Message, "analysis budget") || a.learning.WindowAnalyses != 6) {
+				t.Fatal("background prematurely exhausted the window")
 			}
 			if _, err := a.ArmLearning(); err == nil {
 				t.Fatal("background rejection permitted a new press window")
@@ -183,7 +183,7 @@ func TestBackgroundThenLearningWithActualOfflineRTL433(t *testing.T) {
 	a.ReceivePulse(generation, receiver.PulsePacket{OOK: true, Pulses: 1, Data: background})
 	c.advance(time.Second)
 	a.learningTick()
-	if a.learning == nil || a.learning.Presses != 0 || a.learning.Diagnostics.Replays != 2 || a.learning.Diagnostics.Candidates != 0 || a.learning.Diagnostics.RejectedCaptures != 1 {
+	if a.learning == nil || a.learning.Presses != 0 || a.learning.Diagnostics.Replays != 0 || a.learning.Diagnostics.Candidates != 0 || a.learning.Diagnostics.RejectionCode != "short_burst" {
 		t.Fatalf("actual unrecognized replay did not keep listening: active=%+v ended=%+v", a.learning, a.learningNotice)
 	}
 	raw, err := os.ReadFile("../receiver/testdata/synthetic-pwm.ook")
@@ -208,7 +208,7 @@ func TestBackgroundThenLearningWithActualOfflineRTL433(t *testing.T) {
 				a.ReceivePulse(generation, receiver.PulsePacket{OOK: true, Pulses: 1, Data: background})
 				c.advance(time.Second)
 				a.learningTick()
-				if a.learning == nil || a.learning.Stage != "waiting" || a.learning.Presses != 1 || a.learning.Profile.ID != profileID || a.learning.Diagnostics.RejectedCaptures != 2 {
+				if a.learning == nil || a.learning.Stage != "waiting" || a.learning.Presses != 1 || a.learning.Profile.ID != profileID || a.learning.Diagnostics.RejectionCode != "short_burst" {
 					t.Fatal("background failed to decode with selected profile and ended or changed learning")
 				}
 			}

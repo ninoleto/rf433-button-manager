@@ -85,6 +85,10 @@ type Learning struct {
 	expires             time.Time
 	armedAt             time.Time
 	lastRF              time.Time
+	decodedSource       bool
+	lastDecoded         time.Time
+	lastAnalysis        time.Time
+	analysisCancel      context.CancelFunc
 	firstPulse          time.Time
 	packets             []receiver.PulsePacket
 	bytes               int
@@ -364,6 +368,7 @@ func Signature(raw []byte, fields []string) (string, error) {
 	if e := dec.Decode(&m); e != nil || m == nil {
 		return "", errors.New("invalid RF JSON")
 	}
+	normalizeButtonFields(m)
 	model, ok := m["model"].(string)
 	if !ok || strings.TrimSpace(model) == "" || len(model) > 128 {
 		return "", errors.New("RF event has no model")

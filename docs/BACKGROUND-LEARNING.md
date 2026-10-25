@@ -1,5 +1,9 @@
 # Background traffic must not end a learning session
 
+> Historical 0.2.2 investigation. Current 0.3.0 behavior adds decoded-event priority,
+> PWM/PPM discovery, short-burst filtering and a larger rate-limited analysis budget.
+> See [LEARNING.md](LEARNING.md) for the current contract.
+
 ## Report and demonstrated cause
 
 Installed 0.2.1-dev, commit `9c700312b10be4506a1d1550c0b5c2282af0333d`, ended an

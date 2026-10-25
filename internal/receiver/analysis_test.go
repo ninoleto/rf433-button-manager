@@ -151,7 +151,7 @@ func TestOfflineProcessFailureIsNotAnUnrecognizedCapture(t *testing.T) {
 }
 
 func TestPWMRejectsMixedCodesAndUnsafeParameters(t *testing.T) {
-	for _, spec := range []string{"n=name,m=OOK_PPM,s=400,l=1200,r=10004", "n=name,m=OOK_PWM,s=400,l=1200,r=10004,decode_uart", "n=name,m=OOK_PWM,s=400,l=1200,r=10004,s=500", "n=name,m=OOK_PWM,s=400,l=1200,r=99999999"} {
+	for _, spec := range []string{"n=name,m=UNKNOWN,s=400,l=1200,r=10004", "n=name,m=OOK_PWM,s=400,l=1200,r=10004,decode_uart", "n=name,m=OOK_PWM,s=400,l=1200,r=10004,s=500", "n=name,m=OOK_PWM,s=400,l=1200,r=99999999"} {
 		if _, err := canonicalTiming(spec); err == nil {
 			t.Fatal("unsafe/unsupported candidate", spec)
 		}

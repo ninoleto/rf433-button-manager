@@ -161,15 +161,16 @@ request that has already reached a destination cannot be undone.
 
 Automatic learning has a 180-second session limit, 30 seconds to acquire the
 receiver, a fixed 20-second window per armed press including analysis, and a 6-second
-continuous RF activity limit. It captures until one second of RF silence, replays
-measured candidates, and requires three separately armed matching presses plus
-confirmation. The demo retains its 90-second decoded-event path. Cancel/failure/
+continuous RF activity limit. Live decoded identities take the direct learning
+path and can cancel unrelated background analysis. Otherwise it collects complete
+pulse packets until 350 ms quiet or 1.2 s of collection, then replays measured
+candidates. Both paths require three separately armed matching presses and confirmation. The demo retains its 90-second decoded-event path. Cancel/failure/
 timeout preserve previous mappings. A timer drives cleanup even with no browser.
 Unrecognized or mismatched recordings return to waiting in that same window, with
 per-capture rejection metadata. They never reset deadlines, advance press count,
-overwrite the verified candidate, or rearm learning. Four analysis attempts per
-window bound background-driven work; after exhaustion the remaining time is idle
-listening/accounting only. Analysis receives a context clipped to the original
+overwrite the verified candidate, or rearm learning. At most 40 analysis starts per window, at least 500 ms apart, bound background
+work. Short bursts are filtered before analysis. Live decoded events remain eligible
+until the same deadline even after the pulse-analysis budget is exhausted. Analysis receives a context clipped to the original
 window deadline, and late results cannot become candidates. Receiver/decoder-process
 failure remains terminal. See [BACKGROUND-LEARNING.md](BACKGROUND-LEARNING.md).
 

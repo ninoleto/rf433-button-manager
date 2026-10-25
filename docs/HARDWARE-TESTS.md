@@ -1,5 +1,14 @@
 # Physical hardware acceptance gate
 
+**0.3.0-dev: physical validation pending.** Real upstream recordings have been
+replayed successfully, including software learning, persistence and a localhost
+webhook. These tests do not prove operation with the operator's remote or the new
+Amazon switch. After updating, verify the version in the learning dialog, perform
+three separate A ON presses, save with actions disabled, and check normal matching
+before deliberately configuring/testing a real webhook. Receiver-only reconnect
+and hub/port recovery tests still require the operator.
+
+
 **0.2.2-dev background correction: no new physical pass.** The operator started
 learning on 0.2.1-dev / `9c700312` without pressing a button; an undecodable background
 OOK recording incorrectly ended the session. That software failure is reproduced

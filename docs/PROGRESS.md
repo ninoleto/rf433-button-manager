@@ -1,5 +1,25 @@
 # Project progress
 
+## 2026-10-25: rtl_433-first browser learning (0.3.0-dev)
+
+Restored the supplied development bundle at `6f43a1f5ba5d9f8b109a38235e0265eac3ab0fa1`.
+This source baseline was newer than the last confirmed running ZORIN binary
+(0.2.1-dev). No further local-server deployment is assumed.
+
+Learning now accepts upstream decoded button events, including cmd/data and
+numbered-button identities. A decoded press takes priority over background replay.
+Generic automatic discovery supports PWM and PPM, aggregates repetition across
+packet records, and preserves existing schema-2 profiles. Each button still needs
+three separate presses and explicit confirmation; actions remain disabled.
+Short noise is filtered without spending replay work. Analysis stays bounded and
+does not require the entire RF channel to be silent before each initial capture.
+
+The release includes a static prebuilt binary, full source/history and an update
+helper that checks the LIVE version and rolls back failed installation. It needs
+no user-side toolchain. See TEST-REPORT.md for recording and synthetic test evidence.
+Physical acceptance and public GitHub publication remain pending.
+
+
 ## 2026-10-25: ignore background captures within a fixed learning window (0.2.2-dev)
 
 The operator's no-button attempt on installed `9c700312` reached replay with one

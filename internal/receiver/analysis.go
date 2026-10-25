@@ -117,6 +117,7 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 	consistent := func(frames []json.RawMessage, profile *DecoderProfile) (json.RawMessage, error) {
 		var chosen json.RawMessage
 		identity := ""
+		frameCount := 0
 		for _, frame := range frames {
 			normalized := []byte(frame)
 			if profile != nil {
@@ -125,6 +126,7 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 				if e != nil {
 					return nil, e
 				}
+				frameCount += matchingFrameCount(frame, profile.Bits)
 			}
 			signature := string(normalized) // Profile normalization already fixes model + exact code.
 			if profile == nil {
@@ -139,6 +141,9 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 			}
 			identity = signature
 			chosen = append(json.RawMessage(nil), normalized...)
+		}
+		if profile != nil && frameCount < 2 {
+			return nil, errors.New("capture needs at least two matching RF frames")
 		}
 		if chosen == nil {
 			return nil, errors.New("no stable decoded identity")
@@ -239,29 +244,31 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 	}
 	result.Diagnostics.Candidates = len(timings)
 	if len(timings) == 0 || len(timings) > 8 {
-		return result, analysisFailure("unsupported", "No unambiguous supported fixed-code OOK/PWM candidate was found in this capture. The intended transmitter was not identified.")
+		return result, analysisFailure("unsupported", "No unambiguous supported fixed-code OOK/PWM or OOK/PPM candidate was found in this capture. The intended transmitter was not identified.")
 	}
 	var accepted *DecoderProfile
 	var acceptedRaw json.RawMessage
 	identity := ""
 	for _, timing := range timings {
-		frames, _, e := replay([]string{"-R", "0", "-X", "n=RFB-Probe," + timing + ",bits>=16,bits<=64,repeats>=2"})
+		frames, _, e := replay([]string{"-R", "0", "-X", "n=RFB-Probe," + timing + ",bits>=16,bits<=64,repeats>=1"})
 		if e != nil {
 			return result, replayFailure()
 		}
 		code := ""
 		bits := 0
+		frameCount := 0
 		valid := len(frames) > 0
 		for _, frame := range frames {
-			next, n, e := repeatedCode(frame, 0)
+			next, n, e := repeatedCode(frame, 0, 1)
 			if e != nil || (code != "" && next != code) {
 				valid = false
 				break
 			}
 			code = next
 			bits = n
+			frameCount += matchingFrameCount(frame, bits)
 		}
-		if !valid || code == "" {
+		if !valid || code == "" || frameCount < 2 {
 			continue
 		}
 		if identity != "" && identity != code {

@@ -55,6 +55,7 @@ test('browser controller learns without decoder setup and exposes progress, diag
   await h.el('button-grid').children[0].click();
   await h.el('learn-start').click();
   assert.equal(h.el('learning-dialog').open,true);
+  assert.equal(h.el('learning-version').textContent,'RF Button Manager test');
   assert.match(h.el('learning-instruction').textContent,/Press the physical button once/);
   assert.equal(h.el('webhook-test').disabled,true);
   assert.deepEqual(h.calls.filter(c=>c.method==='POST').map(c=>c.url),['/api/learn/start']);

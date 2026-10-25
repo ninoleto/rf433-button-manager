@@ -16,6 +16,7 @@ test-deploy:
 	for script in scripts/*.sh; do bash -n "$$script"; done
 	bash scripts/test-deploy.sh
 	bash scripts/test-history.sh
+	python3 scripts/test-update-prebuilt.py
 vet:
 	GOTOOLCHAIN=local $(GO) vet ./...
 check: test vet test-ui test-deploy

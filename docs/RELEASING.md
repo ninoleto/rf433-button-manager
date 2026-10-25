@@ -115,7 +115,11 @@ Follow [OPERATIONS.md](OPERATIONS.md): private logical backup; stopped full-stat
 snapshot when needed; checksum verification; installer dry run; scoped apply;
 health/authentication/configuration/receiver checks. Existing manager.env, state
 and token are preserved. Only this service is restarted. The prior executable is
-saved as `/usr/local/bin/rf-button-manager.previous` on upgrade.
+saved as `/usr/local/bin/rf-button-manager.previous` by install.sh. The prebuilt
+update helper instead creates a private stopped-state snapshot under
+`/var/lib/rf-button-manager-upgrades/` and restores it automatically on failed
+verification. The package includes `release.json` with binary/bundle hashes and
+commit, plus `SHA256SUMS`; verify extraction and `scripts/test-update-prebuilt.py`.
 
 An incompatible schema change requires a matching stopped data snapshot for
 rollback; retain the newer data separately. Do not start an older binary against
@@ -123,3 +127,20 @@ an unsupported newer schema. Uninstall removes only managed service/binary/rule
 files and preserves data, token, account and environment. Permanent deletion is
 a separate deliberate decision. Neither upgrade nor uninstall authorizes unrelated
 service, automation, Docker, firewall, proxy or USB-hub changes.
+
+## Build the reviewed binary archive
+
+With a clean checkout whose `main` points at the tested commit, run the clean build
+and test steps above, collect notices, and package:
+
+```sh
+python3 scripts/collect-notices.py --output /tmp/rfb-notices.txt
+python3 scripts/package-release.py --notices /tmp/rfb-notices.txt --output dist
+```
+
+The ZIP contains tracked source, executable, complete main/HEAD Git bundle,
+notices, `release.json` and a SHA256SUMS covering every included file except itself.
+The packager refuses dirty source or an existing archive. Extract in a fresh
+directory, verify SHA256SUMS, clone the bundle with `--branch main`, and compare
+its commit to release.json. Build from that clean clone and compare the executable
+hash before distribution. The archive's outer SHA-256 is printed by the packager.

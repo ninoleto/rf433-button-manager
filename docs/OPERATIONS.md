@@ -281,3 +281,24 @@ accepted and migrated on restore; restores still disable all actions. An older
 snapshot on internal storage. A rollback to 0.1 requires that matching snapshot
 as well as the old executable; retain the newer state separately. Do not edit
 SQLite or delete profiles to force an old executable to start.
+
+## Prebuilt 0.3.0 update
+
+For an existing active managed service, use `sudo python3 scripts/update-prebuilt.py`
+from an extracted binary package for a read-only preflight. Add `--apply` for the
+already-reviewed update. Close learning and disable actions in the GUI first.
+The helper verifies package hashes, keeps the listener/token/settings and takes a
+private stopped-state snapshot before replacing the executable. It then checks
+the running HTTP version, authentication, unchanged configuration, 20 seconds of
+stable service operation, and ownership of the live decoder child. A receiver that
+was connected before the update must reconnect for verification to pass. Failure
+restores the old executable and stopped-state snapshot; the failed state is retained
+for investigation. No compiler or old /tmp helper is needed.
+
+The report gives the snapshot path. For a deliberate later rollback, stop only
+`rf-button-manager.service`, preserve current state separately, restore `binary`
+and `state` from that same snapshot to the standard paths with ownership preserved,
+and start only this service. Never mix a binary with an incompatible database.
+The helper leaves the existing development checkout unchanged. Its bundled Git
+history can be cloned with `git clone --branch main rf-button-manager.git.bundle`
+or fetched/fast-forwarded into a clean existing checkout; do not reset local edits.

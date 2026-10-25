@@ -327,6 +327,7 @@
       }
       return;
     }
+    $('learning-version').textContent = state.version ? `RF Button Manager ${state.version}` : '';
     const target = findButton(learning.button_id);
     $('learning-target').textContent = target ? `${target.remote.name} / ${target.button.name}` : `Button ${learning.button_id}`;
     const key = JSON.stringify([learning, state.receiver, state.receiver_mode, state.actions_paused]);
@@ -364,7 +365,7 @@
         `Capture receiver ${active ? 'during this attempt' : 'at failure'}: ${capturedReceiver.state || 'not recorded'} — ${capturedReceiver.message || ''}`,
         `Capture plan: ${learning.capture_generation ?? 'not recorded'}; status time: ${learning.capture_receiver_at || 'not recorded'}`,
         `Current reception: ${currentMode} — ${state.receiver.state || 'unknown'} — ${state.receiver.message || ''}`,
-        `Mode: ${learning.automatic ? 'Captured pulse analysis and replay' : 'Decoded signal / demonstration'}`,
+        `Mode: ${learning.automatic ? 'Automatic learning: decoded events and pulse discovery' : 'Decoded signal / demonstration'}`,
         `Packet records seen: ${diagnostic.observed_packets || 0}; accepted for replay: ${diagnostic.packets || 0}; rejected: ${diagnostic.rejected_packets || 0}; outside capture window / during cleanup: ${diagnostic.discarded_packets || 0}`,
         `Observed pulses: ${diagnostic.pulses || 0}; packet bytes: ${diagnostic.bytes || 0}; accepted bytes: ${diagnostic.accepted_bytes || 0}`,
         `OOK packets: ${diagnostic.ook_packets || 0}; FSK packets: ${diagnostic.fsk_packets || 0}; malformed: ${diagnostic.malformed_packets || 0}; empty: ${diagnostic.empty_packets || 0}`,

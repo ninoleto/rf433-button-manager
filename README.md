@@ -7,8 +7,7 @@ account is required. This application receives signals; it does not transmit RF 
 reprogram remotes.
 
 **Development build.** Automated software tests do not establish physical USB
-reliability. The ZORIN receiver, its exact `Switch433` decoder and Home Assistant
-integration must pass the [hardware acceptance matrix](docs/HARDWARE-TESTS.md)
+reliability. Receiver recovery and the intended remote/webhook combinations must pass the [hardware acceptance matrix](docs/HARDWARE-TESTS.md)
 before this build can be called a production release.
 
 ![Running application in explicitly labeled demo mode](docs/screenshots/dashboard.png)
@@ -28,11 +27,11 @@ synthetic RF data and demonstrate the actual application, not physical receiver 
 - Loopback binding and a management token by default.
 
 Learning is entirely browser-driven: choose **Learn**, press/release the button,
-verify three separate presses, then **Confirm and save**. Existing decoders are
-reused. For supported 16–64 bit fixed-code OOK/PWM signals, the application captures
+verify three separate presses, then **Confirm and save**. Button events decoded by rtl_433 are learned directly, including common
+EV1527, PT2262 and HT680 event formats. For supported 16–64 bit fixed-code OOK PWM/PPM signals, the application captures
 pulses, obtains measured candidates from rtl_433, and validates them by replay.
-A suggestion alone is never saved. Other protocols, rolling/encrypted codes,
-ambiguous captures and changing identities receive an explicit failure. This is
+A suggestion alone is never saved. Unrecognized traffic is ignored within a bounded press window. Rolling/encrypted
+codes and ambiguous or changing identities cannot be saved as fixed buttons. This is
 not universal RF learning. See [the learning workflow](docs/LEARNING.md).
 
 ## Requirements and supplied binary
@@ -54,11 +53,29 @@ bash scripts/inspect-zorin.sh
 bash scripts/install.sh --binary "$PWD/bin/rf-button-manager"
 ```
 
-The packaged `SHA256SUMS` covers the binary; the outer archive checksum covers the
+The packaged `SHA256SUMS` covers the binary and included update artifacts; the outer archive checksum covers the
 complete package. Review the dry run and receiver ownership, then follow
 [installation](#install-on-zorin). Use the supplied executable; rebuilding is only
 needed for development or an intentional source change. To attach bundled history
 without overwriting extracted source, follow the [developer guide](docs/DEVELOPMENT.md).
+
+## Update an existing installation with a prebuilt package
+
+Extract the new archive to a fresh directory on the internal disk. Close learning
+and leave actions disabled in the GUI, then run from the extracted project:
+
+```sh
+sha256sum -c SHA256SUMS
+sudo python3 scripts/update-prebuilt.py --apply
+```
+
+No Go installation or rebuild is involved. The helper snapshots stopped state and
+the old executable, replaces only the application executable, checks the **live**
+HTTP version and 20 seconds of stable operation, and verifies authentication and
+configuration/token/environment preservation. It restores the old binary and state
+if verification fails. It does not modify the service unit, USB rule, firewall or
+other services. Full source and history are included separately in the bundle;
+this update does not overwrite your existing development checkout.
 
 ## Build and verify from source
 
@@ -99,7 +116,8 @@ the build machine. Runtime decoding still uses an installed `rtl_433` executable
 Open `http://127.0.0.1:8787` and enter the token from
 `rf-data/management.token`. Keep the token private. A missing receiver is reported;
 demo data is never substituted automatically. Without explicit decoder settings,
-rtl_433 uses its default protocols, which does not prove Switch433 support.
+rtl_433 uses its default protocols. Learn discovers supported unknown PWM/PPM
+profiles automatically; a connected receiver alone does not prove a button decoded.
 
 For an interface preview without radio hardware, use a **separate** data directory:
 

@@ -258,10 +258,11 @@ is echoed into the reason. Failure/cleanup metadata is persisted in `learning` a
 after application restart.
 
 Automatic learning includes `window_expires_at`, `window_analyses` and
-`window_analysis_limit` (4). The 20-second window starts at initial receiver
+`window_analysis_limit` (40). The 20-second window starts at initial receiver
 readiness or an explicit successful `/api/learn/arm`; it covers receiving and
 analysis as well as waiting. Ignored traffic never moves it or `expires_at`.
-After four analyses, waiting continues without more analysis until cancel/timeout.
+At most 40 pulse analyses are started per window, separated by at least 500 ms.
+Live decoded button identities remain eligible until the same fixed deadline.
 `press_timeout` has `failure_code=press_window_timeout`. The overall 180-second
 session timeout remains independent, including time spent awaiting browser input.
 
@@ -278,5 +279,15 @@ capture rejection counts have different meanings and must not be combined.
 They never include credentials or raw IQ data. Profile timing and decoded identities
 may identify a remote; treat full state and diagnostics as private. There is no
 public pulse-injection endpoint or unauthenticated capture control. Profile limits
-are 16 profiles, fixed-code OOK_PWM, 16–64 bits, with exact measured timings and
+are 16 profiles, fixed-code OOK_PWM/OOK_PPM, 16–64 bits, with exact measured timings and
 repeated frames. See LEARNING.md for resource bounds and validation semantics.
+
+## Learning in 0.3.0-dev
+
+The API paths and schema remain unchanged. Automatic learning now accepts live
+rtl_433 button events. Identity calculation aliases `cmd`, `action`, or `data`
+to `command` when no command exists, and combines active `button1`–`buttonN`
+fields into `button`. The original event remains available for inspection.
+A live decoded candidate can cancel background file analysis; a late result cannot
+overwrite it. Diagnostics source is `rtl_433 decoded button`. Three separately
+armed matching presses and explicit confirmation are still required.

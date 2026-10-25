@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.2.2-dev"
+const Version = "0.3.0-dev"
 
 type App struct {
 	mu                                  sync.Mutex
@@ -367,7 +367,11 @@ func (a *App) ArmLearning() (*Learning, error) {
 	if l == nil || l.Stage != "captured" {
 		return nil, errors.New("capture a candidate before arming the next press")
 	}
-	if l.Automatic && !l.lastRF.IsZero() && a.now().Sub(l.lastRF) < time.Second {
+	lastTransmission := l.lastRF
+	if l.decodedSource {
+		lastTransmission = l.lastDecoded
+	}
+	if l.Automatic && !lastTransmission.IsZero() && a.now().Sub(lastTransmission) < time.Second {
 		return nil, errors.New("release the button and wait for one second of RF silence before the next press")
 	}
 	l.Stage = "waiting"
@@ -474,8 +478,9 @@ func (a *App) Receive(raw []byte) {
 	a.eventLocked("rf", "Decoded RF transmission", "", append(json.RawMessage{}, raw...))
 	if l := a.learning; l != nil {
 		if l.Automatic {
+			a.receiveDecodedLearningLocked(l, raw)
 			return
-		} // Only captured pulse replay verifies automatic learning.
+		}
 		sig, e := Signature(raw, l.Fields)
 		if e != nil {
 			a.eventLocked("learning", e.Error(), l.ButtonID, nil)

@@ -11,11 +11,14 @@ import (
 )
 
 const learningPressWindow = 20 * time.Second
-const maxWindowAnalyses = 4
+
+// One worker, at most two analysis starts per second, for the fixed 20s window.
+const maxWindowAnalyses = 40
+const analysisInterval = 500 * time.Millisecond
 
 func waitingMessage(l *Learning) string {
 	if l.WindowAnalyses >= maxWindowAnalyses {
-		return "Background traffic used this window's analysis budget. No further signal will be accepted in this window. Cancel or wait for timeout, then retry."
+		return "Pulse analysis limit reached for this window. Still listening for decoded button events; cancel or wait for timeout to retry discovery."
 	}
 	return "Unrecognized signal ignored; waiting for your button"
 }
@@ -171,14 +174,24 @@ func (a *App) ReceivePulse(generation uint64, packet receiver.PulsePacket) {
 	if packet.Cleanup {
 		return
 	}
+	if l.decodedSource {
+		return
+	}
 	if !packet.OOK {
 		if l.Stage == "waiting" {
 			l.Message = waitingMessage(l)
 		}
 		return
 	}
+	// A short burst cannot contain a supported 16-bit generic code. Count it
+	// without consuming analysis work or resetting the release timer.
+	if packet.Pulses > 0 && packet.Pulses < 16 {
+		l.Diagnostics.RejectedPackets++
+		l.Diagnostics.RejectionCode = "short_burst"
+		l.Diagnostics.RejectionReason = "Pulse burst too short for generic code discovery; still listening for decoded events"
+		return
+	}
 	now := a.now()
-	previous := l.lastRF
 	l.lastRF = now
 	if (l.Stage != "waiting" && l.Stage != "receiving") || now.Before(l.armedAt) {
 		l.Diagnostics.DiscardedPackets++
@@ -187,11 +200,6 @@ func (a *App) ReceivePulse(generation uint64, packet receiver.PulsePacket) {
 	if l.WindowAnalyses >= maxWindowAnalyses {
 		l.Diagnostics.DiscardedPackets++
 		l.Message = waitingMessage(l)
-		return
-	}
-	if l.Stage == "waiting" && !previous.IsZero() && now.Sub(previous) < time.Second {
-		l.Diagnostics.DiscardedPackets++
-		l.Message = "Transmission is still active. Release the button and allow one second of silence before pressing again."
 		return
 	}
 	if len(l.packets) >= receiver.MaxCapturePackets || l.bytes+len(packet.Data) > receiver.MaxCaptureBytes {
@@ -364,7 +372,9 @@ func (a *App) learningTick() {
 			a.mu.Unlock()
 			return
 		}
-		if now.Sub(l.lastRF) < time.Second {
+		// Complete pulse packets already have rtl_433 boundaries. Do not wait
+		// indefinitely for an entirely quiet RF channel.
+		if now.Sub(l.lastRF) < 350*time.Millisecond && now.Sub(l.firstPulse) < 1200*time.Millisecond {
 			a.mu.Unlock()
 			return
 		}
@@ -372,6 +382,11 @@ func (a *App) learningTick() {
 		a.mu.Unlock()
 		return
 	}
+	if !l.lastAnalysis.IsZero() && now.Sub(l.lastAnalysis) < analysisInterval {
+		a.mu.Unlock()
+		return
+	}
+	l.lastAnalysis = now
 	capture, err := receiver.ValidatePulseCapture(l.packets)
 	if err != nil {
 		l.Diagnostics.FailureCode = "capture_assembly"
@@ -408,6 +423,7 @@ func (a *App) learningTick() {
 	}
 	id, analyze := l.SessionID, a.analyzeCapture
 	ctx, cancel := context.WithTimeout(l.ctx, min(10*time.Second, l.armedAt.Add(learningPressWindow).Sub(now)))
+	l.analysisCancel = cancel
 	a.analysisActive = true
 	a.mu.Unlock()
 	result, err := analyze(ctx, request)
@@ -441,6 +457,10 @@ func (a *App) learningTick() {
 	}
 	l.Diagnostics.Replays += result.Diagnostics.Replays
 	l.Diagnostics.Candidates += result.Diagnostics.Candidates
+	l.analysisCancel = nil
+	if l.decodedSource {
+		return // A live decoder already verified this press; discard background result.
+	}
 	l.Diagnostics.Source = result.Diagnostics.Source
 	if contextErr != nil {
 		if rejection.Code == "" {

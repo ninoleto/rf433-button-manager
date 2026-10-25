@@ -42,7 +42,7 @@ func startCapture(t *testing.T, a *App, id string) uint64 {
 func capturePress(t *testing.T, a *App, c *clock, generation uint64) {
 	t.Helper()
 	c.advance(1100 * time.Millisecond)
-	a.ReceivePulse(generation, receiver.PulsePacket{OOK: true, Pulses: 2, Data: []byte(";ook 2 pulses\n400 1200\n1200 10000\n;end\n")})
+	a.ReceivePulse(generation, receiver.PulsePacket{OOK: true, Pulses: 144, Data: captureFixture(t)})
 	c.advance(1100 * time.Millisecond)
 	a.learningTick()
 }
@@ -50,9 +50,9 @@ func capturePress(t *testing.T, a *App, c *clock, generation uint64) {
 func TestCaptureRequiresThreeSeparateConfirmedPresses(t *testing.T) {
 	a, c, r := captureApp(t)
 	generation := startCapture(t, a, r.Buttons[0].ID)
-	a.Receive(signalA)
+	a.Receive([]byte(`{"model":"Weather","id":1,"temperature_C":22}`))
 	if a.learning.Presses != 0 {
-		t.Fatal("ordinary decoded output bypassed capture verification")
+		t.Fatal("sensor-only output became a button")
 	}
 	for i := 0; i < 3; i++ {
 		capturePress(t, a, c, generation)

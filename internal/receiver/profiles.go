@@ -27,7 +27,7 @@ type DecoderProfile struct {
 var suggestionPattern = regexp.MustCompile(`Use a flex decoder with -X '([^'\r\n]+)'`)
 var codePattern = regexp.MustCompile(`^\{([0-9]{1,3})\}([0-9a-fA-F]+)$`)
 
-// canonicalTiming accepts only the PWM numeric vocabulary printed by rtl_433.
+// canonicalTiming accepts only the PWM/PPM numeric vocabulary printed by rtl_433.
 func canonicalTiming(spec string) (string, error) {
 	values := map[string]int{}
 	modulation := ""
@@ -53,37 +53,49 @@ func canonicalTiming(spec string) (string, error) {
 			return "", errors.New("unsupported analyzer candidate parameter")
 		}
 	}
-	if modulation != "OOK_PWM" || values["s"] < 1 || values["l"] <= values["s"] || values["r"] <= values["l"] {
-		return "", errors.New("only measured OOK PWM candidates are supported")
+	if (modulation != "OOK_PWM" && modulation != "OOK_PPM") || values["s"] < 1 || values["l"] <= values["s"] || values["r"] <= values["l"] {
+		return "", errors.New("only measured OOK PWM/PPM candidates are supported")
 	}
-	return fmt.Sprintf("m=OOK_PWM,s=%d,l=%d,r=%d,g=%d,t=%d,y=%d", values["s"], values["l"], values["r"], values["g"], values["t"], values["y"]), nil
+	return fmt.Sprintf("m=%s,s=%d,l=%d,r=%d,g=%d,t=%d,y=%d", modulation, values["s"], values["l"], values["r"], values["g"], values["t"], values["y"]), nil
 }
 
 func profileFromTiming(timing string, bits int) (DecoderProfile, error) {
+	return profileWithRepeats(timing, bits, 1)
+}
+
+func profileWithRepeats(timing string, bits, repeats int) (DecoderProfile, error) {
 	canonical, err := canonicalTiming(timing)
 	if err != nil {
 		return DecoderProfile{}, err
 	}
 	if bits < 16 || bits > 64 {
-		return DecoderProfile{}, errors.New("automatic PWM learning supports 16–64 bit fixed codes")
+		return DecoderProfile{}, errors.New("automatic PWM/PPM learning supports 16–64 bit fixed codes")
 	}
-	key := fmt.Sprintf("%s,bits=%d,repeats>=2", canonical, bits)
+	key := fmt.Sprintf("%s,bits=%d,repeats>=%d", canonical, bits, repeats)
 	hash := sha256.Sum256([]byte(key))
 	id := hex.EncodeToString(hash[:16])
-	model := "RFB-PWM-" + id
-	return DecoderProfile{ID: id, Name: fmt.Sprintf("Fixed-code OOK PWM (%d bits)", bits), Model: model, FlexDecoder: "n=" + model + "," + key, Bits: bits}, nil
+	kind := "PWM"
+	if strings.HasPrefix(canonical, "m=OOK_PPM,") {
+		kind = "PPM"
+	}
+	model := "RFB-" + kind + "-" + id
+	return DecoderProfile{ID: id, Name: fmt.Sprintf("Fixed-code OOK %s (%d bits)", kind, bits), Model: model, FlexDecoder: "n=" + model + "," + key, Bits: bits}, nil
 }
 
 func (p DecoderProfile) Validate(persisted bool) error {
 	if len(p.Name) == 0 || len(p.Name) > 100 || len(p.FlexDecoder) > 512 {
 		return errors.New("invalid learned decoder profile")
 	}
-	suffix := fmt.Sprintf(",bits=%d,repeats>=2", p.Bits)
+	repeats := 1
+	if strings.HasSuffix(p.FlexDecoder, "repeats>=2") {
+		repeats = 2
+	} // Existing schema-2 PWM profiles.
+	suffix := fmt.Sprintf(",bits=%d,repeats>=%d", p.Bits, repeats)
 	if !strings.HasSuffix(p.FlexDecoder, suffix) {
 		return errors.New("profile framing is not bounded")
 	}
 	candidate := strings.TrimSuffix(p.FlexDecoder, suffix)
-	expected, err := profileFromTiming(candidate, p.Bits)
+	expected, err := profileWithRepeats(candidate, p.Bits, repeats)
 	if err != nil || expected.ID != p.ID || expected.Model != p.Model || expected.FlexDecoder != p.FlexDecoder {
 		return errors.New("profile does not match its measured timing/framing identity")
 	}
@@ -100,7 +112,7 @@ func (p DecoderProfile) Validate(persisted bool) error {
 
 // repeatedCode never chooses the first of multiple distinct same-length codes.
 // Short delimiter rows are excluded only after the profile's bit length is fixed.
-func repeatedCode(raw []byte, bits int) (string, int, error) {
+func repeatedCode(raw []byte, bits int, minimum ...int) (string, int, error) {
 	var event struct {
 		Codes []string `json:"codes"`
 	}
@@ -127,7 +139,11 @@ func repeatedCode(raw []byte, bits int) (string, int, error) {
 		return "", 0, errors.New("capture has no unambiguous repeated fixed code")
 	}
 	for code, count := range counts {
-		if count < 2 {
+		required := 2
+		if len(minimum) > 0 {
+			required = minimum[0]
+		}
+		if count < required {
 			return "", 0, errors.New("capture needs at least two repeated RF frames")
 		}
 		match := codePattern.FindStringSubmatch(code)
@@ -147,10 +163,33 @@ func NormalizeProfile(raw []byte, profile DecoderProfile) ([]byte, error) {
 	if model != profile.Model {
 		return nil, errors.New("different decoder model")
 	}
-	code, _, err := repeatedCode(raw, profile.Bits)
+	code, _, err := repeatedCode(raw, profile.Bits, 1)
 	if err != nil {
 		return nil, err
 	}
 	// Keep only the exact validated identity. No analyzer output reaches this path.
 	return json.Marshal(map[string]any{"model": model, "codes": []string{code}})
+}
+
+// rtl_433 can emit repeated frames in separate pulse packets/JSON records.
+// Count across the recording, rather than demanding two repeats in each record.
+func matchingFrameCount(raw []byte, bits int) int {
+	var event struct {
+		Codes []string `json:"codes"`
+	}
+	if json.Unmarshal(raw, &event) != nil {
+		return 0
+	}
+	n := 0
+	for _, code := range event.Codes {
+		m := codePattern.FindStringSubmatch(strings.TrimSpace(code))
+		if m == nil {
+			continue
+		}
+		width, _ := strconv.Atoi(m[1])
+		if width == bits {
+			n++
+		}
+	}
+	return n
 }

@@ -8,20 +8,24 @@ advanced decoder settings are preserved. New mappings stay disabled.
 
 ## What is supported
 
-The application first reuses a profile associated with the remote, then tries
-existing configured/default rtl_433 decoders and other saved profiles. A decoded
-identity must satisfy the existing stable model/device/button rules.
+The app accepts button events already decoded by the live rtl_433 process. It
+recognizes command/cmd/action/data and numbered button fields, alongside existing
+code/button/state identities. RSSI, timestamps and sensor readings are excluded.
+Each press must match the first candidate, with explicit arming between presses.
+If no live decoder identifies a button, the app replays captured pulses through
+existing decoders and saved profiles before asking rtl_433 for timing candidates.
 
 When those decoders cannot identify a capture, automatic profile discovery supports
-**fixed-code OOK/PWM, 16–64 bits**, at the application's fixed 433.92 MHz frequency.
-It requires repeated RF rows inside a capture and the same identity across three
+**fixed-code OOK PWM or PPM, 16–64 bits**, at the application's fixed 433.92 MHz frequency.
+It requires at least two matching RF frames across the captured recording
+(including separate packet/JSON records) and the same identity across three
 separately armed physical presses. A continuous hold cannot supply three presses.
 Keep other remotes idle: the application cannot know which physical transmitter
 you intended, and the final review remains necessary.
 
 Analyzer suggestions are candidates only. The app never installs stock timings
 for “Switch433,” chooses the first arbitrary code, or claims universal learning.
-FSK/PPM and other modulation discovery, rolling/encrypted codes, captures without
+FSK and other modulation discovery, rolling/encrypted codes, captures without
 stable repeated frames, and ambiguous interpretations are unsupported. Three
 matching observations do not prove that an unfamiliar protocol can never change
 its code. Physical evidence for a particular remote is tracked separately.
@@ -31,9 +35,9 @@ its code. Physical evidence for a particular remote is tracked separately.
 1. Select **A ON** in the existing six-button remote. Save any pending editor edits
    and click **Learn signal**. All webhook actions pause, including explicit tests.
 2. Wait for **Press the physical button once**. Briefly press physical **A ON** and
-   release it completely. The dialog shows **Transmission detected**, then
-   **Checking the captured signal**, then **1 of 3 matching presses**.
-3. After release and one second of silence, select **Ready for next press**. Press
+   release it completely. A known decoder can advance directly to **1 of 3
+   matching presses**. An unknown signal first shows capture and analysis progress.
+3. After release and at least one second without another matching frame, select **Ready for next press**. Press
    and release the same physical button once. Expect **2 of 3**.
 4. Arm again and make the third separate press. Expect **Ready to save / 3 of 3**.
 5. Review the candidate and choose **Confirm and save**. Decoder profile and button
@@ -55,11 +59,12 @@ that the intended remote uses changing, rolling or encrypted codes.
 
 Each armed window is **20 seconds total, including capture and analysis**. Ignored
 traffic cannot restart that deadline or the 180-second session deadline. At most
-four recordings are analyzed per window (at most twelve over three successful
-windows); every analysis also has its existing ten-second limit and is cancelled
-at the window deadline. If the four attempts are exhausted, the GUI says the budget
-is used and no more signals can be accepted in that window. Cancel or wait for its
-timeout before deliberately retrying. Ordinary packets never arm the next window;
+40 recordings are analyzed per window, with one worker and at least 500 ms between
+analysis starts. Every analysis has a ten-second limit and is cancelled at the
+window deadline. FSK and bursts shorter than 16 pulses do not consume analysis
+attempts. Unsupported captures return to waiting. Even if the analysis limit is
+reached, live decoded button events can still be accepted before the deadline.
+Ordinary packets never arm the next window;
 only **Ready for next press** does so after a verified capture.
 
 | Visible state | Meaning / next step |
@@ -72,7 +77,7 @@ only **Ready for next press** does so after a verified capture.
 | No pulse capture | No usable pulse recording reached analysis. Decoded JSON or a sample heartbeat alone is not capture proof. |
 | Malformed pulse capture | A header, timing row, count or packet boundary was invalid. Diagnostics retain the specific parser rejection; no compatibility conclusion is made. |
 | Unrecognized signal ignored; waiting for your button | FSK was excluded or a complete OOK recording failed replay/identity validation. The same window remains open; no press was counted. |
-| Analysis budget reached | Four recordings used this window's analysis budget. Further traffic is counted but not analyzed; cancel or wait for timeout. |
+| Analysis budget reached | The pulse-analysis safety limit was reached. Live decoded events can still be accepted; cancel/retry if necessary. |
 | Press window timed out | No matching press was verified within the original 20-second window. Diagnostics retain ignored-capture evidence; compatibility remains unverified. |
 | Capture stream failed | Reading stdout failed or a line exceeded its limit. Inspect the retained stream error. |
 | Inconsistent capture (diagnostic) | Ambiguous frames or another identity were ignored; the previously verified candidate is retained. Keep other remotes idle. |
@@ -100,9 +105,9 @@ other state fields can still identify a remote: review before sharing.
 flowchart TD
     Learn[Browser: Learn] --> Pause[Wait for in-flight actions; suppress new actions]
     Pause --> Live[Stop and wait for old live child; start same receiver with pulse output]
-    Live --> Capture[Brief press; bounded OOK pulses; one second of silence]
+    Live --> Capture[Brief press; bounded OOK pulses]
     Capture --> Existing[Replay through existing decoders and profiles]
-    Existing -->|No valid identity| Analyze[rtl_433 file analysis: measured PWM candidates]
+    Existing -->|No valid identity| Analyze[rtl_433 file analysis: measured PWM or PPM candidates]
     Analyze --> Proof[Replay candidate; repeated consistent fixed code; exact bit length]
     Existing -->|Valid identity| Match[Compare with previous separate presses]
     Proof --> Match
@@ -122,16 +127,21 @@ stream metadata, and `;ook N pulses` / `;fsk N pulses` packets ending in `;end`.
 Version 1, an explicit 1us timescale, matching row counts and bounded integer timing
 pairs are required; malformed input is never repaired by guessing units or timings.
 Valid FSK traffic is counted and excluded while OOK learning continues to wait.
-Learning does not count live JSON as capture proof. A quiet interval closes each
-press recording. The application replays it with `rtl_433 -r PRIVATE_FILE`, never
+Live JSON with a supported button identity follows the direct learning path;
+it is not evidence of pulse capture. For discovery, complete packets are collected
+until 350 ms of quiet or 1.2 seconds of collection, whichever occurs first. The
+application replays this bounded recording with `rtl_433 -r PRIVATE_FILE`, never
 another USB selector. See [CAPTURE-INVESTIGATION.md](CAPTURE-INVESTIGATION.md) for
 the 0.2.0 diagnostic failure and the actual 23.11 IQ-stream regression evidence.
 
 When needed, `-A -R 0` produces timing candidates. The parser accepts only measured
-numeric `m=OOK_PWM,s,l,r,g,t,y` values within bounds. Probe replay requires 16–64
-bits and at least two repeated rows. Multiple distinct eligible codes are rejected.
+numeric `m=OOK_PWM` or `m=OOK_PPM` plus `s,l,r,g,t,y` values within bounds. Probe replay requires 16–64
+bits and at least two matching frames across the replay output. Multiple distinct eligible codes are rejected.
 An accepted candidate is narrowed to its exact measured bit count, replayed again,
-and then used unchanged for the second and third presses. A profile is not persisted
+and then used unchanged for the second and third presses. The saved flex decoder
+uses `repeats>=1`, allowing normal operation when a press yields one JSON row;
+learning still verifies repeated frames across each recording. Legacy `repeats>=2`
+profiles remain valid and keep their existing identity. A profile is not persisted
 until final confirmation and overlap validation succeed.
 
 Profile IDs/models derive from a hash of canonical timing and framing, not an RF
@@ -154,11 +164,11 @@ private `/tmp` is on internal storage; captures are not written to the backup di
 | Receiver preparation | 30 seconds |
 | Armed press window, including analysis | 20 seconds; rejected captures never extend it |
 | Continuous RF activity per capture | 6 seconds |
-| Quiet interval between capture and analysis / rearming | 1 second |
+| Capture collection / rearming | 350 ms quiet or 1.2 s collection; at least 1 s release before rearming |
 | One press recording | 32 packets, 256 KiB total; 4,096 pulse pairs per packet |
 | Session stream | 2 MiB / 128 observed packet records, checked at progress callbacks |
 | Offline analysis | 10 seconds total, 2 seconds per child |
-| Analysis attempts | 4 per armed window; at most 12 per three-window session |
+| Analysis attempts | 40 per armed window; one worker, starts at least 500 ms apart |
 | Child output | 512 KiB stdout, 128 KiB stderr; bounded individual lines |
 | Distinct analyzer candidates | 8 |
 | Saved profiles | 16 |
