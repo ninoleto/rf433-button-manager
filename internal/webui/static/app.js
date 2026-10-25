@@ -247,6 +247,10 @@
     $('webhook-payload').value = hook.payload || '';
     $('webhook-headers').value = Object.keys(hook.headers || {}).length ? JSON.stringify(hook.headers, null, 2) : '';
     $('ha-id').value = '';
+    try {
+      const saved = new URL(hook.url);
+      if (saved.pathname.startsWith('/api/webhook/')) $('ha-base').value = saved.origin;
+    } catch (_) { /* No saved Home Assistant URL yet. */ }
     editorDirty = false;
     setError('editor-error', '');
   }
@@ -262,7 +266,27 @@
     $('learn-start').textContent = button.signature ? 'Relearn signal' : 'Learn signal';
     $('button-last-received').textContent = fmtDate(button.last_received);
     $('unsaved-status').textContent = editorDirty ? 'Unsaved changes' : '';
+    renderWebhookDestination();
     updateActionAvailability();
+  }
+  function webhookDestination(raw) {
+    if (!raw) return null;
+    let url;
+    try { url = new URL(raw); } catch (_) { throw new Error('Paste a complete HTTP(S) webhook URL, including the server address.'); }
+    if (!/^https?:\/\//i.test(raw) || !['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash || /[\r\n\t]/.test(raw)) {
+      throw new Error('Use an HTTP(S) webhook URL without a username, password or # fragment.');
+    }
+    // Preserve explicit ports, matching the server's exact origin check.
+    const origin = raw.match(/^https?:\/\/[^/?#]+/i)[0].toLowerCase();
+    return { origin, needsApproval: !(state.settings.allowed_origins || []).includes(origin) };
+  }
+  function renderWebhookDestination() {
+    let destination;
+    try { destination = webhookDestination($('webhook-url').value.trim()); } catch (_) { /* Explain invalid input on Save. */ }
+    $('button-save').textContent = destination?.needsApproval ? 'Save & allow destination' : 'Save button';
+    $('webhook-destination-note').textContent = destination?.needsApproval
+      ? `Saving will allow webhook requests to ${destination.origin}. It will not send a test request.`
+      : 'Saving does not send a test request. Requests run from this server.';
   }
   function updateActionAvailability() {
     const learning = !!state.learning || !!state.actions_paused;
@@ -502,7 +526,9 @@
     if (!name) throw new Error('Enter a button name.');
     const identityFields = fields($('button-fields').value);
     const oldFields = existing.identity_fields || [];
+    const destination = webhookDestination($('webhook-url').value.trim());
     return {
+      ...(destination?.needsApproval ? { allow_webhook_origin: destination.origin } : {}),
       id: existing.id, name, enabled: $('button-enabled').checked,
       debounce_ms: Number($('button-debounce').value), identity_fields: existing.signature ? oldFields : identityFields,
       webhook: { url: $('webhook-url').value.trim(), method: $('webhook-method').value,
@@ -517,12 +543,17 @@
     } catch (error) { handleError(error, 'editor-error'); }
   });
   bindAction('ha-apply', async () => {
-    const rawBase = $('ha-base').value.trim();
-    const base = new URL(rawBase);
-    if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash || !['', '/'].includes(base.pathname)) throw new Error('Use a plain HTTP(S) Home Assistant origin, without credentials or a path.');
-    const id = $('ha-id').value.trim();
-    if (!id) throw new Error('Enter the Home Assistant webhook ID.');
-    $('webhook-url').value = `${base.origin}/api/webhook/${encodeURIComponent(id)}`;
+    const value = $('ha-id').value.trim();
+    if (!value) throw new Error('Paste a Home Assistant webhook ID or complete URL.');
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith('//')) {
+      webhookDestination(value);
+      $('webhook-url').value = value;
+      $('ha-base').value = new URL(value).origin;
+    } else {
+      const base = new URL($('ha-base').value.trim());
+      if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash || !['', '/'].includes(base.pathname)) throw new Error('Use a plain HTTP(S) Home Assistant origin, without credentials or a path.');
+      $('webhook-url').value = `${base.origin}/api/webhook/${encodeURIComponent(value)}`;
+    }
     $('webhook-method').value = 'POST'; $('ha-id').value = '';
     editorDirty = true; renderEditor(); toast('Home Assistant URL filled in. Save the button to apply it.');
   }, 'editor-error');

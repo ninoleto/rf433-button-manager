@@ -19,6 +19,7 @@ class Element {
   close() { this.open=false; }
   focus() {}
   reset() {}
+  async emit(name,target=this) { for(const handler of this.handlers[name] || []) await handler({preventDefault(){},target}); }
   async click() { if(this.disabled || this.hidden) return; for(const handler of this.handlers.click || []) await handler({preventDefault(){},target:this}); }
 }
 
@@ -40,6 +41,12 @@ async function harness() {
       else if(url==='/api/learn/cancel') state={...state,learning:null,learning_notice:null,actions_paused:false};
       else if(url==='/api/learn/arm') state={...state,learning:{...state.learning,stage:'waiting'}};
       else if(url==='/api/learn/confirm') state={...state,learning:null,learning_notice:null,actions_paused:true};
+      else if(url==='/api/buttons/fixture-button' && options.method==='PUT') {
+        const {allow_webhook_origin,...saved}=JSON.parse(options.body);
+        Object.assign(button,saved);
+        state.remotes[0].buttons[0]=button;
+        if(allow_webhook_origin) state.settings.allowed_origins=[...(state.settings.allowed_origins || []),allow_webhook_origin];
+      }
       else throw Error(`Unexpected mutation: ${url}`);
       return {ok:true,json:async()=>({ok:true})};
     }};
@@ -129,4 +136,58 @@ test('failure diagnostics retain capture evidence separately from restored recep
   assert.match(text,/Pulse stream: closed/);
   assert.equal(h.el('learning-instruction').textContent,'Malformed pulse capture');
   assert.equal(h.el('learning-confirm').hidden,true);
+});
+
+test('pasted complete webhook URL saves with visible exact destination approval in one request',async()=>{
+  const h=await harness();
+  await h.el('button-grid').children[0].click();
+  const url='http://192.168.50.20:8123/api/webhook/synthetic-Aa_1?key=one%2Ftwo';
+  h.el('webhook-url').value=`  ${url}  `;
+  await h.el('button-editor').emit('input',h.el('webhook-url'));
+  assert.equal(h.el('button-save').textContent,'Save & allow destination');
+  assert.match(h.el('webhook-destination-note').textContent,/http:\/\/192\.168\.50\.20:8123/);
+  assert.equal(h.el('webhook-destination-note').textContent.includes('synthetic-Aa'),false,'approval shows server only, not the secret path');
+  assert.equal(h.calls.some(c=>c.method==='PUT'),false,'pasting cannot change settings');
+  await h.el('button-editor').emit('submit');
+  const writes=h.calls.filter(c=>c.method!=='GET');
+  assert.equal(writes.length,1);
+  assert.equal(writes[0].url,'/api/buttons/fixture-button');
+  assert.equal(writes[0].body.webhook.url,url);
+  assert.equal(writes[0].body.allow_webhook_origin,'http://192.168.50.20:8123');
+  assert.equal(writes[0].body.enabled,false);
+  assert.equal(h.el('button-save').textContent,'Save button');
+  await h.el('button-editor').emit('submit');
+  assert.equal(h.calls.filter(c=>c.method==='PUT').at(-1).body.allow_webhook_origin,undefined,'known destination needs no new approval');
+  assert.equal(h.calls.some(c=>c.url==='/api/settings' || c.url.endsWith('/test')),false);
+});
+
+test('Home Assistant helper accepts a complete URL independently of its base and preserves ID-only entry',async()=>{
+  const h=await harness();
+  await h.el('button-grid').children[0].click();
+  h.el('ha-base').value='not a valid base';
+  const full='https://ha.example.test:8443/api/webhook/synthetic%2Fid?key=value';
+  h.el('ha-id').value=full;
+  await h.el('ha-apply').click();
+  assert.equal(h.el('webhook-url').value,full,'full URL must not be encoded as an ID');
+  assert.equal(h.el('ha-base').value,'https://ha.example.test:8443');
+  assert.equal(h.el('ha-id').value,'');
+  assert.equal(h.el('webhook-method').value,'POST');
+  h.el('ha-id').value='only an ID/part';
+  await h.el('ha-apply').click();
+  assert.equal(h.el('webhook-url').value,'https://ha.example.test:8443/api/webhook/only%20an%20ID%2Fpart');
+  assert.equal(h.calls.some(c=>c.method!=='GET'),false,'helper must only fill the editor');
+});
+
+test('webhook editor rejects unsafe URLs without saving and preserves explicit origin ports',async()=>{
+  const h=await harness();
+  await h.el('button-grid').children[0].click();
+  for(const url of ['file:///etc/passwd','http://user:secret@ha.example.test/hook','http://ha.example.test/hook#fragment','http:example.test','http://ha.example.test/line\nbreak']) {
+    h.el('webhook-url').value=url;
+    await h.el('button-editor').emit('submit');
+    assert.equal(h.el('editor-error').hidden,false);
+  }
+  assert.equal(h.calls.some(c=>c.method!=='GET'),false);
+  h.el('webhook-url').value='http://ha.example.test:80/api/webhook/synthetic';
+  await h.el('button-editor').emit('submit');
+  assert.equal(h.calls.filter(c=>c.method==='PUT').at(-1).body.allow_webhook_origin,'http://ha.example.test:80');
 });

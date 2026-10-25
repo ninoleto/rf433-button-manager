@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.3.3-dev"
+const Version = "0.3.4-dev"
 
 type App struct {
 	mu                                  sync.Mutex
@@ -253,11 +253,30 @@ func (a *App) CreateButton(id, name string) (Button, error) {
 	return b, e
 }
 func (a *App) EditButton(id string, next Button) (Button, error) {
+	return a.editButton(id, next, "")
+}
+
+// A destination approved in the button editor is saved atomically with that
+// button. Ordinary API edits still require an already allowed destination.
+func (a *App) editButton(id string, next Button, allowOrigin string) (Button, error) {
 	var out Button
 	e := a.mutate(func(c *Config) error {
 		b := findButton(c, id)
 		if b == nil {
 			return errors.New("button not found")
+		}
+		if allowOrigin != "" {
+			destination, err := origin(next.Webhook.URL)
+			if err != nil || destination != allowOrigin {
+				return errors.New("approved destination must match this button's webhook origin")
+			}
+			found := false
+			for _, allowed := range c.Settings.AllowedOrigins {
+				found = found || allowed == destination
+			}
+			if !found {
+				c.Settings.AllowedOrigins = append(c.Settings.AllowedOrigins, destination)
+			}
 		}
 		next.ID = id
 		next.Signature = b.Signature

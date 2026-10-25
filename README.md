@@ -137,10 +137,13 @@ It cannot verify your radio, decoder or Home Assistant installation.
 4. Inspect the received candidate. Release the button, arm the next capture, and
    repeat until three separate presses match. Confirm and save the mapping and
    validated profile. Keep actions disabled until deliberate action testing.
-5. Add the endpoint's origin to Settings, for example `http://127.0.0.1:8123`.
-6. Save the button webhook, normally a POST to
-   `http://127.0.0.1:8123/api/webhook/YOUR_PRIVATE_WEBHOOK_ID`.
-7. Use **Test webhook** deliberately, then enable the button and test a physical press.
+5. Paste the complete URL copied from Home Assistant into **Webhook URL**.
+   If you only have an ID, expand the optional Home Assistant helper; it accepts
+   either an ID with a base URL or a complete URL.
+6. Click **Save button**, or **Save & allow destination** for a new server address.
+   The editor shows the exact address being allowed. Saving does not send a test
+   request; the button and destination permission are saved together.
+7. Use **Test saved action** deliberately, then enable the button and test a physical press.
 
 Home Assistant must already contain the intended webhook automation. This app does
 not create or change Home Assistant automations. Home Assistant enables POST by

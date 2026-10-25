@@ -85,11 +85,14 @@ func (a *App) Handler(token string, static fs.FS, publicOrigins ...string) http.
 		return a.CreateButton(r.PathValue("id"), b.Name)
 	})
 	handle("PUT /api/buttons/{id}", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		var b Button
+		var b struct {
+			Button
+			AllowWebhookOrigin string `json:"allow_webhook_origin"`
+		}
 		if e := readJSON(w, r, &b); e != nil {
 			return nil, e
 		}
-		return a.EditButton(r.PathValue("id"), b)
+		return a.editButton(r.PathValue("id"), b.Button, b.AllowWebhookOrigin)
 	})
 	handle("DELETE /api/buttons/{id}", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		return nil, a.DeleteButton(r.PathValue("id"))

@@ -134,8 +134,13 @@ Held bursts keep extending the interval. Distinct presses faster than the interv
 can be suppressed. Automatic learning requires a release interval and explicit arming between
 captures. The synthetic demo retains the older 750 ms decoded-event interval.
 
-Add an origin in Settings, save a button GET/POST webhook, and test only in an
-agreed safe window. **Test webhook sends a real request even if the button is
+Paste a complete GET/POST webhook URL into the button editor. For a new address,
+the editor shows that address and **Save & allow destination** saves its permission
+and the button together. An invalid button does not add a destination. Existing
+permissions can still be reviewed or edited in Settings. Pasting or saving does
+not send a test request. The optional Home Assistant ID helper also accepts complete
+URLs without combining them with its base URL or encoding the whole URL as an ID.
+Test only in an agreed safe window. **Test webhook sends a real request even if the button is
 disabled.** Disabled blocks RF dispatch, not deliberate manual testing. Demo
 mode suppresses all real requests. Installation/learning never require testing one.
 

@@ -1,5 +1,18 @@
 # Project progress
 
+## 2026-10-25: simplified webhook paste/save (0.3.4-dev)
+
+The operator reports learning works after 0.3.3. The next reported obstacle was
+the destination allowlist when pasting a complete Home Assistant URL. The button
+editor now accepts that URL directly and offers one **Save & allow destination**
+action for new addresses. Its optional ID helper accepts complete URLs too.
+Button data and its exact destination approval persist atomically; failed saves
+change neither. Saving sends no test request and does not restart reception.
+
+Source/API/controller regressions pass. The prebuilt update preserves learned
+signals, configuration and authentication. Installation and browser acceptance
+of this editor change remain operator steps; no production webhook was invoked.
+
 ## 2026-10-25: two-switch learning repair (0.3.3-dev)
 
 Direct operator tests established live decoding for two separate switches using

@@ -23,6 +23,12 @@ Confirmation requires three separately armed captures; see LEARNING.md.
 - DELETE /api/remotes/{id} -> {ok:true}
 - POST /api/remotes/{id}/buttons {name} -> Button
 - PUT /api/buttons/{id} -> full Button editable fields (signature only through learning)
+  Optional request-only `allow_webhook_origin` string approves the exact origin
+  of this button's URL in the same transaction. It must match the URL's lowercase
+  scheme/host/explicit port, with no path. Omitting it retains strict allowlist
+  enforcement. The GUI sends it only when the user saves a newly approved address.
+  Invalid edits persist neither the button nor permission; saving never invokes
+  a webhook. The response and stored Button do not include this request field.
 - DELETE /api/buttons/{id} -> {ok:true}
 - POST /api/buttons/{id}/clear -> clears mapping+action, disables button
 - POST /api/buttons/{id}/test -> {ok:true} (test saved action; blocked in learning)

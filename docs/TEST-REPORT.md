@@ -1,5 +1,26 @@
 # Verification report — 2026-10-25
 
+## 0.3.4-dev: paste a complete webhook URL and save
+
+- Operator reports the 0.3.3 learning update works; no additional physical webhook
+  or USB recovery claim is made from that brief report.
+- The reported screenshot error was an unapproved destination origin, not an
+  invalid Home Assistant ID. The URL field now shows its destination and offers
+  **Save & allow destination** when needed. The optional ID helper accepts either
+  a complete URL or an ID with a base URL; complete URLs retain their path/query.
+- Authenticated API regression verifies explicit matching approval, anonymous and
+  cross-origin rejection, rollback on invalid input, duplicate-free saves,
+  database persistence and unchanged learned mappings/settings. No webhook is sent
+  and no receiver restart is requested by this save operation.
+- Seven frontend controller tests include direct full-URL paste, single-request
+  save/approval, full URL in the helper despite a stale base, ID-only compatibility,
+  explicit port handling and rejected credential/fragment/non-HTTP URLs.
+- Full Go race suite (including saved private/public RF replay regressions), vet,
+  seven frontend controller tests, deployment/history and five updater checks
+  passed. No new receiver code or dependency versions are included.
+- No production automation was called. UI controller and API tests are isolated;
+  live operator acceptance of the new editor remains pending.
+
 ## 0.3.3-dev: measured PWM learning and partial-row correction
 
 Validation: isolated Linux x86_64, Go 1.27.3 and unmodified upstream rtl_433

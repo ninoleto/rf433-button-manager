@@ -22,6 +22,13 @@ are intentionally allowed for local automation; other unicast destinations can
 be used if explicitly allowlisted. Administrators must choose safe destinations;
 this is not a general-purpose untrusted-URL or SSRF sandbox.
 
+The authenticated button editor can approve one exact destination while saving:
+**Save & allow destination** shows its server address and atomically saves that
+permission with the button. Pasting alone makes no change. Invalid edits cannot
+widen the allowlist. API callers must provide the matching `allow_webhook_origin`
+explicitly or use an already allowed origin. This does not enable disabled actions,
+send a test request or change receiver configuration.
+
 Requests do not follow redirects, use environment proxies, reuse connections or
 retry automatically. At most eight actions are pending globally and one per button.
 A timeout/network failure leaves the physical outcome unknown. Prefer idempotent
