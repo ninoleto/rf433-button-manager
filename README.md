@@ -1,22 +1,88 @@
-# RF Button Manager
+# RF433 Manager
 
-Receive 433.92 MHz remote-control buttons with a native Linux service, learn supported
-signals in a browser, and assign each button an HTTP webhook. Reception and actions
-continue when the browser is closed. No MQTT broker, Docker container or cloud
-account is required. This application receives signals; it does not transmit RF or
-reprogram remotes.
+**Turn ordinary 433 MHz wireless buttons into controls for Home Assistant.**
 
-**0.3.6-dev development build.** See [releases](https://github.com/ninoleto/rf-button-manager/releases)
-and the [publication/verification record](docs/TEST-REPORT.md) for availability.
-Automated software tests do not establish physical USB
-reliability. Receiver recovery and the intended remote/webhook combinations must pass the [hardware acceptance matrix](docs/HARDWARE-TESTS.md)
-before this build can be called a production release.
+Press a wall switch or remote button to turn on a light, activate a scene, or run
+another automation you choose. RF433 Manager listens for supported **433.92 MHz**
+signals through a USB RTL-SDR receiver and sends a webhook when it recognizes a
+button you have assigned.
 
-**Compatibility is model-specific.** The operator tested three assigned home buttons
-and their webhooks, and accepted the latest interface within the testing available.
-Physical multi-tuner selection, USB/hub recovery, soak and broader compatibility
-remain unverified. This does not establish support for every Amazon product or every
-433 MHz remote. Read the [compatibility matrix and inspection guide](docs/COMPATIBILITY.md).
+A webhook is simply a special web address that starts an automation when the app
+calls it. You choose what happens in Home Assistant; RF433 Manager connects the
+physical button press to that automation.
+
+## Why this exists
+
+An inexpensive wireless button can be useful even when it has no direct Home
+Assistant integration. This project brings receiving, learning and assigning
+supported buttons into one browser interface, so you do not need to maintain a
+separate Python script for each remote.
+
+Install it on an always-on Linux computer, connect a compatible RTL-SDR USB receiver
+and antenna, then configure your buttons from a PC or phone. The service keeps
+listening and sending assigned webhooks after you close the browser. No MQTT broker,
+Docker container or cloud account is required.
+
+## How it works
+
+1. **Listen:** the RTL-SDR receives the radio signal from your button.
+2. **Decode:** the open-source [rtl_433](https://github.com/merbanan/rtl_433) decoder
+   turns supported signals into data. RF433 Manager manages reception and helps
+   discover supported fixed-code signals.
+3. **Learn:** choose a button in the web interface, select **Learn**, and follow the
+   prompts for three separate matching presses. Confirm the result.
+4. **Assign:** paste a webhook URL and save the action for that button.
+5. **Use:** enable the action. A recognized press calls the webhook, and Home
+   Assistant runs your automation. The event monitor shows reception and request results.
+
+## Connect a button to Home Assistant
+
+For example, use a wireless wall button to switch on your living-room lights:
+
+1. In Home Assistant, create an automation with a **Webhook** trigger and an action
+   that turns on the lights. Save it.
+2. Copy the complete webhook URL from Home Assistant.
+3. In RF433 Manager, learn your physical button, then paste that complete URL into
+   **Webhook URL**. Select **POST** for a standard Home Assistant webhook.
+4. Choose **Save button**, or **Save & allow destination** when the app asks to
+   approve a new server address. Saving does not run the automation.
+5. When ready to operate the lights, use **Test saved action**, enable the button,
+   and try a physical press.
+
+RF433 Manager runs as a separate Linux service and connects to Home Assistant over
+the network. It does not need to run on the Home Assistant machine. You create and
+manage the automation in Home Assistant; the app sends its trigger. It can also
+call other services that accept HTTP webhooks.
+
+Keep the webhook URL private. See [Home Assistant's webhook guide](https://www.home-assistant.io/docs/automation/trigger/#webhook-trigger)
+for trigger settings and [security guidance](SECURITY.md) for this app.
+
+## What you need
+
+- An always-on **Linux x86_64** computer; the supplied installer uses systemd and udev.
+- A compatible **RTL-SDR USB receiver** and antenna, with `rtl_433` installed.
+- A supported **433.92 MHz wireless button or remote**.
+- Home Assistant with a webhook automation, or another service with an HTTP webhook.
+- A browser for setup and management.
+
+**Compatibility depends on the remote's signal format.** The frequency alone does
+not guarantee support. Use **Inspect signal** to investigate a new button before
+assigning it. The app receives radio signals; it cannot transmit commands back to
+RF devices. See the [compatibility and inspection guide](docs/COMPATIBILITY.md).
+
+**Development prerelease:** three home button assignments and their webhooks have
+been tested by the project owner. Broader hardware support and long-term reliability
+still need testing. Read the [test report](docs/TEST-REPORT.md) and
+[hardware test plan](docs/HARDWARE-TESTS.md) for the evidence and remaining work.
+
+[Download 0.3.6-dev](https://github.com/ninoleto/rf-button-manager/releases/tag/v0.3.6-dev)
+· [Install](#requirements-and-supplied-binary)
+· [Developer guide](docs/DEVELOPMENT.md)
+· [Instructions for AI coding agents](AGENTS.md)
+
+Previously called **RF Button Manager**. The published 0.3.6-dev package, executable,
+service and data paths retain their original names for compatibility. Existing
+installations need no migration for this public project-name change.
 
 ![Running application in explicitly labeled demo mode](docs/screenshots/dashboard.png)
 
@@ -58,8 +124,8 @@ RTL-SDR and a remote using a supported signal format. Runtime state belongs on
 reliable internal storage. A browser is the management client; no Node server,
 Go compiler, Docker container or MQTT broker is required to install the binary.
 
-The prepared package is `rf-button-manager-0.3.6-dev-linux-amd64.zip`; use the
-supplied archive or the release asset once published. Its SHA-256 is
+The release package is `rf-button-manager-0.3.6-dev-linux-amd64.zip`, available
+from the release page. Its SHA-256 is
 `4a55d123df03763ac79f0a6795e3118d65e0d3ac899126a22d8796f466b7df13`.
 Verify before extracting into a fresh directory:
 
@@ -200,7 +266,7 @@ bash scripts/install.sh --binary "$PWD/bin/rf-button-manager"
 sudo bash scripts/install.sh --binary "$PWD/bin/rf-button-manager" --apply
 ```
 
-The installer creates only RF Button Manager's service, service account, state
+The installer creates only RF433 Manager's service, service account, state
 directory, executable and narrowly scoped USB permissions. It does not install
 packages, modify kernel modules, stop competing receiver services, or change Docker
 and Home Assistant. If initial USB permissions have not applied, arrange a
