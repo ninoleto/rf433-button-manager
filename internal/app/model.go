@@ -53,7 +53,13 @@ type Config struct {
 	Remotes         []Remote                  `json:"remotes"`
 	Settings        Settings                  `json:"settings"`
 }
+type ReceiverSource struct {
+	Name    string `json:"name,omitempty"`
+	Serial  string `json:"serial,omitempty"`
+	USBPort string `json:"usb_port,omitempty"`
+}
 type Event struct {
+	Receiver *ReceiverSource `json:"receiver,omitempty"`
 	ID       int64           `json:"id"`
 	Time     string          `json:"time"`
 	Kind     string          `json:"kind"`

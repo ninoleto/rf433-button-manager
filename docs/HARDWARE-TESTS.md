@@ -1,5 +1,17 @@
 # Physical hardware acceptance gate
 
+## Receiver selector acceptance additions (0.3.6-dev)
+
+Pending operator execution: with two uniquely serialized tuners connected, choose
+one in Settings and verify dashboard name/serial/port, actual owned rtl_433 selector
+and reception. Repeat for the other, checking existing assignments and webhook
+configuration remain unchanged. Disconnect the selected tuner only with operator
+participation: acquisition must wait for it and never fall back. Reconnect/move
+that tuner and verify recovery. Check duplicate-serial and no-serial limitations
+against [RECEIVERS.md](RECEIVERS.md). Do not claim these physical cases passed from
+simulated supervision tests. Existing three-button success remains operator-reported.
+
+
 **0.3.4-dev, operator report 2026-10-25:** all three currently available home
 buttons work and webhook handling is reported good. Product model/revision names
 and independent destination traces are not supplied. Record this as operator

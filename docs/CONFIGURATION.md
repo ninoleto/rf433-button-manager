@@ -1,5 +1,15 @@
 # Receiver, identity and learning configuration
 
+## Choose the USB receiver from the GUI
+
+**Settings → Receiver device → Save settings** lists attached RTL-SDR devices.
+Use a unique serial with multiple tuners. The app receives from one tuner at a
+time and waits for the selected device if it disconnects. Duplicate factory
+serials are shown but cannot be individually selected. See
+[RECEIVERS.md](RECEIVERS.md) for activity indicators and limitations. Existing
+button assignments and webhook configuration are preserved when switching.
+
+
 ## Process configuration
 
 The installed unit reads `/etc/rf-button-manager/manager.env` and translates its

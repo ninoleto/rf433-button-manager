@@ -77,6 +77,7 @@ func (a *App) ReceiverPlanApplied(generation uint64) {
 		return
 	}
 	a.receiverApplied = generation
+	a.lastDecodedAt = ""
 	a.receiver = receiver.Status{State: "recovering", Message: "Starting reception; waiting for sample acquisition"}
 	a.receiverMode = "normal"
 	if l := a.learning; l != nil && l.Automatic && l.CaptureGeneration == generation {

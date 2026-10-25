@@ -10,9 +10,11 @@ import (
 	"time"
 )
 
-const Version = "0.3.5-dev"
+const Version = "0.3.6-dev"
 
 type App struct {
+	discoverReceivers                   func() ([]receiver.DeviceInfo, error)
+	lastDecodedAt                       string
 	mu                                  sync.Mutex
 	actionGate                          sync.RWMutex
 	store                               *Store
@@ -52,7 +54,7 @@ func New(store *Store, c Config, demo bool) (*App, error) {
 		return nil, e
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &App{store: store, config: c, inFlight: map[string]bool{}, actionSlots: make(chan struct{}, 8), events: events, lastSeen: map[string]time.Time{}, lastTest: map[string]time.Time{}, muteUntil: time.Now().Add(2 * time.Second), demo: demo, now: time.Now, ctx: ctx, cancel: cancel, settingsChanged: make(chan struct{}, 1), receiver: receiver.Status{State: "disconnected", Message: "Receiver has not started"}}, nil
+	return &App{discoverReceivers: receiver.Devices, store: store, config: c, inFlight: map[string]bool{}, actionSlots: make(chan struct{}, 8), events: events, lastSeen: map[string]time.Time{}, lastTest: map[string]time.Time{}, muteUntil: time.Now().Add(2 * time.Second), demo: demo, now: time.Now, ctx: ctx, cancel: cancel, settingsChanged: make(chan struct{}, 1), receiver: receiver.Status{State: "disconnected", Message: "Receiver has not started"}}, nil
 }
 func (a *App) Close()                           { a.mu.Lock(); a.closed = true; a.cancel(); a.mu.Unlock(); a.wg.Wait() }
 func (a *App) SettingsChanges() <-chan struct{} { return a.settingsChanged }
@@ -63,6 +65,9 @@ func (a *App) eventLocked(kind, message, button string, data json.RawMessage) bo
 		message += " (large raw payload omitted from history)"
 	}
 	ev := Event{Time: a.now().UTC().Format(time.RFC3339Nano), Kind: kind, Message: message, ButtonID: button, Data: data}
+	if kind == "rf" || kind == "matched" || kind == "receiver" {
+		ev.Receiver = &ReceiverSource{Name: a.receiver.Name, Serial: a.receiver.Serial, USBPort: a.receiver.USBPort}
+	}
 	saved, e := a.store.Record(ev)
 	if e != nil {
 		a.storageErr = true
@@ -86,7 +91,11 @@ func (a *App) setReceiverLocked(s receiver.Status) {
 	if a.closed {
 		return
 	}
-	if a.receiver.State != s.State || a.receiver.Message != s.Message {
+	if a.receiver.Serial != s.Serial || a.receiver.USBPort != s.USBPort || s.State != "connected" {
+		a.lastDecodedAt = ""
+	}
+	if a.receiver.State != s.State || a.receiver.Message != s.Message || a.receiver.Serial != s.Serial || a.receiver.USBPort != s.USBPort {
+		a.receiver = s
 		a.eventLocked("receiver", s.State+": "+s.Message, "", nil)
 	}
 	a.receiver = s
@@ -106,21 +115,22 @@ func (a *App) State() any {
 	defer a.mu.Unlock()
 	a.expireLocked()
 	return clone(struct {
-		Remotes            []Remote                  `json:"remotes"`
-		Settings           Settings                  `json:"settings"`
-		Receiver           receiver.Status           `json:"receiver"`
-		Learning           *Learning                 `json:"learning"`
-		Events             []Event                   `json:"events"`
-		Version            string                    `json:"version"`
-		Demo               bool                      `json:"demo"`
-		StorageError       bool                      `json:"storage_error"`
-		LearningNotice     *Learning                 `json:"learning_notice"`
-		ActionsPaused      bool                      `json:"actions_paused"`
-		DecoderProfiles    []receiver.DecoderProfile `json:"decoder_profiles"`
-		ReceiverMode       string                    `json:"receiver_mode"`
-		ReceiverGeneration uint64                    `json:"receiver_generation"`
-		RFCaptureAvailable bool                      `json:"rf_capture_available"`
-	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles, a.receiverMode, a.receiverApplied, a.rfCapture != nil && a.rfCapture.Bytes > 0})
+		Remotes               []Remote                  `json:"remotes"`
+		Settings              Settings                  `json:"settings"`
+		Receiver              receiver.Status           `json:"receiver"`
+		Learning              *Learning                 `json:"learning"`
+		Events                []Event                   `json:"events"`
+		Version               string                    `json:"version"`
+		Demo                  bool                      `json:"demo"`
+		StorageError          bool                      `json:"storage_error"`
+		LearningNotice        *Learning                 `json:"learning_notice"`
+		ActionsPaused         bool                      `json:"actions_paused"`
+		DecoderProfiles       []receiver.DecoderProfile `json:"decoder_profiles"`
+		ReceiverMode          string                    `json:"receiver_mode"`
+		ReceiverGeneration    uint64                    `json:"receiver_generation"`
+		RFCaptureAvailable    bool                      `json:"rf_capture_available"`
+		ReceiverLastDecodedAt string                    `json:"receiver_last_decoded_at"`
+	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles, a.receiverMode, a.receiverApplied, a.rfCapture != nil && a.rfCapture.Bytes > 0, a.lastDecodedAt})
 }
 func findButton(c *Config, id string) *Button {
 	for ri := range c.Remotes {
@@ -322,7 +332,19 @@ func (a *App) DeleteButton(id string) error {
 	})
 }
 func (a *App) UpdateSettings(s Settings) error {
-	return a.mutateConfig(func(c *Config) error { c.Settings = s; return nil }, true)
+	return a.mutateConfig(func(c *Config) error {
+		if c.Settings.ReceiverSerial != s.ReceiverSerial {
+			devices, err := a.discoverReceivers()
+			if err != nil {
+				return err
+			}
+			if err := receiver.ValidateSelection(devices, s.ReceiverSerial); err != nil {
+				return err
+			}
+		}
+		c.Settings = s
+		return nil
+	}, true)
 }
 func (a *App) Backup() Config { a.mu.Lock(); defer a.mu.Unlock(); return clone(a.config) }
 func (a *App) Restore(c Config) error {
@@ -503,13 +525,22 @@ func (a *App) Receive(raw []byte) {
 	}
 	_ = json.Unmarshal(raw, &envelope)
 	a.recordCaptureEventLocked(raw)
+	if a.receiver.State == "connected" {
+		a.lastDecodedAt = a.now().UTC().Format(time.RFC3339Nano)
+	}
+	original := append([]byte(nil), raw...)
 	var normalizeErr error
-	raw, normalizeErr = receiver.NormalizeConfiguredFlex(raw, a.config.Settings.FlexDecoder)
+	raw, normalizeErr = receiver.NormalizeConfiguredFlex(raw, a.config.Settings.FlexDecoder, a.learning != nil && a.learning.Automatic)
 	if normalizeErr != nil {
 		return
 	}
 	for _, profile := range a.config.DecoderProfiles {
 		if envelope.Model == profile.Model {
+			if a.learning != nil && a.learning.Automatic {
+				if receiver.ValidateLearningFrame(original, profile.Bits) != nil {
+					return
+				}
+			}
 			normalized, e := receiver.NormalizeProfile(raw, profile)
 			if e != nil {
 				return

@@ -20,6 +20,9 @@
   let learningWasActive = false;
   let confirmResolve = null;
   let mutationCount = 0;
+  let receiverDevices = [];
+  let receiverListReady = false;
+  let receiverScanGeneration = 0;
 
   function node(tag, className, text) {
     const el = document.createElement(tag);
@@ -88,6 +91,8 @@
     state = { remotes: [], events: [], settings: {}, receiver: {}, learning: null };
     selectedRemote = null; selectedButton = null; editorDirty = false;
     navKey = ''; gridKey = ''; eventsKey = ''; learningKey = ''; learningWasActive = false;
+    receiverDevices = []; receiverListReady = false; receiverScanGeneration++;
+    $('receiver-serial').replaceChildren();
     $('button-editor').reset(); $('settings-form').reset(); $('ha-id').value = '';
     render();
     $('management-token').value = '';
@@ -292,6 +297,8 @@
     const learning = !!state.learning || !!state.actions_paused;
     const busy = mutationCount > 0;
     $('inspect-open').disabled = learning || busy || !token;
+    $('settings-save').disabled = learning || busy || !receiverListReady;
+    $('receiver-serial').disabled = learning || busy || !receiverListReady;
     $('webhook-test').disabled = !!state.demo || learning || busy || editorDirty || !currentButton()?.webhook?.url;
     $('learn-start').disabled = learning || busy || editorDirty;
     $('button-save').disabled = busy || learning;
@@ -328,6 +335,7 @@
       const type = node('span', `event-kind${isError ? ' error' : ''}`, kind.replaceAll('_', ' '));
       const content = node('div', 'event-message');
       content.append(node('span', '', event.message || 'Received event'));
+      if (event.receiver && (event.receiver.serial || event.receiver.usb_port || event.receiver.name)) content.append(node('p', 'event-source', `Receiver: ${receiverLabel(event.receiver)}`));
       if (event.data !== undefined && event.data !== null && event.data !== '') {
         const details = node('details');
         details.append(node('summary', '', event.data.diagnostics || event.kind === 'learning_capture' ? 'Capture diagnostics' : 'Decoded data'), node('pre', '', typeof event.data === 'string' ? event.data : JSON.stringify(event.data, null, 2)));
@@ -430,12 +438,61 @@
     learningWasActive = true;
     if (!$('login-dialog').open && !$('confirm-dialog').open) show('learning-dialog');
   }
+  function receiverLabel(device) {
+    return [device.name || 'RTL-SDR receiver', device.serial ? `Serial ${device.serial}` : 'No serial', device.usb_port ? `USB ${device.usb_port}` : ''].filter(Boolean).join(' · ');
+  }
+  function renderReceiverIdentity() {
+    const active = ['connected','recovering'].includes(state.receiver.state) && (state.receiver.name || state.receiver.usb_port || state.receiver.serial);
+    const label = active ? receiverLabel(state.receiver) : (state.settings.receiver_serial ? `Selected serial ${state.settings.receiver_serial} · not receiving` : 'No active receiver');
+    $('receiver-device').textContent = label;
+    $('receiver-settings-active').textContent = `Current receiver: ${label}`;
+    const at = state.receiver_last_decoded_at;
+    const recent = state.receiver.state === 'connected' && at && Date.now() - new Date(at).getTime() >= 0 && Date.now() - new Date(at).getTime() < 2500;
+    $('receiver-activity').textContent = recent ? 'Decoded RF signal received' : at ? `Last decoded RF: ${fmtTime(at)}` : 'No decoded RF activity yet';
+    $('receiver-activity').className = recent ? 'rf-activity recent' : 'rf-activity';
+  }
+  async function refreshReceiverDevices(wanted = $('receiver-serial').value) {
+    const generation = ++receiverScanGeneration;
+    receiverListReady = false;
+    $('receiver-refresh').disabled = true;
+    $('receiver-list-note').textContent = 'Scanning connected RTL-SDR receivers…';
+    updateActionAvailability();
+    try {
+      const result = await api('/receivers');
+      if (generation !== receiverScanGeneration) return;
+      receiverDevices = result.devices || [];
+      const options = [];
+      const automatic = node('option', '', `Automatic — ${receiverDevices.length === 1 ? 'one receiver connected' : `${receiverDevices.length} receivers; choose a unique serial`}`);
+      automatic.value = ''; automatic.disabled = receiverDevices.length !== 1; options.push(automatic);
+      for (const [index, d] of receiverDevices.entries()) {
+        const option = node('option', '', `${receiverLabel(d)}${d.selectable ? '' : ' — '+d.reason}`);
+        option.value = d.selectable ? d.serial : `!unavailable-${index}`;
+        option.disabled = !d.selectable; options.push(option);
+      }
+      if (wanted && !receiverDevices.some(d => d.selectable && d.serial === wanted)) {
+        const saved = node('option', '', `Saved serial ${wanted} — missing or ambiguous`);
+        saved.value = wanted; saved.disabled = true; options.push(saved);
+      }
+      $('receiver-serial').replaceChildren(...options);
+      $('receiver-serial').value = wanted || '';
+      receiverListReady = true;
+      const problems = receiverDevices.filter(d => !d.selectable).map(d => `${d.usb_port ? 'USB '+d.usb_port+': ' : ''}${d.reason}`);
+      $('receiver-list-note').textContent = `${receiverDevices.length} receiver(s) detected. ${problems.join('. ') || 'Choose a receiver, then Save settings. Detection does not prove USB access or sample acquisition.'}`;
+    } catch (error) {
+      if (generation !== receiverScanGeneration) return;
+      $('receiver-list-note').textContent = 'Device scan failed. Your saved receiver selection has not changed.';
+      handleError(error, 'settings-error');
+    } finally {
+      if (generation === receiverScanGeneration) { $('receiver-refresh').disabled = false; updateActionAvailability(); }
+    }
+  }
   function render() {
     $('demo-banner').hidden = !state.demo;
     const status = state.receiver.state || (token ? 'connecting' : 'locked');
     $('receiver-state').textContent = status;
     $('receiver-message').textContent = state.receiver.message || (token ? 'Waiting for receiver status' : 'Enter a token to connect');
     $('receiver-dot').className = `status-dot ${['connected', 'disconnected', 'recovering', 'error'].includes(status) ? status : ''}`;
+    renderReceiverIdentity();
     $('version-label').textContent = state.version ? `RF Button Manager · ${state.version}` : 'RF Button Manager';
     renderNavigation(); renderRemote(); renderEditor(); renderEvents(); renderLearning(); updateActionAvailability();
   }
@@ -637,16 +694,21 @@
 
   bindAction('settings-open', async () => {
     const settings = state.settings;
-    $('receiver-serial').value = settings.receiver_serial || '';
+    receiverListReady = false;
     $('receiver-flex').value = settings.flex_decoder || '';
     $('receiver-protocols').value = (settings.protocols || []).join(', ');
     $('settings-identity-fields').value = (settings.identity_fields?.length ? settings.identity_fields : DEFAULT_FIELDS).join(', ');
     $('allowed-origins').value = (settings.allowed_origins || []).join('\n');
     setError('settings-error', ''); show('settings-dialog');
+    await refreshReceiverDevices(settings.receiver_serial || '');
   });
+  bindAction('receiver-refresh', () => refreshReceiverDevices(), 'settings-error');
   $('settings-form').addEventListener('submit', async (event) => {
     event.preventDefault(); setError('settings-error', '');
     try {
+      if (!receiverListReady) throw new Error('Refresh devices before saving settings.');
+      const serial = $('receiver-serial').value;
+      if (serial !== (state.settings.receiver_serial || '') && !(serial === '' ? receiverDevices.length === 1 : receiverDevices.some(d => d.selectable && d.serial === serial))) throw new Error('Choose an available receiver with a unique serial.');
       const protocolParts = fields($('receiver-protocols').value);
       if (protocolParts.some((v) => !/^\d+$/.test(v) || Number(v) < 1 || Number(v) > 10000)) throw new Error('Protocol IDs must be comma-separated integers between 1 and 10000.');
       const origins = [...new Set($('allowed-origins').value.split(/\n/).map((v) => v.trim()).filter(Boolean))];

@@ -29,6 +29,7 @@ async function harness() {
   const el=id=>{assert.ok(elements.has(id),`Missing real HTML element: ${id}`);return elements.get(id);};
   const button={id:'fixture-button',name:'A ON',enabled:false,signature:'',identity_fields:['codes'],webhook:{url:''}};
   let state={remotes:[{id:'fixture-remote',name:'Synthetic remote',columns:2,buttons:[button]}],settings:{},receiver:{state:'connected',message:'Synthetic samples'},events:[],version:'test',learning:null,learning_notice:null,actions_paused:false};
+  let devices=[]; let scanError=false;
   const calls=[];
   let timerID=0; const timers=new Map();
   const session=()=>({session_id:'fixture-session',button_id:button.id,identity_fields:['codes'],automatic:true,stage:'waiting',message:'Receiver ready. Press once.',presses:0,required:3,candidate:'',expires_at:new Date(Date.now()+180000).toISOString(),diagnostics:{}});
@@ -36,8 +37,10 @@ async function harness() {
     setTimeout:(fn,delay)=>{timers.set(++timerID,{fn,delay});return timerID;},clearTimeout:id=>timers.delete(id),
     fetch:async(url,options)=>{
       calls.push({url,method:options.method,body:options.body?JSON.parse(options.body):null});
+      if(url==='/api/receivers') return scanError ? {ok:false,status:500,json:async()=>({error:'Scan unavailable'})} : {ok:true,json:async()=>({devices:structuredClone(devices)})};
       if(url==='/api/state') return {ok:true,json:async()=>structuredClone(state)};
-      if(url==='/api/learn/start') state={...state,learning:session(),learning_notice:null,actions_paused:true};
+      if(url==='/api/settings' && options.method==='PUT') state={...state,settings:JSON.parse(options.body)};
+      else if(url==='/api/learn/start') state={...state,learning:session(),learning_notice:null,actions_paused:true};
       else if(url==='/api/inspect/start') state={...state,learning:{...session(),button_id:'',inspect_only:true},learning_notice:null,actions_paused:true};
       else if(url==='/api/learn/cancel') state={...state,learning:null,learning_notice:null,actions_paused:false};
       else if(url==='/api/learn/arm') state={...state,learning:{...state.learning,stage:'waiting'}};
@@ -55,7 +58,7 @@ async function harness() {
   const flush=async()=>{for(let i=0;i<20;i++) await Promise.resolve();};
   await flush();
   const refresh=async()=>{const entry=[...timers.entries()].find(([,v])=>v.delay===1000);assert.ok(entry,'poll scheduled');timers.delete(entry[0]);await entry[1].fn();await flush();};
-  return {el,calls,session,button,set:patch=>{state={...state,...patch};},refresh};
+  return {el,calls,session,button,devices:value=>{devices=value;},scanError:value=>{scanError=value;},set:patch=>{state={...state,...patch};},refresh};
 }
 
 test('browser controller learns without decoder setup and exposes progress, diagnostics and retry',async()=>{
@@ -223,4 +226,48 @@ test('failed inspection retries inspection rather than starting button learning'
   await h.el('learning-retry').click();
   assert.equal(h.calls.filter(c=>c.method==='POST').at(-1).url,'/api/inspect/start');
   assert.equal(h.el('learning-title').textContent,'Inspect signal');
+});
+
+
+test('receiver dropdown keeps selection through refresh and preserves button assignments',async()=>{
+ const h=await harness();
+ h.set({settings:{receiver_serial:'desk',allowed_origins:[],identity_fields:['codes']},receiver:{state:'connected',name:'Desk tuner',serial:'desk',usb_port:'1-2'},receiver_last_decoded_at:new Date().toISOString()});await h.refresh();
+ assert.match(h.el('receiver-device').textContent,/Desk tuner.*Serial desk.*USB 1-2/);
+ assert.match(h.el('receiver-activity').textContent,/Decoded RF signal received/);
+ h.devices([{name:'Desk tuner',serial:'desk',usb_port:'1-2',selectable:true},{name:'Roof tuner',serial:'roof',usb_port:'2-1',selectable:true}]);
+ await h.el('settings-open').click();
+ assert.equal(h.el('receiver-serial').value,'desk');
+ assert.equal(h.el('receiver-serial').children[0].disabled,true);
+ h.el('receiver-serial').value='roof';
+ await h.refresh();assert.equal(h.el('receiver-serial').value,'roof','status polling cannot discard user choice');
+ await h.el('receiver-refresh').click();assert.equal(h.el('receiver-serial').value,'roof');
+ await h.el('settings-form').emit('submit');
+ const writes=h.calls.filter(c=>c.method==='PUT');
+ assert.equal(writes.length,1);assert.equal(writes[0].body.receiver_serial,'roof');
+ assert.equal(h.calls.some(c=>c.url.includes('/buttons/') || c.url.endsWith('/test')),false);
+});
+
+test('missing and duplicate receivers stay explicit and scan failure cannot overwrite selection',async()=>{
+ const h=await harness();h.set({settings:{receiver_serial:'absent',allowed_origins:[]}});await h.refresh();
+ h.devices([{name:'Tuner',serial:'default',usb_port:'1-2',selectable:false,reason:'Duplicate USB serial'},{name:'Tuner',serial:'default',usb_port:'1-3',selectable:false,reason:'Duplicate USB serial'}]);
+ await h.el('settings-open').click();
+ assert.equal(h.el('receiver-serial').value,'absent');
+ assert.equal(h.el('receiver-serial').children.every(o=>o.disabled),true);
+ assert.match(h.el('receiver-list-note').textContent,/Duplicate USB serial/);
+ h.el('receiver-serial').value='default';await h.el('settings-form').emit('submit');
+ assert.equal(h.calls.some(c=>c.method==='PUT'),false);
+ h.scanError(true);await h.el('receiver-refresh').click();
+ assert.equal(h.el('settings-save').disabled,true);
+ assert.match(h.el('receiver-list-note').textContent,/saved receiver selection has not changed/);
+});
+
+test('receiver activity clears on disconnect and settings are blocked during capture',async()=>{
+ const h=await harness();
+ h.devices([{name:'Tuner',serial:'desk',selectable:true}]);
+ await h.el('settings-open').click();
+ h.set({receiver:{state:'disconnected',serial:'desk'},settings:{receiver_serial:'desk'},receiver_last_decoded_at:'',actions_paused:true});await h.refresh();
+ assert.match(h.el('receiver-device').textContent,/not receiving/);
+ assert.match(h.el('receiver-activity').textContent,/No decoded RF/);
+ assert.equal(h.el('settings-save').disabled,true);
+ assert.equal(h.el('receiver-serial').disabled,true);
 });

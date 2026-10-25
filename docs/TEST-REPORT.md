@@ -1,5 +1,31 @@
 # Verification report — 2026-10-25
 
+## 0.3.6-dev: receiver selector, source indicator and saved-fragment guard
+
+- Full race-enabled Go suite, vet, twelve frontend controller tests,
+  deployment/history checks and five updater tests passed in isolated Linux.
+- Synthetic USB inventory/supervision tests cover two distinct serials, selection,
+  disappearance without fallback, duplicate serials, automatic-mode ambiguity and
+  moving the pinned receiver to another port. No real multi-tuner test was run.
+- Backend checks preserve three learned/enabled assignments and webhook settings
+  across selection, verify persisted serial, reject changes during learning and
+  enforce authentication/origin checks for device inventory. Activity/source tests
+  distinguish new events from old receiver history.
+- All existing private RF replay cases and pinned public remote fixtures pass.
+  Four additional private captures reproduce the saved-fragment defect: preferred
+  profile replay now selects the complete frame and explicitly selected conflicting
+  partial profiles fail validation. Private recordings and identifiers are omitted
+  from source/history/releases. Synthetic regressions cover both profile orders,
+  genuine shorter frames, custom flex and unchanged existing-mapping dispatch.
+- UI tests verify selection/refresh, missing/duplicate labels, activity state,
+  blocked editing during capture and failed scans preserving saved selection.
+  These run actual HTML/JS with a DOM adapter. Full Chromium layout testing was
+  unavailable in this environment; live browser and physical acceptance of this
+  update remain pending.
+- Operator reports three working home buttons on the earlier installed release.
+  This update preserves that work; it is not a claim of universal button support.
+
+
 ## 0.3.5-dev: signal inspector and explicit compatibility scope
 
 - Operator reports all three available home buttons and webhook handling work

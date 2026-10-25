@@ -1,5 +1,10 @@
 # RF Button Manager
 
+Receiver selection: use **Settings → Receiver device** to choose one connected
+RTL-SDR by unique serial. The dashboard identifies the active tuner and shows
+decoded RF activity. See [receiver selection and limitations](docs/RECEIVERS.md)
+for multiple tuners, duplicate serials and preservation of existing mappings.
+
 Receive 433.92 MHz remote-control buttons with a native Linux service, learn supported
 signals in a browser, and assign each button an HTTP webhook. Reception and actions
 continue when the browser is closed. No MQTT broker, Docker container or cloud

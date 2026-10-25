@@ -377,6 +377,9 @@ func testCaptureReplayPersistenceAndProfileReuse(t *testing.T, fixture string) {
 		t.Fatal("saved profile did not match normal decoded reception")
 	}
 	settings := a.Settings()
+	a.discoverReceivers = func() ([]receiver.DeviceInfo, error) {
+		return []receiver.DeviceInfo{{Serial: "test-serial", Selectable: true}}, nil
+	}
 	settings.ReceiverSerial = "test-serial"
 	if err = a.UpdateSettings(settings); err != nil {
 		t.Fatal(err)

@@ -179,7 +179,7 @@ func NormalizeProfile(raw []byte, profile DecoderProfile) ([]byte, error) {
 
 // NormalizeConfiguredFlex uses only an explicitly configured exact bit length.
 // It never guesses a width from a single live event or changes another decoder.
-func NormalizeConfiguredFlex(raw []byte, spec string) ([]byte, error) {
+func NormalizeConfiguredFlex(raw []byte, spec string, learning ...bool) ([]byte, error) {
 	name, bits := "", 0
 	seen := map[string]bool{}
 	for _, part := range strings.Split(spec, ",") {
@@ -209,12 +209,46 @@ func NormalizeConfiguredFlex(raw []byte, spec string) ([]byte, error) {
 	if model != name {
 		return raw, nil
 	}
+	if len(learning) > 0 && learning[0] {
+		if err := ValidateLearningFrame(raw, bits); err != nil {
+			return nil, err
+		}
+	}
 	code, _, err := repeatedCode(raw, bits, 1)
 	if err != nil {
 		return nil, err
 	}
 	obj["codes"], _ = json.Marshal([]string{code})
 	return json.Marshal(obj)
+}
+
+// ValidateLearningFrame prevents a saved profile's one-off edge fragment from
+// outranking a different, repeated frame in the same raw rtl_433 record. This
+// applies to new learning/inspection, not dispatch of existing saved mappings.
+func ValidateLearningFrame(raw []byte, bits int) error {
+	var event struct {
+		Codes []string `json:"codes"`
+	}
+	if json.Unmarshal(raw, &event) != nil {
+		return errors.New("invalid RF JSON")
+	}
+	counts := map[string]int{}
+	for _, code := range event.Codes {
+		m := codePattern.FindStringSubmatch(strings.TrimSpace(code))
+		if m == nil {
+			continue
+		}
+		n, _ := strconv.Atoi(m[1])
+		if n < 12 || n > 64 || len(m[2]) != (n+3)/4 {
+			continue
+		}
+		canonical := fmt.Sprintf("{%d}%s", n, strings.ToLower(m[2]))
+		counts[canonical]++
+		if counts[canonical] >= 2 && n != bits {
+			return errors.New("profile width conflicts with repeated complete frames; fragment excluded from learning")
+		}
+	}
+	return nil
 }
 
 // rtl_433 can emit repeated frames in separate pulse packets/JSON records.

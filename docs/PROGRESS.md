@@ -1,5 +1,21 @@
 # Project progress
 
+## 2026-10-25: receiver choice and inspection framing (0.3.6-dev)
+
+The operator confirms all three existing button assignments were physically
+working earlier today. Preserve that acceptance record and all saved mappings.
+A subsequent inspection exposed selection of a once-per-record fragment even
+though a different full frame repeated within each transmission. Corrected new
+learning/inspection and saved-profile replay validation without changing dispatch
+of existing mappings. A partial existing mapping is not silently rewritten.
+
+Added authenticated read-only tuner inventory, a GUI device dropdown with refresh,
+active name/serial/USB-port display, decoded RF activity and historical event
+source attribution. One selected tuner is used at a time. Missing selections and
+duplicate factory serials never cause silent fallback; physical multi-tuner
+validation remains pending. No EEPROM, USB rule or unrelated service changes.
+
+
 ## 2026-10-25: signal inspection and compatibility reporting (0.3.5-dev)
 
 All three currently available home buttons and webhook handling are now reported

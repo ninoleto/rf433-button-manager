@@ -122,12 +122,15 @@ func AnalyzeCapture(parent context.Context, request AnalysisRequest) (result Ana
 			normalized := []byte(frame)
 			if profile == nil {
 				var e error
-				normalized, e = NormalizeConfiguredFlex(frame, request.Config.FlexDecoder)
+				normalized, e = NormalizeConfiguredFlex(frame, request.Config.FlexDecoder, true)
 				if e != nil {
 					return nil, e
 				}
 			}
 			if profile != nil {
+				if err := ValidateLearningFrame(frame, profile.Bits); err != nil {
+					return nil, err
+				}
 				var e error
 				normalized, e = NormalizeProfile(frame, *profile)
 				if e != nil {

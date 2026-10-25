@@ -60,7 +60,7 @@ func discoverUSB(root string) ([]device, error) {
 		if bus == "" || number == "" {
 			continue
 		} // transient incomplete enumeration
-		devices = append(devices, device{serial: read(dir, "serial"), incarnation: dir + ":" + bus + ":" + number})
+		devices = append(devices, device{serial: read(dir, "serial"), name: read(dir, "product"), manufacturer: read(dir, "manufacturer"), port: ent.Name(), usbID: strings.ToLower(vendor + ":" + product), incarnation: dir + ":" + bus + ":" + number})
 	}
 	return devices, nil
 }

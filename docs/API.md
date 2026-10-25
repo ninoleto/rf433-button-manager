@@ -1,5 +1,29 @@
 # Management API contract v1
 
+## Receiver inventory and activity (0.3.6-dev)
+
+`GET /api/receivers` requires the management token and normal origin checks. It
+returns `{"devices":[...]}`; each item contains `name`, `manufacturer`, `serial`,
+`usb_port`, `usb_id`, `selectable`, and an optional `reason`. Empty inventory is
+an empty array. It reads Linux sysfs without opening a tuner or stopping a child.
+Do not interpret inventory as proof of permission, availability or acquisition.
+
+`PUT /api/settings` continues to accept `receiver_serial` with all other settings.
+When that field changes, the server checks the current inventory again. New
+missing/duplicate selections are rejected without saving. Empty serial selects
+automatic mode only when exactly one receiver is present. An unchanged saved
+serial remains valid configuration while disconnected. Learning/inspection blocks
+settings changes. Selection never edits remotes, mappings, webhook data or action
+flags. Backup restoration preserves its existing offline-settings semantics;
+the receiver supervisor still refuses ambiguous acquisition after restore.
+
+`GET /api/state` adds optional `receiver.name` and `receiver.usb_port` alongside
+`receiver.serial`, plus `receiver_last_decoded_at` (RFC3339Nano or empty). This is
+the last decoded RF event, not a sample heartbeat, button match or webhook result.
+New `rf`, `matched` and `receiver` events optionally include a `receiver` object
+with `name`, `serial`, `usb_port`; historical events need not have it.
+
+
 All /api routes require `Authorization: Bearer <token>`; JSON bodies, errors
 `{"error":"message"}`. UI login stores token in sessionStorage. GET /healthz is
 minimal liveness; authenticated GET /api/state is status and configuration.

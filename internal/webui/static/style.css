@@ -1504,3 +1504,13 @@ dialog::backdrop{
 
 /* Keep diagnostic reasons in the dialog scroll instead of a second hidden pane. */
 #learning-diagnostics { max-height: none; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Receiver identity stays readable on both the sidebar and narrow screens. */
+.sidebar-footer > div { min-width:0; }
+#receiver-device, #receiver-activity, .event-source { overflow-wrap:anywhere; }
+#receiver-device { color:var(--text); }
+.rf-activity.recent { color:var(--accent); }
+.event-source { font-size:10px; color:var(--muted); margin-top:4px; }
+#receiver-refresh { flex-shrink:0; }
+@media(max-width:940px) { .sidebar-footer > div { display:block; } .sidebar-footer p { margin-top:4px; } }
+@media(max-width:480px) { #settings-form .inline-field { flex-wrap:wrap; } }

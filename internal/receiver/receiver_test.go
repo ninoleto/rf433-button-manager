@@ -94,6 +94,9 @@ type fixture struct {
 }
 
 func startFixture(t *testing.T, heartbeat time.Duration) *fixture {
+	return startConfiguredFixture(t, heartbeat, Config{})
+}
+func startConfiguredFixture(t *testing.T, heartbeat time.Duration, cfg Config) *fixture {
 	t.Helper()
 	f := &fixture{devices: []device{{serial: "serial", incarnation: "port1:1"}}, processes: make(chan *fakeProcess, 100), statuses: make(chan Status, 100), events: make(chan []byte, 100), done: make(chan error, 1)}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -108,7 +111,7 @@ func startFixture(t *testing.T, heartbeat time.Duration) *fixture {
 		return p, nil
 	}, poll: 2 * time.Millisecond, initialBackoff: 10 * time.Millisecond, maxBackoff: 80 * time.Millisecond, stableAfter: time.Second, heartbeatTimeout: heartbeat, stopTimeout: 20 * time.Millisecond}
 	go func() {
-		f.done <- run(ctx, Config{}, func(b []byte) { f.events <- b }, func(s Status) { f.statuses <- s }, rt)
+		f.done <- run(ctx, cfg, func(b []byte) { f.events <- b }, func(s Status) { f.statuses <- s }, rt)
 	}()
 	t.Cleanup(func() {
 		cancel()

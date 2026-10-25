@@ -26,10 +26,13 @@ type Status struct {
 	Message  string `json:"message"`
 	Serial   string `json:"serial"`
 	Restarts int    `json:"restarts"`
+	Name     string `json:"name,omitempty"`
+	USBPort  string `json:"usb_port,omitempty"`
 }
 
 type device struct {
-	serial string
+	serial                          string
+	name, manufacturer, port, usbID string
 	// incarnation is only an in-memory observation, never a selector or saved path.
 	incarnation string
 }
@@ -157,8 +160,8 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 	}
 	var previous Status
 	attempts := 0
-	emit := func(state, message, serial string) {
-		s := Status{State: state, Message: message, Serial: serial, Restarts: max(0, attempts-1)}
+	emit := func(state, message string, d device) {
+		s := Status{State: state, Message: message, Serial: d.serial, Name: d.name, USBPort: d.port, Restarts: max(0, attempts-1)}
 		if s != previous {
 			previous = s
 			onStatus(s)
@@ -223,7 +226,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 	defer stop()
 	failure := func(message string) {
 		stop()
-		emit("error", message, current.serial)
+		emit("error", message, current)
 		nextAttempt = time.Now().Add(backoff)
 		backoff = min(backoff*2, rt.maxBackoff)
 	}
@@ -236,7 +239,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 		select {
 		case <-ctx.Done():
 			stop()
-			emit("disconnected", "receiver service stopped", "")
+			emit("disconnected", "receiver service stopped", device{})
 			return nil
 		case err := <-exited:
 			message := "rtl_433 stopped unexpectedly; checking receiver access and retrying"
@@ -266,7 +269,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 				if packet != nil {
 					if packet.Error == "" && len(packet.Data) > 0 {
 						heartbeat = time.Now()
-						emit("connected", "receiver is producing pulse records", current.serial)
+						emit("connected", "receiver is producing pulse records", current)
 					}
 					callback(*packet)
 				}
@@ -285,7 +288,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 				continue
 			}
 			heartbeat = time.Now()
-			emit("connected", "receiver is acquiring samples", current.serial)
+			emit("connected", "receiver is acquiring samples", current)
 			if kind == event {
 				onJSON(rec.data)
 			}
@@ -298,7 +301,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 			devices, err := rt.discover()
 			if err != nil {
 				stop()
-				emit("error", "USB discovery failed; check sysfs access", "")
+				emit("error", "USB discovery failed; check sysfs access", device{})
 				continue
 			}
 			d, err := selectDevice(devices, cfg.Serial)
@@ -308,12 +311,12 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 				if errors.Is(err, errMissing) {
 					state = "disconnected"
 				}
-				emit(state, err.Error(), cfg.Serial)
+				emit(state, err.Error(), device{serial: cfg.Serial})
 				continue
 			}
 			if child != nil && current != d {
 				stop()
-				emit("recovering", "USB receiver changed; reacquiring it", d.serial)
+				emit("recovering", "USB receiver changed; reacquiring it", d)
 				nextAttempt = now.Add(rt.initialBackoff)
 			}
 			if child != nil {
@@ -329,7 +332,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 			}
 			current = d
 			attempts++
-			emit("recovering", "starting rtl_433; waiting for sample acquisition", d.serial)
+			emit("recovering", "starting rtl_433; waiting for sample acquisition", d)
 			p, err := rt.start(ctx, cfg.Binary, arguments(cfg, d), rt.stopTimeout)
 			if err != nil {
 				failure("cannot start rtl_433; check executable installation and permissions")

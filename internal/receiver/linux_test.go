@@ -21,7 +21,7 @@ func TestDiscoverUSBTopologyAndSerial(t *testing.T) {
 		if err := os.Mkdir(dir, 0700); err != nil {
 			t.Fatal(err)
 		}
-		for k, v := range map[string]string{"idVendor": vid, "idProduct": pid, "serial": serial, "busnum": "2", "devnum": num} {
+		for k, v := range map[string]string{"idVendor": vid, "idProduct": pid, "serial": serial, "busnum": "2", "devnum": num, "product": "Fixture RTL tuner", "manufacturer": "Fixture vendor"} {
 			if err := os.WriteFile(filepath.Join(dir, k), []byte(v+"\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
@@ -32,6 +32,9 @@ func TestDiscoverUSBTopologyAndSerial(t *testing.T) {
 	ds, err := discoverUSB(root)
 	if err != nil || len(ds) != 1 || ds[0].serial != "00000001" {
 		t.Fatalf("%v %v", ds, err)
+	}
+	if ds[0].name != "Fixture RTL tuner" || ds[0].manufacturer != "Fixture vendor" || ds[0].port != "2-1" || ds[0].usbID != "0bda:2838" {
+		t.Fatal("incomplete device inventory", ds[0])
 	}
 	old := ds[0].incarnation
 	if err := os.WriteFile(filepath.Join(root, "2-1", "devnum"), []byte("10"), 0600); err != nil {

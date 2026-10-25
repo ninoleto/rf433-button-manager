@@ -50,6 +50,12 @@ func (a *App) Handler(token string, static fs.FS, publicOrigins ...string) http.
 			writeJSON(w, 200, v)
 		})
 	}
+	handle("GET /api/receivers", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		devices, err := a.discoverReceivers()
+		return struct {
+			Devices any `json:"devices"`
+		}{devices}, err
+	})
 	handle("POST /api/remotes", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		var b struct {
 			Name        string `json:"name"`
