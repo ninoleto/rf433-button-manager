@@ -11,6 +11,11 @@ A webhook is simply a special web address that starts an automation when the app
 calls it. You choose what happens in Home Assistant; RF433 Button Manager connects the
 physical button press to that automation.
 
+> [!NOTE]
+> **Why some scripts mention Zorin**
+>
+> This is an AI-assisted ("vibe coded") community project, originally developed for and physically tested on **Zorin OS**. Script names such as `scripts/inspect-zorin.sh` reflect that history. That script performs general Linux checks; its name does not mean Zorin is required. Use the filename included with your download. Generic script names are planned for a future release. Other Linux distributions have not yet been physically validated.
+
 ## Why this exists
 
 An inexpensive wireless button can be useful even when it has no direct Home
