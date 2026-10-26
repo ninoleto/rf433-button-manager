@@ -23,6 +23,28 @@ Read [Getting started](docs/GETTING-STARTED.md) for the user flow, including the
 server-side login token. Read this file and DEVELOPMENT before making changes.
 Inspect the current checkout/version and preserve operator configuration.
 
+## Explain setup to a first-time user
+
+Use [Getting started](docs/GETTING-STARTED.md) as the user walkthrough. Name the
+computer or application where each step happens before giving a command or click.
+Explain that `rtl_433` and RF433 Button Manager are two separately installed
+programs on the Linux computer with the USB receiver. Install/check `rtl_433`
+first; the app installer does not supply it. After setup, the app starts and
+supervises the decoder. Do not tell users to run a competing receiver process.
+
+Home Assistant is an existing, separate requirement; it may run on the same
+machine or elsewhere on the LAN. Its built-in Webhook trigger needs no additional
+integration. Explain a webhook as a private automation address, then distinguish
+the complete URL, its webhook ID and our app's management token. Never ask users
+to paste those secrets into chat. Do not confuse the app address on port 8787 with
+the Home Assistant address, or copy an author's LAN IP into someone else's setup.
+
+Use actual interface labels and explain expected results and the next step after
+an error. Include saving after toggling Enabled. State that Test saved action
+sends a real request. Explain unfamiliar terms instead of compressing required
+steps into phrases such as "app plus decoder". Initial installation needs a Linux
+terminal; routine learning and button assignment should stay in the browser.
+
 ## Project map and authoritative guides
 
 - `cmd/rf-button-manager/main.go`: flags, token, data lock, shutdown and receiver

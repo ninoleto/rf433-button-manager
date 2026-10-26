@@ -46,37 +46,60 @@ Docker container or cloud account is required.
 
 ## What must be installed, and where?
 
-| Where | Required software |
-| --- | --- |
-| Linux computer with the RTL-SDR plugged in | **RF433 Button Manager and `rtl_433`**, installed separately. The native installation uses systemd and udev; Python 3 and unzip are needed for setup/updates. |
-| Home Assistant machine | An **existing Home Assistant installation** and an automation using its built-in Webhook trigger. It can run on another machine on the same local network. |
-| PC or phone used for setup | A web browser. No receiver software is needed on this device. |
+**You must install two separate programs on the Linux computer where you plug in
+the USB RTL-SDR receiver:**
 
-**`rtl_433` is required and is not bundled or automatically installed by our app.**
-It provides radio decoding; RF433 Button Manager starts and supervises it. Do not
-start a second decoder against the same receiver while the app is running. See
-[installing the required decoder](docs/GETTING-STARTED.md#install-the-required-decoder)
-for the package-manager command and checks.
+1. **Install `rtl_433` first.** This free program reads the radio signal from the
+   receiver and converts supported signals into data the app can recognize. It
+   does not provide our button-management interface. RF433 Button Manager does
+   **not** include or install it for you. Follow the
+   [decoder installation steps](docs/GETTING-STARTED.md#install-the-required-decoder).
+2. **Then install RF433 Button Manager.** Download our application ZIP and follow
+   the [first-installation guide](docs/GETTING-STARTED.md). This is the app that
+   displays your buttons in a browser, remembers their signals and sends the
+   requests that trigger Home Assistant. Once installed, it starts and manages
+   `rtl_433` automatically; you do not start the decoder manually each time.
 
-For the Home Assistant connection, you do **not** need a custom integration, HACS
-component, add-on, MQTT broker or Home Assistant access token. You create a normal
-Webhook automation and give our app its URL. This triggers the automation; it does
-not automatically add an RF device or entity to Home Assistant. Keep that URL
-private. The app's management token is only for logging into our interface.
+You also need **Home Assistant already installed and working**. Our installer does
+not install Home Assistant. It can run on the same Linux computer or on another
+computer on your home network. For example, you can keep Home Assistant on your
+existing Raspberry Pi and connect the receiver to a separate Linux x86_64 mini PC
+running the two programs above. You do not move your existing Home Assistant setup.
+
+On the PC or phone you use to configure everything, open a web browser. If the
+receiver is connected to a separate Linux computer, you do not install either
+program on your Windows PC or phone. Initial Linux installation uses terminal
+commands; everyday learning and webhook setup use the browser interface.
+
+This connection needs **no extra software installed inside Home Assistant**.
+Its built-in Webhook trigger is enough. A webhook is a private web address for an
+automation: our app sends a request to that address when it recognizes your button.
+No custom integration, add-on, HACS component, MQTT broker or Home Assistant access
+token is required. The app's management token is a separate credential for logging
+into our interface.
 
 ## Connect a button to Home Assistant
 
 For example, use a wireless wall button to switch on your living-room lights:
 
-1. In Home Assistant, create an automation with a **Webhook** trigger and an action
-   that turns on the lights. Save it.
-2. Copy the complete webhook URL from Home Assistant.
-3. In RF433 Button Manager, learn your physical button, then paste that complete URL into
-   **Webhook URL**. Select **POST** for a standard Home Assistant webhook.
-4. Choose **Save button**, or **Save & allow destination** when the app asks to
-   approve a new server address. Saving does not run the automation.
-5. When ready to operate the lights, use **Test saved action**, enable the button,
-   and try a physical press.
+1. Install the two programs above, open RF433 Button Manager and log in using its
+   management token. Check that the receiver is connected.
+2. In Home Assistant, create an automation: its **Webhook** trigger receives the
+   request, and its action turns on your chosen light. Save and enable it.
+3. In RF433 Button Manager, select a button and use **Learn signal**. Follow the
+   prompts for three separate presses, then choose **Confirm and save**.
+4. Copy the automation's **complete webhook URL** into **Webhook URL** in our app
+   and select **POST**. Choose **Save button**, or **Save & allow destination** if
+   asked to approve your Home Assistant address. Saving does not run the automation.
+5. When ready for the light to turn on, choose **Test saved action** and confirm
+   **Send test**. After a successful test, turn on **Enabled**, click **Save button**
+   again, and press the physical button.
+
+The [complete walkthrough](docs/GETTING-STARTED.md#learn-a-button-and-connect-home-assistant)
+explains each screen, what to paste, what to do if you only have a webhook ID and
+how to find the cause if the light does not turn on. This method triggers an
+automation; it does not automatically add your RF button as a Home Assistant
+device or entity.
 
 RF433 Button Manager runs as a separate Linux service and connects to Home Assistant over
 the network. It does not need to run on the Home Assistant machine. You create and
