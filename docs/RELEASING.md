@@ -115,33 +115,37 @@ Release notes include supported architecture, toolchain, binary/archive hashes,
 changes, installation instructions, schema compatibility, actual test evidence
 and all remaining hardware limits. Do not fabricate a stable release date.
 
-## Publish 0.3.7-dev (RF433 Button Manager branding)
+## Publish 0.3.8-dev (consolidated onboarding release)
 
-This release changes visible product text and the version only. Keep executable,
-archive, service, environment, Go module and data-path identifiers compatible with
-existing installations. Schema 2, receiver behavior and action settings are unchanged.
+This release adds login-token help, clearer first-install/update documentation and
+the `rf433-button-manager` ZIP name. It documents Zorin-only physical validation
+and AI-assisted development. Keep executable, extracted folder, service,
+environment, Go module and data paths unchanged. Schema 2, RF decoding and webhook
+behavior are unchanged. Batch related small fixes; documentation-only edits do not
+require a new binary release.
 
-1. Run the documented clean checks and build, collect dependency notices, and
-   package the tested `main` commit with `scripts/package-release.py`.
-2. Extract freshly; verify every checksum and version. Clone the packaged bundle
+1. Run clean checks and build, collect dependency notices, and package the tested
+   `main` commit with `scripts/package-release.py`. Review the login, download,
+   install and update instructions together.
+2. Extract freshly; verify every checksum and version. Clone the bundled history
    with `--branch main`, rebuild and compare the binary hash.
-3. Push the reviewed commit without force and require successful CI for that exact
-   commit. Create a new `v0.3.7-dev` tag at it; never move `v0.3.6-dev`.
-4. Publish **RF433 Button Manager 0.3.7-dev** as a prerelease, including the ZIP and
-   a matching checksum asset generated from the final ZIP:
+3. Push without force and require successful CI for the exact packaged commit.
+   Create a new `v0.3.8-dev` tag there; never move an existing published tag.
+4. Publish **RF433 Button Manager 0.3.8-dev** as a prerelease with these assets:
 
    ```sh
    cd dist
-   sha256sum rf-button-manager-0.3.7-dev-linux-amd64.zip > rf-button-manager-0.3.7-dev-linux-amd64.zip.sha256
+   sha256sum rf433-button-manager-0.3.8-dev-linux-amd64.zip > rf433-button-manager-0.3.8-dev-linux-amd64.zip.sha256
    ```
 
-5. Verify the public asset hash, tag and prerelease status. Then withdraw the old
-   release to draft if requested, preserving its tag, assets and release notes.
-   Previously downloaded packages continue to exist; withdrawal cannot recall them.
+5. Verify the public download hash, tag and prerelease status. Only after that,
+   remove superseded release pages/assets if the user has explicitly requested it.
+   Preserve their Git tags and source history. Deleting a release cannot recall
+   copies already downloaded. Never replace an old ZIP with different contents.
 
-The running server changes only after its operator installs the new binary and
-restarts the service using the existing updater. See README and OPERATIONS for
-backups, disabled actions during the update, verification and rollback.
+Publishing does not update a running server. Its operator follows the
+[getting-started update steps](GETTING-STARTED.md#update-an-existing-installation),
+which preserve state and require disabled actions until verification completes.
 
 ## Historical 0.3.6-dev package provenance
 

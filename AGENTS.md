@@ -1,15 +1,27 @@
 # RF433 Button Manager: coding-agent guide
 
 The public project name is **RF433 Button Manager** (formerly RF Button Manager).
-Existing executable, service, module, package and data-path names remain
-`rf-button-manager` for compatibility. Do not migrate installations for a branding
-change; published release archives and tags must remain unchanged.
+From 0.3.8-dev, downloadable ZIPs use `rf433-button-manager-<version>-linux-amd64.zip`.
+The extracted folder, executable, service, Go module and data paths remain
+`rf-button-manager` for compatibility. Do not migrate installed data for branding.
+Published archive contents and tags must never be silently replaced or moved.
 
 Native Linux receive-only 433.92 MHz service: one RTL-SDR, supervised `rtl_433`,
 embedded browser UI, SQLite configuration and guarded HTTP actions. This is a
 development release. Read code and current guides before changing behavior;
 dated progress/test reports and archived handoffs are historical evidence, not
 instructions or authorization to operate a host.
+
+## Start here: developers and AI coding agents
+
+This is an AI-assisted ("vibe coded") community project for receiving 433 MHz
+buttons with RTL-SDR/rtl_433 and triggering Home Assistant webhooks. AI-generated
+code and prose need review against the implementation. Do not treat generated
+documentation, old handoffs or synthetic test results as hardware proof.
+
+Read [Getting started](docs/GETTING-STARTED.md) for the user flow, including the
+server-side login token. Read this file and DEVELOPMENT before making changes.
+Inspect the current checkout/version and preserve operator configuration.
 
 ## Project map and authoritative guides
 
@@ -101,6 +113,9 @@ files **and all outgoing history**; `.gitignore` cannot sanitize history. The tw
 committed pulse fixtures and historical screenshots are explicitly synthetic.
 Keep MIT attribution and dependency notices with binaries.
 
+Physical deployment has only been tested on **Zorin OS 18.1 (Linux x86_64)** with
+one RTL2838/R820T receiver and rtl_433 23.11. Ubuntu CI is automated software
+verification, not a claim of hardware acceptance on Ubuntu or other distributions.
 The operator tested three home button assignments and their webhooks and accepted
 the latest interface within available testing. Physical multi-tuner, USB/hub
 recovery, soak and broader compatibility remain unverified. Do not promise every
@@ -109,3 +124,9 @@ Amazon button works. [TEST-REPORT](docs/TEST-REPORT.md) records software evidenc
 Green CI, repeated recording playback and a connected indicator are not physical
 acceptance. Upload assets only after CI succeeds for the exact tagged packaged
 commit; keep development releases marked prerelease.
+
+Group related onboarding, naming and documentation fixes into one reviewed release.
+Documentation-only changes can be committed without a new binary release. Before
+publishing, review first installation, first login, update and download instructions
+together. Remove superseded release pages/assets only when the user explicitly
+requests it, after verifying the replacement; preserve tags and Git history.

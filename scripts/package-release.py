@@ -33,7 +33,7 @@ def main():
     if not version or any(c not in '0123456789abcdefghijklmnopqrstuvwxyz.-' for c in version):
         raise SystemExit('Unexpected version')
     args.output.mkdir(parents=True, exist_ok=True)
-    target = args.output.resolve() / f'rf-button-manager-{version}-linux-amd64.zip'
+    target = args.output.resolve() / f'rf433-button-manager-{version}-linux-amd64.zip'
     if target.exists():
         raise SystemExit('Refusing to overwrite an existing release archive')
     with tempfile.TemporaryDirectory(prefix='rfb-release-') as scratch:

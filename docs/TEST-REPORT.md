@@ -1,5 +1,26 @@
 # Verification reports
 
+
+## 0.3.8-dev onboarding and package naming (2026-10-26)
+
+This update adds server-side token retrieval instructions to the login page, the
+`rf433-button-manager` ZIP name, a first-install/update guide, Zorin-only physical
+validation wording and AI-assisted development disclosure. Installed identifiers,
+schema 2, RF decoding and webhook dispatch are unchanged.
+
+On the development runner, dependency verification, Go formatting, `make check`
+and `make build` passed with Go 1.27.3 and rtl_433 23.11. This includes uncached Go
+race tests, vet, 12 JavaScript controller tests, deployment/history checks and five
+updater simulations. An isolated demo HTTP smoke check verified version 0.3.8-dev,
+served login-help text, generated-token authentication and rejection of an
+unauthenticated management request. No live receiver or webhook was used.
+
+Full browser rendering was not performed for this change. A local-file preview
+was blocked by the browser environment's URL policy; no workaround was attempted.
+This is not a new Zorin installation or a physical hardware acceptance run.
+Release-specific CI, packaged-source reproducibility and download-checksum results
+belong in the published release notes after those checks complete.
+
 ## 0.3.7-dev branding verification
 
 This update changes the product name shown in the browser and CLI to **RF433

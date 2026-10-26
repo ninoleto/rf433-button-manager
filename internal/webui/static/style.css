@@ -977,7 +977,7 @@ dialog::backdrop{
 }
 .login-dialog{
   padding:34px;
-  max-width:405px
+  max-width:480px
 }
 .login-dialog h2{
   font-size:26px;
@@ -986,6 +986,31 @@ dialog::backdrop{
 }
 .login-dialog p{
   color:var(--muted);
+  font-size:12px
+}
+.token-help{
+  margin-top:18px;
+  padding:16px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  text-align:left
+}
+.token-help h3{
+  margin:0 0 8px;
+  font-size:14px
+}
+.token-help code{
+  font-size:12px;
+  overflow-wrap:anywhere;
+  user-select:all
+}
+.token-help > code{
+  display:block;
+  padding:10px 0;
+  line-height:1.6
+}
+.token-help summary{
+  cursor:pointer;
   font-size:12px
 }
 .login-dialog label{

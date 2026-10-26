@@ -1,5 +1,17 @@
 # Project progress
 
+
+## 0.3.8-dev: consolidated first-use guidance
+
+- Visible login help explains how to retrieve the app's token on the Linux server.
+- Downloadable ZIPs now begin `rf433-button-manager`; internal installed names stay
+  compatible. No schema or reception/action behavior change.
+- GETTING-STARTED separates download, first installation, login, HA assignment and
+  updating. README and AGENTS explain AI-assisted development and the boundary
+  between Zorin-only physical testing and automated Ubuntu CI.
+- Local automated checks and an isolated demo authentication/help smoke check pass.
+  No new physical testing or operator-host update is claimed. See TEST-REPORT.
+
 ## 0.3.7-dev: RF433 Button Manager branding
 
 The public repository is now `ninoleto/rf433-button-manager`. Version 0.3.7-dev

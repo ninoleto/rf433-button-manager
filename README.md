@@ -70,20 +70,62 @@ not guarantee support. Use **Inspect signal** to investigate a new button before
 assigning it. The app receives radio signals; it cannot transmit commands back to
 RF devices. See the [compatibility and inspection guide](docs/COMPATIBILITY.md).
 
-**Development prerelease:** three home button assignments and their webhooks have
-been tested by the project owner. Broader hardware support and long-term reliability
-still need testing. Read the [test report](docs/TEST-REPORT.md) and
-[hardware test plan](docs/HARDWARE-TESTS.md) for the evidence and remaining work.
+**Tested on Zorin OS only:** physical deployment has been tested on **Zorin OS 18.1
+(Linux x86_64)** with an RTL2838/R820T receiver and rtl_433 23.11. The project owner
+has tested three home buttons and their webhooks. Other Linux distributions,
+multi-tuner setups, USB/hub recovery and long-term reliability still need physical
+testing. Ubuntu CI runs automated software tests; it does not establish hardware
+compatibility. This remains a **development prerelease**, not universal support for
+every 433 MHz or Amazon button. See [test evidence](docs/TEST-REPORT.md) and the
+[hardware test plan](docs/HARDWARE-TESTS.md).
 
-[Download 0.3.7-dev](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.7-dev)
-· [Install](#requirements-and-supplied-binary)
+[Download 0.3.8-dev](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-dev)
+· [Install or update: step-by-step guide](docs/GETTING-STARTED.md)
+· [Find your login token](#first-login-where-is-my-token)
 · [Developer guide](docs/DEVELOPMENT.md)
 · [Instructions for AI coding agents](AGENTS.md)
 
-Previously called **RF Button Manager**. Version **0.3.7-dev** also displays the
-new name in the browser interface. Executable, archive, service and data paths
-retain their original names for compatibility. Updating preserves saved buttons,
-webhooks, receiver settings and the management token; no data migration is needed.
+Previously called **RF Button Manager**. The interface and new ZIP filename now use
+**RF433 Button Manager**. The extracted `rf-button-manager` folder, executable,
+service and data paths keep their old names so existing installations continue to
+work. Updating preserves buttons, webhooks, receiver settings and the management
+token; no data migration is needed.
+
+## First login: where is my token?
+
+The app creates its own login token on the Linux server during first startup.
+Open a terminal **on that server** (or connect to it by SSH) and run:
+
+```sh
+sudo cat /var/lib/rf-button-manager/management.token
+```
+
+Copy the text it prints into **Management token** on the login screen, then select
+**Connect**. It is **not** a Home Assistant access token or webhook ID. Keep it
+private. Restarting or updating the app preserves it; you can run the same command
+again whenever you need it. The login screen also shows these instructions.
+
+If you run directly from source with a custom `--data-dir`, the token is in that
+folder instead. For the source-run example below: `cat rf-data/management.token`.
+If the installed file is missing, check that installation completed and the service
+is running; do not create an empty token file or disable authentication.
+
+## AI-assisted development ("vibe coded")
+
+This community project was built iteratively with AI coding agents and hands-on
+testing by its owner. That is what we mean by **vibe coded**. It is shared so others
+can inspect, improve and fork it. Automated checks and the limited physical tests
+are documented; this is not an independently audited or universally validated
+product. Bug reports, code review and hardware test results are welcome.
+
+## For developers and AI coding agents
+
+Working on this 433 MHz / RTL-SDR / rtl_433 / Home Assistant project? Start with
+[AGENTS.md](AGENTS.md), the [developer guide](docs/DEVELOPMENT.md),
+[architecture](docs/ARCHITECTURE.md) and [contribution guide](CONTRIBUTING.md). They
+explain how to build, test and extend the app, preserve existing data and report
+what has actually been verified. Public Markdown is available to readers and
+search tools; search-engine indexing is not guaranteed.
 
 ![Running application in explicitly labeled demo mode](docs/screenshots/dashboard.png)
 
@@ -125,14 +167,14 @@ RTL-SDR and a remote using a supported signal format. Runtime state belongs on
 reliable internal storage. A browser is the management client; no Node server,
 Go compiler, Docker container or MQTT broker is required to install the binary.
 
-The release package is `rf-button-manager-0.3.7-dev-linux-amd64.zip`, available
+The release package is `rf433-button-manager-0.3.8-dev-linux-amd64.zip`, available
 from the release page. Download its matching `.zip.sha256` asset as well, then
 verify before extracting into a fresh directory:
 
 ```sh
-sha256sum -c rf-button-manager-0.3.7-dev-linux-amd64.zip.sha256
-rfb_extract_dir=$(mktemp -d)
-unzip rf-button-manager-0.3.7-dev-linux-amd64.zip -d "$rfb_extract_dir"
+sha256sum -c rf433-button-manager-0.3.8-dev-linux-amd64.zip.sha256
+rfb_extract_dir=$(mktemp -d "$HOME/rf433-button-manager.XXXXXX")
+unzip rf433-button-manager-0.3.8-dev-linux-amd64.zip -d "$rfb_extract_dir"
 cd "$rfb_extract_dir/rf-button-manager"
 ```
 
@@ -166,7 +208,8 @@ No Go installation or rebuild is involved. The helper snapshots stopped state an
 the old executable, replaces only the application executable, checks the **live**
 HTTP version and 20 seconds of stable operation, and verifies authentication and
 configuration/token/environment preservation. It restores the old binary and state
-if verification fails. It does not modify the service unit, USB rule, firewall or
+if verification fails. Refresh the browser, check the live version and receiver,
+then re-enable the button actions you want to use. It does not modify the service unit, USB rule, firewall or
 other services. Full source and history are included separately in the bundle;
 this update does not overwrite your existing development checkout.
 
