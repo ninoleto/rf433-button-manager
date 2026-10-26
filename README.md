@@ -12,9 +12,13 @@ calls it. You choose what happens in Home Assistant; RF433 Button Manager connec
 physical button press to that automation.
 
 > [!NOTE]
-> **Why some scripts mention Zorin**
+> **Linux requirements and testing status**
 >
-> This is an AI-assisted ("vibe coded") community project, originally developed for and physically tested on **Zorin OS**. Script names such as `scripts/inspect-zorin.sh` reflect that history. That script performs general Linux checks; its name does not mean Zorin is required. Use the filename included with your download. Generic script names are planned for a future release. Other Linux distributions have not yet been physically validated.
+> This AI-assisted ("vibe coded") app targets **Linux x86_64 with systemd, udev and rtl_433**. It was originally developed for a Zorin OS server; **Zorin itself is not a requirement**.
+>
+> Physical testing so far covers **Zorin OS 18.1**, one RTL2838/R820T receiver, rtl_433 23.11 and three home buttons with working webhooks. Other Linux distributions and hardware combinations remain unverified. Ubuntu CI runs automated software tests, not physical receiver tests. This remains a development prerelease.
+>
+> Legacy names such as `scripts/inspect-zorin.sh` reflect the original setup. That script performs general Linux checks. Use the filename included with your download; generic script names are planned for a future release.
 
 ## Why this exists
 
@@ -75,14 +79,7 @@ not guarantee support. Use **Inspect signal** to investigate a new button before
 assigning it. The app receives radio signals; it cannot transmit commands back to
 RF devices. See the [compatibility and inspection guide](docs/COMPATIBILITY.md).
 
-**Tested on Zorin OS only:** physical deployment has been tested on **Zorin OS 18.1
-(Linux x86_64)** with an RTL2838/R820T receiver and rtl_433 23.11. The project owner
-has tested three home buttons and their webhooks. Other Linux distributions,
-multi-tuner setups, USB/hub recovery and long-term reliability still need physical
-testing. Ubuntu CI runs automated software tests; it does not establish hardware
-compatibility. This remains a **development prerelease**, not universal support for
-every 433 MHz or Amazon button. See [test evidence](docs/TEST-REPORT.md) and the
-[hardware test plan](docs/HARDWARE-TESTS.md).
+See the [test report](docs/TEST-REPORT.md) and [hardware test plan](docs/HARDWARE-TESTS.md) for recorded evidence and remaining checks.
 
 [Download 0.3.8-dev](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-dev)
 · [Install or update: step-by-step guide](docs/GETTING-STARTED.md)
