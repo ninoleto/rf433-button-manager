@@ -44,6 +44,26 @@ Docker container or cloud account is required.
 5. **Use:** enable the action. A recognized press calls the webhook, and Home
    Assistant runs your automation. The event monitor shows reception and request results.
 
+## What must be installed, and where?
+
+| Where | Required software |
+| --- | --- |
+| Linux computer with the RTL-SDR plugged in | **RF433 Button Manager and `rtl_433`**, installed separately. The native installation uses systemd and udev; Python 3 and unzip are needed for setup/updates. |
+| Home Assistant machine | An **existing Home Assistant installation** and an automation using its built-in Webhook trigger. It can run on another machine on the same local network. |
+| PC or phone used for setup | A web browser. No receiver software is needed on this device. |
+
+**`rtl_433` is required and is not bundled or automatically installed by our app.**
+It provides radio decoding; RF433 Button Manager starts and supervises it. Do not
+start a second decoder against the same receiver while the app is running. See
+[installing the required decoder](docs/GETTING-STARTED.md#install-the-required-decoder)
+for the package-manager command and checks.
+
+For the Home Assistant connection, you do **not** need a custom integration, HACS
+component, add-on, MQTT broker or Home Assistant access token. You create a normal
+Webhook automation and give our app its URL. This triggers the automation; it does
+not automatically add an RF device or entity to Home Assistant. Keep that URL
+private. The app's management token is only for logging into our interface.
+
 ## Connect a button to Home Assistant
 
 For example, use a wireless wall button to switch on your living-room lights:

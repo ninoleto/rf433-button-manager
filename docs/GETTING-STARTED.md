@@ -23,6 +23,47 @@ The ZIP includes a ready-to-run executable: you do **not** need Go, Node.js, Doc
 or a source build. Python 3, unzip and the normal system administration tools are
 needed by these installation/update steps. Home Assistant can run on another machine.
 
+### Install the required decoder
+
+**Our app does not include `rtl_433`. Install it on the same Linux computer as the
+USB RTL-SDR**, before installing RF433 Button Manager. If it is already installed
+and working, keep that setup; an app update does not require a decoder upgrade.
+
+For a missing decoder on Debian/Ubuntu-based systems, the
+[upstream installation instructions](https://github.com/merbanan/rtl_433#installation)
+use:
+
+```sh
+sudo apt install rtl-433
+```
+
+The package is named `rtl-433`; the executable is named `rtl_433`. Confirm its
+location and version without opening the receiver:
+
+```sh
+command -v rtl_433
+rtl_433 -c /dev/null -V
+```
+
+A fresh installation with our supplied installer expects `/usr/bin/rtl_433`.
+Our physical tests used version 23.11. Other distributions/package versions need
+verification; consult the upstream guide for their installation method. RF433
+Button Manager runs the decoder automatically after setup. Do not launch another
+live rtl_433 process against the same USB receiver.
+
+### What is needed in Home Assistant?
+
+You need **Home Assistant already running**, with a saved automation using its
+built-in **Webhook** trigger. Home Assistant can be on another computer, NAS or
+Raspberry Pi on the same local network; it does not need to be installed on the
+Linux receiver computer. Our app must be able to reach the webhook URL.
+
+No extra Home Assistant add-on, custom integration, HACS component or MQTT broker
+is needed for this connection. You do not need a Home Assistant access token:
+the webhook URL itself must be kept private. This method triggers an automation;
+it does not automatically create RF devices/entities in Home Assistant. See
+[Home Assistant's webhook documentation](https://www.home-assistant.io/docs/automation/trigger/#webhook-trigger).
+
 ## Download and unpack
 
 1. Open the [0.3.8-dev release page](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-dev).
