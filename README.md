@@ -16,7 +16,7 @@ physical button press to that automation.
 >
 > This AI-assisted ("vibe coded") app targets **Linux x86_64 with systemd, udev and rtl_433**. It was originally developed for a Zorin OS server; **Zorin itself is not a requirement**.
 >
-> Physical testing so far covers **Zorin OS 18.1**, one RTL2838/R820T receiver, rtl_433 23.11 and three home buttons with working webhooks. Other Linux distributions and hardware combinations remain unverified. Ubuntu CI runs automated software tests, not physical receiver tests. This remains a development prerelease.
+> Physical testing so far covers **Zorin OS 18.1**, one RTL2838/R820T receiver, rtl_433 23.11 and three home buttons with working webhooks. Other Linux distributions and hardware combinations remain unverified. Ubuntu CI runs automated software tests, not physical receiver tests. **Current status: Release Candidate 1 (RC1).** On 30 October 2026, the maintainer reported several days of successful everyday use with his existing equipment and requested promotion of the existing download. This is an operator report, not a formal soak test or a guarantee for other hardware.
 >
 > Legacy names such as `scripts/inspect-zorin.sh` reflect the original setup. That script performs general Linux checks. Use the filename included with your download; generic script names are planned for a future release.
 
@@ -124,11 +124,17 @@ RF devices. See the [compatibility and inspection guide](docs/COMPATIBILITY.md).
 
 See the [test report](docs/TEST-REPORT.md) and [hardware test plan](docs/HARDWARE-TESTS.md) for recorded evidence and remaining checks.
 
-[Download 0.3.8-dev](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-dev)
+[Download Release Candidate 1 (existing 0.3.8-dev build)](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-dev)
 · [Install or update: step-by-step guide](docs/GETTING-STARTED.md)
 · [Find your login token](#first-login-where-is-my-token)
 · [Developer guide](docs/DEVELOPMENT.md)
 · [Instructions for AI coding agents](AGENTS.md)
+
+**RC1 changes the release status only.** The existing tag, ZIP, checksums and app
+version remain `0.3.8-dev`; existing users do not need to reinstall. The GitHub
+release is published without its Pre-release flag at the maintainer's request.
+RC means release candidate, not a claim of universal compatibility or completion
+of the remaining hardware tests.
 
 Previously called **RF Button Manager**. The interface and new ZIP filename now use
 **RF433 Button Manager**. The extracted `rf-button-manager` folder, executable,

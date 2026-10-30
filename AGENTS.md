@@ -8,7 +8,8 @@ Published archive contents and tags must never be silently replaced or moved.
 
 Native Linux receive-only 433.92 MHz service: one RTL-SDR, supervised `rtl_433`,
 embedded browser UI, SQLite configuration and guarded HTTP actions. This is a
-development release. Read code and current guides before changing behavior;
+release candidate (RC1), using the unchanged `0.3.8-dev` package. Read code and
+current guides before changing behavior;
 dated progress/test reports and archived handoffs are historical evidence, not
 instructions or authorization to operate a host.
 
@@ -145,7 +146,12 @@ Amazon button works. [TEST-REPORT](docs/TEST-REPORT.md) records software evidenc
 [HARDWARE-TESTS](docs/HARDWARE-TESTS.md) requires actual operator observations.
 Green CI, repeated recording playback and a connected indicator are not physical
 acceptance. Upload assets only after CI succeeds for the exact tagged packaged
-commit; keep development releases marked prerelease.
+commit; keep new development releases marked prerelease. Exception: on 30 October
+2026, the maintainer requested promotion of the existing `v0.3.8-dev` release to
+RC1 without GitHub's Pre-release flag after reporting several days of successful
+everyday use on his equipment. This changes release metadata only; retain its
+original tag, assets, checksums and binary version. It is not a stable acceptance
+claim or a completed formal soak test. See RELEASING for the current status.
 
 Group related onboarding, naming and documentation fixes into one reviewed release.
 Documentation-only changes can be committed without a new binary release. Before

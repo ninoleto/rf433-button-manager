@@ -1,5 +1,26 @@
 # Releases, publication and rollback
 
+## Current release: RC1 status promotion (30 October 2026)
+
+At the maintainer's explicit request, the existing `v0.3.8-dev` GitHub release
+is presented as **Release Candidate 1 (RC1)** without GitHub's Pre-release flag.
+The maintainer reports several days of successful everyday use with his existing
+RF buttons and Home Assistant setup on Zorin OS. This is an operator report;
+no measured uptime, formal soak, reboot, USB/hub recovery or multi-tuner result
+is inferred from it. Other hardware and Linux distributions remain unverified.
+
+RC1 is a release-status label for the existing build, not a new binary version.
+The tag still points to `2a559f1148adccdbb1125ec8eb51538a29d75c0f`, the executable
+still reports `0.3.8-dev`, and both assets retain their existing names and bytes.
+ZIP SHA-256: `bc98b07e61c57e2428d37a7b59897bc959a12c29b948b8f127538a340e20ffa9`.
+Existing users do not need to reinstall. The original package's development
+wording is historical; this document and the release notes record the promotion.
+
+This is an explicit exception for that existing release to the development
+prerelease policy below. RC is not a final stable acceptance claim. Future code
+or binary-version changes require a new tested package and tag; never silently
+replace this ZIP or move its published tag.
+
 ## Development versus stable
 
 Versions labeled `-dev` are development builds. A public source repository or green automated
