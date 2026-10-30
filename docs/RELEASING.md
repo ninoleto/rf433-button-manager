@@ -1,25 +1,37 @@
 # Releases, publication and rollback
 
-## Current release: RC1 status promotion (30 October 2026)
+## Current release: 0.3.8-rc.1 (30 October 2026)
 
-At the maintainer's explicit request, the existing `v0.3.8-dev` GitHub release
-is presented as **Release Candidate 1 (RC1)** without GitHub's Pre-release flag.
-The maintainer reports several days of successful everyday use with his existing
-RF buttons and Home Assistant setup on Zorin OS. This is an operator report;
-no measured uptime, formal soak, reboot, USB/hub recovery or multi-tuner result
-is inferred from it. Other hardware and Linux distributions remain unverified.
+This is a version-only rebuild of the working 0.3.8-dev application. The only
+runtime source change is `internal/app/engine.go`'s Version constant. The UI obtains
+its displayed version from the API. RF reception, learning, webhook handling,
+schema 2, configuration, dependencies, installer and updater behavior are unchanged.
+Update current download examples and release documentation together. Existing
+0.3.8-dev users do not need to install this cosmetic update.
 
-RC1 is a release-status label for the existing build, not a new binary version.
-The tag still points to `2a559f1148adccdbb1125ec8eb51538a29d75c0f`, the executable
-still reports `0.3.8-dev`, and both assets retain their existing names and bytes.
-ZIP SHA-256: `bc98b07e61c57e2428d37a7b59897bc959a12c29b948b8f127538a340e20ffa9`.
-Existing users do not need to reinstall. The original package's development
-wording is historical; this document and the release notes record the promotion.
+Use a new `v0.3.8-rc.1` tag at the tested packaged commit and publish these assets:
 
-This is an explicit exception for that existing release to the development
-prerelease policy below. RC is not a final stable acceptance claim. Future code
-or binary-version changes require a new tested package and tag; never silently
-replace this ZIP or move its published tag.
+- `rf433-button-manager-0.3.8-rc.1-linux-amd64.zip`
+- `rf433-button-manager-0.3.8-rc.1-linux-amd64.zip.sha256`
+
+The maintainer requested RC1 as a regular GitHub release (Pre-release unchecked).
+This explicit RC1 decision supersedes the development-prerelease rule below for
+this release only. RC remains a candidate, not a completed stable hardware gate.
+The maintainer reports several days of successful everyday use on his existing
+Zorin/RF/Home Assistant setup. Do not infer measured uptime, a formal soak test,
+reboot, USB/hub recovery, multi-tuner or broader compatibility from that report.
+
+The earlier RC1 title on `v0.3.8-dev` was a metadata-only promotion. Preserve that
+tag at `2a559f1148adccdbb1125ec8eb51538a29d75c0f` and its original assets. Its ZIP
+SHA-256 remains `bc98b07e61c57e2428d37a7b59897bc959a12c29b948b8f127538a340e20ffa9`.
+Do not replace it with the RC1 rebuild. Mark the new release as the current download;
+retain the older page for provenance with a clear superseded notice.
+
+Before publishing, run clean checks with the pinned toolchain and public offline
+RF fixtures, verify that code changes are limited to the version, collect notices,
+verify every packaged checksum and reproduce the binary from the bundled history.
+Require successful GitHub CI for the exact packaged commit before uploading assets.
+Record final checksums, reproducibility and CI evidence in the release notes.
 
 ## Development versus stable
 
@@ -136,7 +148,7 @@ Release notes include supported architecture, toolchain, binary/archive hashes,
 changes, installation instructions, schema compatibility, actual test evidence
 and all remaining hardware limits. Do not fabricate a stable release date.
 
-## Publish 0.3.8-dev (consolidated onboarding release)
+## Historical 0.3.8-dev publication (consolidated onboarding release)
 
 This release adds login-token help, clearer first-install/update documentation and
 the `rf433-button-manager` ZIP name. It documents Zorin-only physical validation

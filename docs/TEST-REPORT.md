@@ -1,5 +1,34 @@
 # Verification reports
 
+## 0.3.8-rc.1 version-only rebuild (2026-10-30)
+
+Scope was compared directly with the published `v0.3.8-dev` tree. The only change
+under runtime source, UI, dependencies, scripts, deployment and CI is the Version
+constant in `internal/app/engine.go`, from `0.3.8-dev` to `0.3.8-rc.1`.
+Current release/download documentation is aligned with that new version. No feature,
+receiver, webhook, storage/schema, installer or updater behavior was changed.
+
+On the isolated Ubuntu 24.04 build runner:
+
+- The pinned Go 1.27.3 toolchain archive and Go modules passed checksum verification.
+  Go formatting, uncached race tests, vet and the complete `make check` passed.
+- All four checksum-pinned public RF recordings were available. Offline replay used
+  upstream rtl_433 23.11 built for file input, without RTL-SDR/Soapy hardware drivers.
+  Optional private recordings were not supplied. These tests are not live RF tests.
+- All 12 Node.js interface-controller tests, deployment/history checks and five
+  updater simulations passed. Node.js 24.22.1 and Python 3.12.14 were used.
+- The native Linux amd64 build reports `0.3.8-rc.1`. An isolated demo smoke check
+  verified that version through CLI, `/healthz` and authenticated `/api/state`,
+  rejected unauthenticated management with HTTP 401, and served the login-token help.
+  Demo mode opened no receiver and sent no webhook. Full browser rendering was not run.
+
+The maintainer reports several days of successful use of the previous working
+build with his own RF buttons and Home Assistant setup. No Zorin installation,
+physical button test, USB/hub recovery, multi-tuner or formal soak test was performed
+for this version-label rebuild. Existing 0.3.8-dev users may keep their installation.
+Clean package/bundle reproducibility, exact-commit CI and public-download hashes
+are verified separately before publication and recorded in the release notes.
+
 
 ## 0.3.8-dev onboarding and package naming (2026-10-26)
 

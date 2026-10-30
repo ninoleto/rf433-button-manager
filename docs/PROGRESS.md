@@ -1,5 +1,15 @@
 # Project progress
 
+## 0.3.8-rc.1: version and packaging alignment
+
+The maintainer authorized a version-only rebuild to make the application, ZIP
+and GitHub tag consistently identify RC1. Only the Version constant changes in
+runtime source; existing installations can remain on 0.3.8-dev. RF behavior,
+webhooks, schema and settings are unchanged. The maintainer reports several days
+of successful everyday use on his equipment; broader hardware gates remain open.
+Release-specific build, package and CI evidence is recorded in TEST-REPORT and
+the published release notes. No Zorin deployment is part of this packaging task.
+
 
 ## 0.3.8-dev: consolidated first-use guidance
 

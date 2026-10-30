@@ -126,10 +126,10 @@ it does not automatically create RF devices/entities in Home Assistant. See
 
 ## Download and unpack
 
-1. Open the [0.3.8-dev release page](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-dev).
+1. Open the [0.3.8-rc.1 release page](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-rc.1).
 2. Under **Assets**, download both:
-   - **rf433-button-manager-0.3.8-dev-linux-amd64.zip** — the application, source and documentation.
-   - **rf433-button-manager-0.3.8-dev-linux-amd64.zip.sha256** — its integrity checksum.
+   - **rf433-button-manager-0.3.8-rc.1-linux-amd64.zip** — the application, source and documentation.
+   - **rf433-button-manager-0.3.8-rc.1-linux-amd64.zip.sha256** — its integrity checksum.
 3. Put both files in the same folder on the Linux computer where the app will run.
    GitHub's automatic **Source code** downloads do not contain the prebuilt executable.
 4. Open a terminal in that folder and run:
@@ -137,9 +137,9 @@ it does not automatically create RF devices/entities in Home Assistant. See
 ```sh
 (
   set -e
-  sha256sum -c rf433-button-manager-0.3.8-dev-linux-amd64.zip.sha256
+  sha256sum -c rf433-button-manager-0.3.8-rc.1-linux-amd64.zip.sha256
   rfb_extract_dir=$(mktemp -d "$HOME/rf433-button-manager.XXXXXX")
-  unzip -q rf433-button-manager-0.3.8-dev-linux-amd64.zip -d "$rfb_extract_dir"
+  unzip -q rf433-button-manager-0.3.8-rc.1-linux-amd64.zip -d "$rfb_extract_dir"
   cd "$rfb_extract_dir/rf-button-manager"
   sha256sum -c SHA256SUMS
   chmod u+x bin/rf-button-manager
@@ -148,7 +148,7 @@ it does not automatically create RF devices/entities in Home Assistant. See
 )
 ```
 
-Every checksum must report **OK**, and the version must be **0.3.8-dev**. Stop on
+Every checksum must report **OK**, and the version must be **0.3.8-rc.1**. Stop on
 an error. Copy the printed project folder and `cd` into it for the next steps.
 The inner folder is still called `rf-button-manager` for compatibility; this is
 intentional. Extraction leaves existing installations and workspaces untouched.
@@ -317,6 +317,10 @@ Assistant are running. Closing the browser does not turn off enabled button acti
 
 ## Update an existing installation
 
+**Already using 0.3.8-dev successfully? You can keep it.** The 0.3.8-rc.1 update
+only aligns the version label and packaging; it adds no behavior changes or fixes.
+Use the steps below only if you choose to update.
+
 1. Leave the existing app running. In its browser interface, finish or cancel any
    learning/inspection. For each enabled button, turn **Enabled** off and click
    **Save button** to temporarily disable its action.
@@ -333,7 +337,7 @@ Assistant are running. Closing the browser does not turn off enabled button acti
    sudo python3 scripts/update-prebuilt.py --apply
    ```
 
-4. Wait for **Update verified**, then refresh the browser. Confirm **0.3.8-dev**
+4. Wait for **Update verified**, then refresh the browser. Confirm **0.3.8-rc.1**
    and the expected receiver status. Use the same address and management token.
 5. Re-enable the button actions you want to use and click **Save button** for each.
    The updater leaves actions disabled so they do not trigger unexpectedly during

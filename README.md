@@ -124,17 +124,17 @@ RF devices. See the [compatibility and inspection guide](docs/COMPATIBILITY.md).
 
 See the [test report](docs/TEST-REPORT.md) and [hardware test plan](docs/HARDWARE-TESTS.md) for recorded evidence and remaining checks.
 
-[Download Release Candidate 1 (existing 0.3.8-dev build)](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-dev)
+[Download 0.3.8-rc.1 — Release Candidate 1](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-rc.1)
 · [Install or update: step-by-step guide](docs/GETTING-STARTED.md)
 · [Find your login token](#first-login-where-is-my-token)
 · [Developer guide](docs/DEVELOPMENT.md)
 · [Instructions for AI coding agents](AGENTS.md)
 
-**RC1 changes the release status only.** The existing tag, ZIP, checksums and app
-version remain `0.3.8-dev`; existing users do not need to reinstall. The GitHub
-release is published without its Pre-release flag at the maintainer's request.
-RC means release candidate, not a claim of universal compatibility or completion
-of the remaining hardware tests.
+**0.3.8-rc.1 aligns the app version and package name with Release Candidate 1.**
+Only the version label, release documentation and package metadata differ from
+0.3.8-dev; RF reception, learning, webhooks and settings behavior are unchanged.
+If 0.3.8-dev works for you, no update is required. New installations can use this
+RC1 package. RC means release candidate; broader hardware testing remains pending.
 
 Previously called **RF Button Manager**. The interface and new ZIP filename now use
 **RF433 Button Manager**. The extracted `rf-button-manager` folder, executable,
@@ -218,14 +218,14 @@ RTL-SDR and a remote using a supported signal format. Runtime state belongs on
 reliable internal storage. A browser is the management client; no Node server,
 Go compiler, Docker container or MQTT broker is required to install the binary.
 
-The release package is `rf433-button-manager-0.3.8-dev-linux-amd64.zip`, available
+The release package is `rf433-button-manager-0.3.8-rc.1-linux-amd64.zip`, available
 from the release page. Download its matching `.zip.sha256` asset as well, then
 verify before extracting into a fresh directory:
 
 ```sh
-sha256sum -c rf433-button-manager-0.3.8-dev-linux-amd64.zip.sha256
+sha256sum -c rf433-button-manager-0.3.8-rc.1-linux-amd64.zip.sha256
 rfb_extract_dir=$(mktemp -d "$HOME/rf433-button-manager.XXXXXX")
-unzip rf433-button-manager-0.3.8-dev-linux-amd64.zip -d "$rfb_extract_dir"
+unzip rf433-button-manager-0.3.8-rc.1-linux-amd64.zip -d "$rfb_extract_dir"
 cd "$rfb_extract_dir/rf-button-manager"
 ```
 
