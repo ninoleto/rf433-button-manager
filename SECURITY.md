@@ -7,8 +7,8 @@ Browser-origin/cross-site checks add protection but do not replace authenticatio
 The GUI stores the token in tab `sessionStorage`, never a URL or cookie.
 
 The default listener is loopback. An operator can deliberately choose one private
-LAN address with authentication retained. HTTP is unencrypted; use a trusted LAN
-or independently configured encrypted transport. This project does not configure
+LAN address with authentication retained. HTTP is unencrypted; use the built-in
+HTTPS listener with a verified trust certificate, an SSH tunnel or a trusted VPN. This project does not configure
 public exposure, tunnels, firewall, proxy or router rules. The supplied service
 runs as `rfbutton`, without login shell or capabilities, with private state and
 limited USB permissions. Do not run the application as root to solve device access.
@@ -59,19 +59,40 @@ Synthetic fixtures use invented identifiers and example endpoints.
 Retrieve the installed token only in a trusted local terminal:
 
 ```sh
-sudo cat /var/lib/rf-button-manager/management.token
+sudo cat /var/lib/rf433-button-manager/management.token
 ```
 
 Do not put it in a URL, process argument, issue or shared log. Avoid shell tracing
 around credentials. The API examples read the token file into memory. Review
 receiver diagnostics and decoded data before sharing; they can identify hardware.
 
-To rotate a compromised token, stop only this service, securely preserve the old
-credential if needed, remove that application's token file, then start the service
-to generate a fresh token. Login again using the new local token. Deliberate
-replacement must use 64 hexadecimal characters and private ownership/permissions.
-Rotate leaked webhook credentials at their destination too; deleting a commit
-does not revoke a secret. Rotation is not performed during a normal installation.
+Use **Settings → Management token → Replace token** to generate a new random
+256-bit token. Confirmation is required. The new credential is persisted atomically
+before it replaces the live verifier. Other browser tabs are rejected immediately;
+the initiating tab receives the new token in its authenticated response. A failed
+write retains the old token. RF reception and webhooks continue during rotation.
+
+If login is impossible, retrieve the current credential locally using the command
+above. Token files are mode 0600 in private application state; do not remove a
+working token merely because a browser has an old value. Backups can contain old
+tokens: a full-state rollback restores the token from that snapshot. Rotate it
+again after rollback if it was compromised. Rotate leaked webhook credentials at
+their destination too; deleting a commit does not revoke them.
+
+## Local HTTPS trust
+
+`tls.json` holds the local CA key, server key and certificates with mode 0600.
+Only the **public CA certificate** can be downloaded through the authenticated
+API. Never publish or export `tls.json`. The browser must trust that CA on each
+client; the download does not install trust automatically. Verify its fingerprint
+through a trusted channel before installing it. Leaf certificates are limited to
+the configured IP addresses. This is private-LAN TLS, not a public certificate or
+permission to expose the app to the Internet. See [NETWORK.md](docs/NETWORK.md).
+
+A staged network change keeps the previous listeners until the new endpoint is
+confirmed within three minutes. HTTPS must be confirmed through HTTPS. Expiry,
+cancellation and an unconfirmed restart retain the prior saved configuration.
+This protects against an unreachable address; it is not a firewall manager.
 
 ## Vulnerability reports
 

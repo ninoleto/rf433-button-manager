@@ -165,7 +165,7 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 base = 'http://127.0.0.1:8787'  # Replace if bound to a verified LAN address.
-token = Path('/var/lib/rf-button-manager/management.token').read_text().strip()
+token = Path('/var/lib/rf433-button-manager/management.token').read_text().strip()
 client = build_opener(ProxyHandler({}), NoRedirect())
 
 def call(method, path, body=None):
@@ -333,8 +333,43 @@ armed matching presses and explicit confirmation are still required.
 ## GET /api/learn/capture (0.3.1)
 
 Authenticated read-only download of the most recent in-memory RF attempt. Returns
-400 when no data is retained. `format` is `rf-button-manager-capture-v1`; fields
+400 when no data is retained. `format` is `rf433-button-manager-capture-v1`; fields
 include `version`, `started_at`, `frequency_hz`, `sample_rate`, `captured_bytes`,
 `limit_reached`, `packets` (offset_ms/modulation/pulses/cleanup/pulse_data), and
 `decoded_events`. `/api/state` includes only `rf_capture_available`, not the raw
 recordings. Config/settings/token/webhooks are never copied into this export.
+
+
+## Management API added in 0.4
+
+All routes below require the current Bearer token and the same origin checks as
+other `/api/` endpoints. JSON request bodies here are limited to **8 KiB**, reject
+unknown fields and require `Content-Type: application/json`. Errors return JSON
+with an `error` field. Never log a token-rotation response.
+
+| Method and path | Request / behavior |
+| --- | --- |
+| GET `/api/manage/network` | Current `config`, `urls`, optional `pending`, local `interfaces`, certificate expiry/fingerprint |
+| POST `/api/manage/network/stage` | Full network object; opens proposed listeners and creates a three-minute pending change |
+| POST `/api/manage/network/confirm` | `{ "id": "pending-id" }`; must arrive at proposed endpoint, over TLS if HTTPS enabled |
+| POST `/api/manage/network/cancel` | Cancels the pending change; old configuration remains |
+| POST `/api/manage/certificate/prepare` | Creates/loads a local CA and valid leaf for current/pending addresses |
+| GET `/api/manage/certificate` | Public CA PEM attachment; never a private key; prepare first |
+| POST `/api/manage/certificate/renew` | Renews leaf with same CA; refuses during a pending network change |
+| POST `/api/manage/token/rotate` | `{ "confirm": true }`; returns `{ "token": "new-64-hex-token" }`, immediately revoking the old credential |
+
+Network object example (replace with the actual host's private address):
+
+```json
+{"address":"192.168.50.20","http":false,"http_port":8787,"https":true,"https_port":8788}
+```
+
+Ports are 1024–65535; at least one protocol must be enabled. A pending object has
+`id`, `config` and `expires_at`. Only successful confirmation persists settings.
+Logical `/api/backup` still exports RF configuration only; it excludes the token,
+network settings and TLS keys. Full stopped-state snapshots include them.
+
+For scripts, read the current token locally into memory and use a TLS context
+that trusts the downloaded CA. Do not disable TLS verification, embed tokens in
+URLs/command arguments or automatically confirm an unreachable connection. See
+NETWORK.md for the browser flow and trust setup.

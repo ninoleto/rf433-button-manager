@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 )
 
 // Runs the production analysis, three-arm learning, store reload, live-event

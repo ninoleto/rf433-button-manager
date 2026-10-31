@@ -1,5 +1,5 @@
 /* Optional browser integration check against an isolated real --demo service.
- * Build first: go build -o internal/webui/.qa/rf-button-manager ./cmd/rf-button-manager
+ * Build first: go build -o internal/webui/.qa/rf433-button-manager ./cmd/rf433-button-manager
  * Requires Playwright + Chromium. RFB_UI_BINARY and RFB_UI_BROWSER override paths.
  * Signals are synthetic; no hardware or webhook execution is tested here.
  */
@@ -13,7 +13,7 @@ const {chromium} = require(require.resolve('playwright', {paths: [process.env.CO
 const qa = path.join(__dirname, '.qa');
 fs.mkdirSync(qa, {recursive: true});
 const data = fs.mkdtempSync(path.join(qa, 'ui-state-'));
-const binary = process.env.RFB_UI_BINARY || path.join(qa, 'rf-button-manager');
+const binary = process.env.RFB_UI_BINARY || path.join(qa, 'rf433-button-manager');
 const browserPath = process.env.RFB_UI_BROWSER || (fs.existsSync(path.join(qa, 'chromium')) ? path.join(qa, 'chromium') : undefined);
 const port = process.env.RFB_UI_PORT || '18788';
 const base = `http://127.0.0.1:${port}`;
@@ -103,7 +103,7 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     const stateRoute = route => route.fulfill({json:mock});
     const learnRoute = async route => {
       if (route.request().url().endsWith('/capture')) {
-        await route.fulfill({json:{format:'rf-button-manager-capture-v1',packets:[{modulation:'FSK',pulse_data:'synthetic fixture'}]}});return;
+        await route.fulfill({json:{format:'rf433-button-manager-capture-v1',packets:[{modulation:'FSK',pulse_data:'synthetic fixture'}]}});return;
       }
       if (route.request().url().endsWith('/start')) {
         assert.equal(route.request().postDataJSON().button_id, button.id);
@@ -133,9 +133,9 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
       await page.locator('#learning-export').click();
       const captureFile = await captureDownload;
       const exportedCapture = JSON.parse(fs.readFileSync(await captureFile.path(), 'utf8'));
-      assert.equal(captureFile.suggestedFilename(), 'rf-button-manager-capture.json');
+      assert.equal(captureFile.suggestedFilename(), 'rf433-button-manager-capture.json');
       assert.equal(exportedCapture.packets[0].modulation, 'FSK');
-      assert.equal(exportedCapture.format, 'rf-button-manager-capture-v1');
+      assert.equal(exportedCapture.format, 'rf433-button-manager-capture-v1');
       await page.waitForFunction(() => !document.getElementById('learning-retry').disabled);
       await page.locator('#learning-retry').click();
       await hidden(page.locator('#learning-retry'));
@@ -183,15 +183,39 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     fs.mkdirSync(screenshots, {recursive:true});
     await hidden(page.locator('#toast'));
     await page.screenshot({path:path.join(screenshots,'dashboard.png'),fullPage:true});
+    await page.locator('#button-name').fill('Unsaved layout check');
+    await page.locator('#layout-toggle').click();
+    assert.equal(await page.locator('html').getAttribute('data-layout'), 'unified');
+    await page.locator('#view-activity').click();
+    await visible(page.locator('#activity-view'));
+    await page.locator('#view-remotes').click();
+    assert.equal(await page.locator('#button-name').inputValue(), 'Unsaved layout check');
+    await page.locator('#button-name').fill('A ON');
+    await page.locator('#button-save').click();
+    await page.waitForFunction(() => document.getElementById('unsaved-status').textContent === '');
+    await page.screenshot({path:path.join(screenshots,'unified.png'),fullPage:true});
     await page.locator('#theme-toggle').click();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
+    await page.setViewportSize({width:820,height:1180});
+    await visible(page.locator('#remote-picker'));
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({path:path.join(screenshots,'tablet.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});
     await delay(250);
+    await page.locator('#editor-back').click();
     await visible(page.locator('#receiver-state'));
     assert.equal(await page.locator('.rf-button').nth(1).evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.screenshot({path:path.join(screenshots,'mobile.png'),fullPage:true});
-    await page.locator('#theme-toggle').click();
+    const keyBox=await page.locator('.rf-button').first().boundingBox();
+    assert.ok(keyBox.width>=48 && keyBox.height>=48);
+    await page.locator('#settings-open').click();
+    await page.locator('#appearance-theme').selectOption('dark');
+    assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+    await page.locator('#view-remotes').click();
+    await page.locator('.rf-button').first().click();
+    await visible(page.locator('#editor-back'));
+    await hidden(page.locator('.remote-panel'));
   });
   await check('lock removes token and clears visible secrets', async () => {
     await page.locator('#logout').click();

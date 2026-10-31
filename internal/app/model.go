@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"context"
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 )
 
 type Webhook struct {
@@ -94,6 +94,8 @@ type Learning struct {
 	lastRF              time.Time
 	decodedSource       bool
 	lastDecoded         time.Time
+	pendingDecoded      json.RawMessage
+	pendingDecodedAt    time.Time
 	lastAnalysis        time.Time
 	analysisCancel      context.CancelFunc
 	firstPulse          time.Time

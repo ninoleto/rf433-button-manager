@@ -59,7 +59,7 @@ func sendWebhook(ctx context.Context, w Webhook) (string, string) {
 	if w.Payload != "" && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("User-Agent", "RF-Button-Manager/"+Version)
+	req.Header.Set("User-Agent", "RF433-Button-Manager/"+Version)
 	// A fresh, non-reused transport also prevents net/http's transparent retry of
 	// idempotent requests on stale pooled connections. Each trigger is one attempt.
 	transport := &http.Transport{DialContext: safeDial, DisableKeepAlives: true, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: time.Duration(w.TimeoutMS) * time.Millisecond, MaxResponseHeaderBytes: 16384, Proxy: nil}

@@ -9,7 +9,7 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 )
 
 func TestReceiverSelectionPreservesThreeMappingsAndPersists(t *testing.T) {

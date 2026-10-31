@@ -1,0 +1,144 @@
+/* One DOM and one editor across layouts: resizing never discards a draft. */
+body{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+.topbar,.banner{flex-shrink:0}
+.topbar{height:78px;padding:0 24px}
+.workspace{flex:1;min-height:0;display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+.app-navigation{grid-row:1;grid-column:1/-1;display:flex;gap:6px;padding:8px 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+.app-navigation button{min-height:48px;min-width:110px;display:flex;gap:9px;align-items:center;justify-content:center;background:transparent;color:var(--muted);border-radius:9px;padding:10px 18px;font-weight:600}
+.app-navigation button span{font-size:21px}
+.app-navigation button[aria-current=page]{color:var(--accent);background:var(--accent-soft)}
+.sidebar{grid-column:1;grid-row:2;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:20px 16px;border-right:1px solid var(--border);border-bottom:0}
+.sidebar .section-heading{flex-shrink:0}
+.sidebar .remote-list{display:flex;flex-direction:column;flex:1;min-height:0;overflow:auto;gap:8px;margin-top:15px;padding:3px}
+.sidebar .remote-nav{flex-shrink:0;min-height:64px;width:100%;max-width:none}
+.sidebar-footer{flex-shrink:0;margin-top:18px;padding-top:16px}
+.sidebar-footer p{font-size:12px;overflow-wrap:anywhere}
+.nav-label{font-size:14px}.nav-count{font-size:12px}
+.remote-search-label{margin-top:16px;font-size:12px}
+#remote-search{min-height:42px;font-size:14px;flex-shrink:0}
+#main-content{grid-column:2;grid-row:2;min-width:0;min-height:0;overflow:auto;padding:28px}
+#remote-view{min-width:0}
+.control-layout{grid-template-columns:minmax(260px,.9fr) minmax(340px,1.1fr);align-items:start;gap:24px}
+.remote-panel{padding:22px;min-width:0}
+.remote-device{max-width:320px}
+.editor-panel{min-width:0}
+.page-heading{gap:16px;align-items:center}
+.page-heading h1{font-size:28px}
+.compact-remote-picker,.mobile-only{display:none}
+#activity-view,#settings-dialog{display:none}
+:root[data-view=activity] #remote-view,:root[data-view=settings] #remote-view{display:none}
+:root[data-view=activity] #activity-view{display:block;margin-top:0}
+:root[data-view=settings] #settings-dialog{display:block}
+.settings-dialog{width:100%;max-width:900px;padding:0;margin:0 auto;background:transparent;border:0;box-shadow:none;max-height:none;color:var(--text)}
+.settings-dialog>form,.settings-card{background:var(--surface);border:1px solid var(--border);padding:24px;border-radius:14px;margin:0 0 22px}
+.settings-card h3{font-size:20px;margin-bottom:12px}
+.certificate-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.connection-links{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}
+.connection-links a{color:var(--accent);text-decoration:underline;overflow-wrap:anywhere}
+.hint,.muted,.advanced summary,.signal-actions button,.editor-actions button,.danger-actions button{font-size:12px}
+.signal-card code{font-size:12px}
+.button-grid .rf-name{font-size:15px}
+.button-grid .rf-sub{font-size:11px}
+.add-button{width:44px;height:44px}
+button.compact{min-height:42px}
+.remote-tools{flex-wrap:wrap}
+.login-dialog{max-width:480px;padding:30px}
+.login-dialog h2{margin:16px 0;font-size:28px}
+.login-dialog #login-submit{margin-top:18px;min-height:48px}
+.login-dialog .token-help{margin:24px 0 18px;padding:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px}
+.login-dialog summary{font-weight:600;cursor:pointer}
+.login-dialog #token-command{display:block;font-size:12px;padding:12px;margin:12px 0;background:var(--input);user-select:all}
+.login-dialog .hint{font-size:12px}
+.login-dialog .token-help p{font-size:13px;margin:12px 0}
+.login-dialog .inline-field input{min-width:0}
+.event-list{max-height:none}
+.settings-card .notice{margin-top:20px}
+:root[data-layout=unified] .workspace{grid-template-rows:auto minmax(0,1fr)}
+:root[data-layout=unified] .app-navigation{grid-column:1;grid-row:1;display:flex;flex-direction:column;padding:16px;border-right:1px solid var(--border)}
+:root[data-layout=unified] .app-navigation button{justify-content:flex-start}
+:root[data-layout=unified] #main-content{grid-row:1/span 2}
+@media(max-width:1099px){
+ .desktop-only{display:none!important}
+ .workspace,:root[data-layout=unified] .workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr)}
+ .app-navigation,:root[data-layout=unified] .app-navigation{grid-column:1;grid-row:1;flex-direction:row;padding:8px 20px;border-right:0}
+ .app-navigation button,:root[data-layout=unified] .app-navigation button{justify-content:center}
+ .sidebar{grid-column:1;grid-row:2;display:block;padding:9px 24px;border:0;border-bottom:1px solid var(--border);background:var(--surface)}
+ .sidebar .section-heading,.sidebar .remote-list,.remote-search-label,#remote-search{display:none}
+ .sidebar-footer{display:flex;align-items:center;margin:0;padding:0;border:0;gap:10px}
+ .sidebar-footer>div{display:flex;align-items:center;flex-wrap:wrap;gap:7px 14px}
+ #receiver-message,#receiver-activity{display:none}
+ #receiver-state{font-size:13px}
+ #receiver-device{margin:0;font-size:12px}
+ #main-content,:root[data-layout=unified] #main-content{grid-column:1;grid-row:3;padding:24px}
+ .compact-remote-picker{display:block;margin-bottom:24px;max-width:440px}
+ .compact-remote-picker select{min-height:48px;min-width:0;font-weight:600}
+ .control-layout{grid-template-columns:minmax(230px,.85fr) minmax(300px,1.15fr);gap:20px}
+ .remote-panel{background:transparent;border:0;padding:12px 0}
+ .remote-device{width:min(100%,300px)}
+ .topbar{height:auto;min-height:76px;padding:14px 20px}
+ .brand{font-size:17px}
+ .brand-icon{width:40px;height:40px}
+ .top-actions{gap:8px}
+ .frequency{display:none}
+}
+@media(max-width:700px){
+ .control-layout{grid-template-columns:1fr}
+ .remote-panel{max-width:450px;width:100%;margin:auto}
+ .editor-panel{max-width:600px;width:100%;margin:auto}
+}
+@media(max-width:640px){
+ .workspace,:root[data-layout=unified] .workspace{grid-template-rows:auto minmax(0,1fr) auto}
+ .app-navigation,:root[data-layout=unified] .app-navigation{grid-row:3;grid-column:1;padding:6px 8px max(6px,env(safe-area-inset-bottom));border:0;border-top:1px solid var(--border);gap:6px}
+ .app-navigation button,:root[data-layout=unified] .app-navigation button{flex:1;min-width:0;flex-direction:column;gap:3px;font-size:12px;padding:8px 4px;min-height:60px}
+ .sidebar{grid-row:1;padding:9px 16px}
+ #main-content,:root[data-layout=unified] #main-content{grid-row:2;padding:18px 16px 24px}
+ .topbar{padding:12px 16px;min-height:68px;gap:8px;align-items:center}
+ .brand{font-size:14px;gap:8px;flex:1;min-width:0}
+ .brand small{display:none}
+ .brand-icon{width:32px;height:36px;flex-shrink:0}
+ .top-actions{gap:4px}
+ .top-actions #inspect-open{font-size:12px;padding:9px;min-height:44px}
+ .top-actions #logout{font-size:12px;min-height:44px;padding:6px}
+ .top-actions #theme-toggle{display:none}
+ .compact-remote-picker{margin-bottom:18px;max-width:none}
+ .page-heading{margin-bottom:20px;gap:12px;display:block}
+ .page-heading h1{font-size:23px}
+ .page-heading .eyebrow,.page-heading #remote-description{display:none}
+ .remote-tools{display:flex;gap:10px;margin-top:14px}
+ .remote-tools button{min-height:44px;flex:1;font-size:13px}
+ .remote-panel{padding:0;min-height:0}
+ .remote-panel .panel-kicker,.device-top,.device-footer,.panel-caption{display:none}
+ .remote-device{border:0;box-shadow:none;background:transparent;width:100%;max-width:none;padding:0;margin:0}
+ .button-grid{gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .button-grid .rf-button{min-height:104px;padding:20px 14px;text-align:left;align-items:flex-start;border-radius:14px}
+ .button-grid .rf-name{font-size:17px}
+ .button-grid .rf-sub{font-size:12px}
+ .editor-panel{display:none;padding:0;border:0;background:transparent}
+ .mobile-only{display:inline-flex}
+ #editor-back{min-height:48px;margin-bottom:20px}
+ :root[data-editor=open] .editor-panel{display:block}
+ :root[data-editor=open] #remote-view>.page-heading,:root[data-editor=open] .compact-remote-picker,:root[data-editor=open] .remote-panel{display:none}
+ #button-editor .editor-heading{margin-bottom:20px}
+ .field-row{grid-template-columns:1fr 1fr;gap:12px}
+ input,textarea,select{font-size:16px!important;min-height:46px}
+ input[type=checkbox]{min-height:auto}
+ .editor-actions{display:grid;grid-template-columns:1fr 1fr}
+ .editor-actions button{min-height:48px;font-size:13px}
+ .danger-actions button{min-height:44px}
+ .settings-dialog>form,.settings-card{padding:18px 14px}
+ .settings-dialog .dialog-heading h2{font-size:24px}
+ .dialog-actions,.backup-actions{flex-wrap:wrap;gap:10px}
+ .dialog-actions button,.backup-actions button{min-height:46px}
+ dialog:not(.login-dialog){width:100%;max-width:100%;max-height:100dvh;min-height:100dvh;margin:0;padding:24px 18px;border:0;border-radius:0}
+ .login-dialog{width:calc(100% - 24px);max-height:calc(100dvh - 24px);padding:24px}
+ .login-dialog h2{font-size:26px}
+ .event-head,.event-row{grid-template-columns:65px 75px minmax(0,1fr)}
+ .event-row,.event-time,.event-kind{font-size:12px}
+ .event-head{font-size:11px}
+ .remote-tools{flex-direction:row}
+ .monitor-heading{display:block;padding:18px 14px}
+ .monitor-filter{margin-top:14px}
+ .page-footer{display:block;font-size:12px;line-height:1.7}
+ .page-footer span{display:block}
+}
+@media(pointer:coarse){button,button.compact,.icon-button,.text-button{min-height:48px}summary{padding:14px 0}.signal-actions button{min-height:44px;font-size:13px}}

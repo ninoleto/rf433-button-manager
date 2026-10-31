@@ -56,7 +56,7 @@ fi
 section 'Relevant systemd unit names and states'
 if command -v systemctl >/dev/null && [[ -d /run/systemd/system ]]; then
   if units=$(systemctl list-units --type=service --all --plain --no-legend --no-pager 2>/dev/null); then
-    awk '/rtl[_-]?(433|tcp|test)|rf-button-manager/ {print $1, $2, $3, $4}' <<< "$units"
+    awk '/rtl[_-]?(433|tcp|test)|rf(433)?-button-manager/ {print $1, $2, $3, $4}' <<< "$units"
   else
     echo 'Host systemd inventory unavailable; receiver ownership remains unverified'
   fi

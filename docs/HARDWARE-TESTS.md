@@ -1,6 +1,9 @@
 # Physical hardware acceptance gate
 
-## Current acceptance boundary: 0.3.6-dev publication
+For the current 0.4 test build, use [TESTING-0.4.md](TESTING-0.4.md). Its physical
+acceptance is pending; earlier records below remain historical evidence.
+
+## Historical acceptance: 0.3.6-dev publication
 
 The operator tested three assigned home buttons and their webhooks and accepted
 the latest interface within the testing available. This is an operator report,
@@ -94,7 +97,7 @@ prove that the desired physical state changed.
 | Different-hub reconnect | Move receiver through a different powered hub | Automatic recovery; hub/power details and recovery time recorded | NOT RUN |
 | Brief disappearance | Replug quickly during child restart/backoff | At most one decoder owner; eventual recovery | NOT RUN |
 | Decoder crash | Terminate only the application's decoder child in an approved test | Application detects exit, backs off, starts one replacement | NOT RUN |
-| Application restart | Restart only RF Button Manager | Mappings survive; no queued actions replayed; receiver reacquired | NOT RUN |
+| Application restart | Restart only RF433 Button Manager | Mappings survive; no queued actions replayed; receiver reacquired | NOT RUN |
 | Server reboot | Reboot ZORIN in an approved window | Service starts automatically; hardware and mappings recover; other services healthy | NOT RUN |
 | Long RF silence | Leave receiver idle for at least 30 minutes | No spurious disconnection solely because no buttons were pressed | NOT RUN |
 | Ambiguous receivers | Attach two supported receivers with unusable/duplicate serials | Clear error, no guessed receiver acquisition | NOT RUN |

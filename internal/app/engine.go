@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 	"sync"
 	"time"
 )
 
-const Version = "0.3.8-rc.1"
+const Version = "0.4.0-test.1"
 
 type App struct {
 	discoverReceivers                   func() ([]receiver.DeviceInfo, error)
@@ -409,7 +409,7 @@ func (a *App) startLearning(id string, fields []string, inspect bool) (*Learning
 		a.captureSuppressed = true
 		a.receiverChangedLocked()
 		l.CaptureGeneration = a.receiverGeneration
-		a.rfCapture = &RFCapture{Format: "rf-button-manager-capture-v1", Version: Version, StartedAt: now.UTC().Format(time.RFC3339Nano), FrequencyHz: 433920000, SampleRate: 250000, generation: l.CaptureGeneration, started: now}
+		a.rfCapture = &RFCapture{Format: "rf433-button-manager-capture-v1", Version: Version, StartedAt: now.UTC().Format(time.RFC3339Nano), FrequencyHz: 433920000, SampleRate: 250000, generation: l.CaptureGeneration, started: now}
 		l.CaptureReceiver = receiver.Status{State: "recovering", Message: "Capture receiver plan has not started"}
 		l.CaptureReceiverAt = now.UTC().Format(time.RFC3339Nano)
 	}

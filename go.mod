@@ -1,4 +1,4 @@
-module github.com/ninoleto/rf-button-manager
+module github.com/ninoleto/rf433-button-manager
 
 go 1.27.0
 

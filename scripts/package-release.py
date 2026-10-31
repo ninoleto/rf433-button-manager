@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package a tested prebuilt executable, clean main source and full Git history."""
+"""Package a tested executable, clean HEAD source and full reachable Git history."""
 import argparse
 import hashlib
 import io
@@ -26,9 +26,7 @@ def main():
     if output('git', 'status', '--porcelain', cwd=repo):
         raise SystemExit('Commit reviewed source first; packaging requires a clean checkout')
     commit = output('git', 'rev-parse', 'HEAD', cwd=repo)
-    if output('git', 'rev-parse', 'main', cwd=repo) != commit:
-        raise SystemExit('Package main must refer to the tested HEAD commit')
-    binary = repo / 'bin/rf-button-manager'
+    binary = repo / 'bin/rf433-button-manager'
     version = output(str(binary), '--version')
     if not version or any(c not in '0123456789abcdefghijklmnopqrstuvwxyz.-' for c in version):
         raise SystemExit('Unexpected version')
@@ -37,17 +35,22 @@ def main():
     if target.exists():
         raise SystemExit('Refusing to overwrite an existing release archive')
     with tempfile.TemporaryDirectory(prefix='rfb-release-') as scratch:
-        root = Path(scratch) / 'rf-button-manager'
+        root = Path(scratch) / 'rf433-button-manager'
         root.mkdir()
         archive = subprocess.check_output(['git', 'archive', commit], cwd=repo)
         with tarfile.open(fileobj=io.BytesIO(archive)) as source:
             source.extractall(root, filter='data')
         (root / 'bin').mkdir(exist_ok=True)
-        shutil.copy2(binary, root / 'bin/rf-button-manager')
-        (root / 'bin/rf-button-manager').chmod(0o755)
+        shutil.copy2(binary, root / 'bin/rf433-button-manager')
+        (root / 'bin/rf433-button-manager').chmod(0o755)
         shutil.copy2(args.notices, root / 'THIRD_PARTY_NOTICES.txt')
-        bundle = root / 'rf-button-manager.git.bundle'
-        subprocess.run(['git', 'bundle', 'create', str(bundle), 'refs/heads/main', 'HEAD'], cwd=repo, check=True)
+        bundle = root / 'rf433-button-manager.git.bundle'
+        # Give the portable bundle a conventional main without moving the
+        # development checkout's branches or any published reference.
+        history = Path(scratch) / 'history.git'
+        subprocess.run(['git', 'init', '--bare', '--quiet', '--initial-branch=main', str(history)], check=True)
+        subprocess.run(['git', '-C', str(history), 'fetch', '--quiet', '--no-tags', str(repo), commit+':refs/heads/main'], check=True)
+        subprocess.run(['git', '-C', str(history), 'bundle', 'create', str(bundle), 'refs/heads/main', 'HEAD'], check=True)
         manifest = {'version': version, 'commit': commit, 'binary_sha256': digest(binary),
                     'bundle_sha256': digest(bundle), 'platform': 'linux-amd64',
                     'hardware_validation': 'pending operator testing'}

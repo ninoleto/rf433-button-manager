@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 )
 
 // An explicit allowlist of RF-only report fields, never a configuration export.
@@ -37,7 +37,7 @@ func (a *App) InspectionResult() (*InspectionReport, error) {
 		return nil, errors.New("start Inspect signal before downloading an inspection report")
 	}
 	return &InspectionReport{
-		Format: "rf-button-manager-inspection-v1", Version: Version, Demo: a.demo,
+		Format: "rf433-button-manager-inspection-v1", Version: Version, Demo: a.demo,
 		FrequencyHz: 433920000, SampleRate: 250000, Stage: l.Stage,
 		MatchingPresses: l.Presses, RequiredPresses: l.Required,
 		RepeatedIdentifier: l.Candidate != "" && l.Presses >= l.Required,

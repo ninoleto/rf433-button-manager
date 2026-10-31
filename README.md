@@ -16,9 +16,15 @@ physical button press to that automation.
 >
 > This AI-assisted ("vibe coded") app targets **Linux x86_64 with systemd, udev and rtl_433**. It was originally developed for a Zorin OS server; **Zorin itself is not a requirement**.
 >
-> Physical testing so far covers **Zorin OS 18.1**, one RTL2838/R820T receiver, rtl_433 23.11 and three home buttons with working webhooks. Other Linux distributions and hardware combinations remain unverified. Ubuntu CI runs automated software tests, not physical receiver tests. **Current status: Release Candidate 1 (RC1).** On 30 October 2026, the maintainer reported several days of successful everyday use with his existing equipment and requested promotion of the existing download. This is an operator report, not a formal soak test or a guarantee for other hardware.
+> The maintainer reports working webhooks with **nine buttons**, Zorin OS 18.1,
+> one RTL2838/R820T receiver and rtl_433 23.11. Other Linux distributions and
+> hardware combinations remain unverified. Software CI and recorded-signal replay
+> are not physical receiver tests.
 >
-> Legacy names such as `scripts/inspect-zorin.sh` reflect the original setup. That script performs general Linux checks. Use the filename included with your download; generic script names are planned for a future release.
+> **This checkout is 0.4.0-test.1, for private upgrade and hardware validation.**
+> The published RC1 remains unchanged. The new receiver preference, renamed
+> installation, HTTPS, token rotation and responsive interface need operator
+> acceptance before a stable release.
 
 ## Why this exists
 
@@ -124,23 +130,30 @@ RF devices. See the [compatibility and inspection guide](docs/COMPATIBILITY.md).
 
 See the [test report](docs/TEST-REPORT.md) and [hardware test plan](docs/HARDWARE-TESTS.md) for recorded evidence and remaining checks.
 
-[Download 0.3.8-rc.1 — Release Candidate 1](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-rc.1)
-· [Install or update: step-by-step guide](docs/GETTING-STARTED.md)
-· [Find your login token](#first-login-where-is-my-token)
+[Published RC1 and its matching instructions](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-rc.1)
+· [This build's setup guide](docs/GETTING-STARTED.md)
 · [Developer guide](docs/DEVELOPMENT.md)
-· [Instructions for AI coding agents](AGENTS.md)
+· [Instructions for AI agents](AGENTS.md)
 
-**0.3.8-rc.1 aligns the app version and package name with Release Candidate 1.**
-Only the version label, release documentation and package metadata differ from
-0.3.8-dev; RF reception, learning, webhooks and settings behavior are unchanged.
-If 0.3.8-dev works for you, no update is required. New installations can use this
-RC1 package. RC means release candidate; broader hardware testing remains pending.
+## What is being tested in 0.4
 
-Previously called **RF Button Manager**. The interface and new ZIP filename now use
-**RF433 Button Manager**. The extracted `rf-button-manager` folder, executable,
-service and data paths keep their old names so existing installations continue to
-work. Updating preserves buttons, webhooks, receiver settings and the management
-token; no data migration is needed.
+- **Learning:** compare an early custom decoder with built-in rtl_433 results
+  before choosing a candidate. The first comparison is bounded to 350 ms;
+  three separately armed matching presses are still required. Existing mappings
+  are preserved. Relearn a troublesome button to use the new selection.
+- **Interface:** Classic or Unified sidebar on desktop, a remote picker on
+  tablets, and Remotes / Activity / Settings navigation on phones. Switching
+  layouts preserves the selected remote and unsaved button edits.
+- **Access:** choose a private address and HTTP/HTTPS ports in Settings. New
+  listeners require confirmation within three minutes. Download the local trust
+  certificate, renew the server certificate, or replace the login token.
+- **Installation:** current paths use `rf433-button-manager`. The updater migrates
+  an ordinary managed legacy installation, keeping a rollback snapshot and
+  preserving buttons, mappings, settings, token and original enabled flags.
+
+See [upgrade and recovery](docs/UPGRADING.md), [network and token settings](docs/NETWORK.md)
+and the [operator test plan](docs/TESTING-0.4.md). This does not amplify RF signals
+or guarantee reception through every wall.
 
 ## First login: where is my token?
 
@@ -148,13 +161,15 @@ The app creates its own login token on the Linux server during first startup.
 Open a terminal **on that server** (or connect to it by SSH) and run:
 
 ```sh
-sudo cat /var/lib/rf-button-manager/management.token
+sudo cat /var/lib/rf433-button-manager/management.token
 ```
 
 Copy the text it prints into **Management token** on the login screen, then select
 **Connect**. It is **not** a Home Assistant access token or webhook ID. Keep it
 private. Restarting or updating the app preserves it; you can run the same command
-again whenever you need it. The login screen also shows these instructions.
+again whenever you need it. The login screen has expandable instructions and a
+**Copy command** button. **Settings → Management token → Replace token** creates
+a new token and revokes the old one; other browser tabs must reconnect.
 
 If you run directly from source with a custom `--data-dir`, the token is in that
 folder instead. For the source-run example below: `cat rf-data/management.token`.
@@ -218,51 +233,51 @@ RTL-SDR and a remote using a supported signal format. Runtime state belongs on
 reliable internal storage. A browser is the management client; no Node server,
 Go compiler, Docker container or MQTT broker is required to install the binary.
 
-The release package is `rf433-button-manager-0.3.8-rc.1-linux-amd64.zip`, available
-from the release page. Download its matching `.zip.sha256` asset as well, then
+The private test package is `rf433-button-manager-0.4.0-test.1-linux-amd64.zip`.
+Use the package supplied for this validation round. Download its matching `.zip.sha256` asset as well, then
 verify before extracting into a fresh directory:
 
 ```sh
-sha256sum -c rf433-button-manager-0.3.8-rc.1-linux-amd64.zip.sha256
+sha256sum -c rf433-button-manager-0.4.0-test.1-linux-amd64.zip.sha256
 rfb_extract_dir=$(mktemp -d "$HOME/rf433-button-manager.XXXXXX")
-unzip rf433-button-manager-0.3.8-rc.1-linux-amd64.zip -d "$rfb_extract_dir"
-cd "$rfb_extract_dir/rf-button-manager"
+unzip rf433-button-manager-0.4.0-test.1-linux-amd64.zip -d "$rfb_extract_dir"
+cd "$rfb_extract_dir/rf433-button-manager"
 ```
 
 Then verify the package and review the installation plan:
 
 ```sh
 sha256sum -c SHA256SUMS
-test -x bin/rf-button-manager || chmod u+x bin/rf-button-manager
-./bin/rf-button-manager --version
-bash scripts/inspect-zorin.sh
-bash scripts/install.sh --binary "$PWD/bin/rf-button-manager"
+test -x bin/rf433-button-manager || chmod u+x bin/rf433-button-manager
+./bin/rf433-button-manager --version
+bash scripts/inspect-linux.sh
+bash scripts/install.sh --binary "$PWD/bin/rf433-button-manager"
 ```
 
 The packaged `SHA256SUMS` covers the binary and included update artifacts; the outer archive checksum covers the
 complete package. Review the dry run and receiver ownership, then follow
-[installation](#install-on-zorin). Use the supplied executable; rebuilding is only
+[installation](#install-on-linux). Use the supplied executable; rebuilding is only
 needed for development or an intentional source change. To attach bundled history
 without overwriting extracted source, follow the [developer guide](docs/DEVELOPMENT.md).
 
 ## Update an existing installation with a prebuilt package
 
-Extract the new archive to a fresh directory on the internal disk. Close learning
-and leave actions disabled in the GUI, then run from the extracted project:
+Leave the existing app running and close learning/inspection. Extract this package
+into a fresh folder, verify its checksums, then review and apply its updater:
 
 ```sh
 sha256sum -c SHA256SUMS
+sudo python3 scripts/update-prebuilt.py
 sudo python3 scripts/update-prebuilt.py --apply
 ```
 
-No Go installation or rebuild is involved. The helper snapshots stopped state and
-the old executable, replaces only the application executable, checks the **live**
-HTTP version and 20 seconds of stable operation, and verifies authentication and
-configuration/token/environment preservation. It restores the old binary and state
-if verification fails. Refresh the browser, check the live version and receiver,
-then re-enable the button actions you want to use. It does not modify the service unit, USB rule, firewall or
-other services. Full source and history are included separately in the bundle;
-this update does not overwrite your existing development checkout.
+The updater records and temporarily disables enabled actions, backs up stopped
+state, migrates legacy application names when necessary, installs the supplied
+binary and verifies live operation. It then restores the original enabled flags.
+It does not invoke a webhook test, reset USB, modify Home Assistant or change
+firewall rules. A failed verification attempts to restore the old installation.
+Keep the printed snapshot path. See [UPGRADING.md](docs/UPGRADING.md) before using
+this private test build. No compiler or development-checkout overwrite is needed.
 
 ## Build and verify from source
 
@@ -279,7 +294,7 @@ go mod download
 go mod verify
 make check
 make build
-./bin/rf-button-manager --version
+./bin/rf433-button-manager --version
 ```
 
 `rtl_433` is also needed for the offline pulse replay integration tests (CI installs
@@ -294,13 +309,13 @@ establish physical receiver behavior.
 `go.mod` and `go.sum` pin the dependency graph and checksums. `make build` uses a
 fixed target (`linux/amd64`), strips machine paths/build IDs and excludes VCS metadata.
 Reproduce a binary with the same commit, toolchain and command; verify it with
-`sha256sum bin/rf-button-manager`. Dependency downloads require internet access on
+`sha256sum bin/rf433-button-manager`. Dependency downloads require internet access on
 the build machine. Runtime decoding still uses an installed `rtl_433` executable.
 
 ## First local run
 
 ```sh
-./bin/rf-button-manager --data-dir ./rf-data --listen 127.0.0.1:8787 --rtl433 /usr/bin/rtl_433
+./bin/rf433-button-manager --data-dir ./rf-data --listen 127.0.0.1:8787 --rtl433 /usr/bin/rtl_433
 ```
 
 Open `http://127.0.0.1:8787` and enter the token from
@@ -312,7 +327,7 @@ profiles automatically; a connected receiver alone does not prove a button decod
 For an interface preview without radio hardware, use a **separate** data directory:
 
 ```sh
-./bin/rf-button-manager --demo --data-dir ./demo-data
+./bin/rf433-button-manager --demo --data-dir ./demo-data
 ```
 
 Demo mode explicitly labels simulated receiver data, generates synthetic
@@ -345,17 +360,17 @@ can have only one pending request. Extra presses while that button or the global
 limit is busy are rejected and logged; they are not queued for delayed execution
 or replayed after restart.
 
-## Install on ZORIN
+## Install on Linux
 
 First review the [operations guide](docs/OPERATIONS.md) and run the read-only
 inspection script. Do not change the production server until the intended changes
 have been reviewed and approved.
 
 ```sh
-bash scripts/inspect-zorin.sh
-bash scripts/install.sh --binary "$PWD/bin/rf-button-manager"
+bash scripts/inspect-linux.sh
+bash scripts/install.sh --binary "$PWD/bin/rf433-button-manager"
 # Only after reviewing the dry-run plan and approving deployment:
-sudo bash scripts/install.sh --binary "$PWD/bin/rf-button-manager" --apply
+sudo bash scripts/install.sh --binary "$PWD/bin/rf433-button-manager" --apply
 ```
 
 The installer creates only RF433 Button Manager's service, service account, state
@@ -367,12 +382,13 @@ receiver-only reconnect with its operator. Never reset hubs or other devices.
 From Windows, keep the default private listener and forward it through SSH:
 
 ```powershell
-ssh -N -L 8787:127.0.0.1:8787 nino@ZORIN
+ssh -N -L 8787:127.0.0.1:8787 YOUR_USER@YOUR_SERVER
 ```
 
 Then open `http://127.0.0.1:8787` in the Windows browser. Retrieve the login token
-on ZORIN with `sudo cat /var/lib/rf-button-manager/management.token`.
-For direct private-network access, see the explicit binding and HTTPS guidance in
+on the Linux server with `sudo cat /var/lib/rf433-button-manager/management.token`.
+For private LAN access and built-in HTTPS, use **Settings → Network access**. See
+[NETWORK.md](docs/NETWORK.md) and the existing-proxy guidance in
 the operations guide. No public exposure is configured by default.
 An HTTPS reverse proxy also requires the exact trusted browser origin through
 `--public-origin https://rf.home.example` (replace the example with your own origin),

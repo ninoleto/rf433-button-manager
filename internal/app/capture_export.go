@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 )
 
 // One bounded, in-memory attempt. Never stored in SQLite or included in state

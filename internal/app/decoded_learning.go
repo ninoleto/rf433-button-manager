@@ -66,21 +66,60 @@ func (a *App) receiveDecodedLearningLocked(l *Learning, raw []byte) {
 		return
 	}
 	now := a.now()
+	// A learned flex profile must not win merely because rtl_433 emits it
+	// before a built-in decoder for the same burst. Keep a bounded first-press
+	// comparison window. Existing mappings and normal reception are untouched.
+	var envelope struct {
+		Model string `json:"model"`
+	}
+	_ = json.Unmarshal(raw, &envelope)
+	custom := strings.HasPrefix(envelope.Model, "RFB-")
+	for _, part := range strings.Split(a.config.Settings.FlexDecoder, ",") {
+		if part == "n="+envelope.Model {
+			custom = true
+		}
+	}
+	if l.Candidate == "" && custom && !now.Before(l.armedAt) && (l.Stage == "waiting" || l.Stage == "receiving" || l.Stage == "analyzing") {
+		if len(l.pendingDecoded) == 0 {
+			l.pendingDecoded = append([]byte(nil), raw...)
+			l.pendingDecodedAt = now
+		} else if previous, _ := Signature(l.pendingDecoded, l.Fields); previous != sig {
+			a.finishLearningLocked("inconsistent", "Multiple learned signal identities appeared in one press. Keep other remotes idle and retry; no mapping changed.")
+			return
+		}
+		l.lastDecoded = now
+		l.decodedSource = true
+		l.Stage = "receiving"
+		l.Message = "Comparing the learned profile with rtl_433 decoders. Release the button."
+		if l.analysisCancel != nil {
+			l.analysisCancel()
+		}
+		return
+	}
 	quiet := l.lastDecoded.IsZero() || now.Sub(l.lastDecoded) >= time.Second
+	if len(l.pendingDecoded) > 0 && !custom {
+		quiet = true
+	}
 	l.lastDecoded = now
 	if (l.Stage != "waiting" && l.Stage != "receiving" && l.Stage != "analyzing") || now.Before(l.armedAt) || !quiet {
 		return
 	}
+	a.acceptDecodedLocked(l, raw, sig)
+}
+
+func (a *App) acceptDecodedLocked(l *Learning, raw []byte, sig string) {
 	if l.analysisCancel != nil {
 		l.analysisCancel() // A decoded button takes priority over background replay.
 	}
 	l.decodedSource = true
+	l.pendingDecoded = nil
 	l.Candidate = sig
 	l.Raw = append(json.RawMessage(nil), raw...)
 	l.packets = nil
 	l.bytes = 0
 	l.firstPulse = time.Time{}
 	l.Diagnostics.Source = "rtl_433 decoded button"
+	l.Profile = nil
 	var envelope struct {
 		Model string `json:"model"`
 	}

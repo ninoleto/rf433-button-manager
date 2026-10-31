@@ -1,4 +1,4 @@
-# Managed by RF Button Manager installer.
+# Managed by RF433 Button Manager installer.
 [Unit]
 Description=RF433 Button Manager
 After=network.target
@@ -13,10 +13,10 @@ Environment=RFB_LISTEN=127.0.0.1:8787
 Environment=RFB_RTL433=/usr/bin/rtl_433
 # Set only when a trusted HTTPS reverse proxy serves this exact browser origin.
 Environment=RFB_PUBLIC_ORIGIN=
-EnvironmentFile=-/etc/rf-button-manager/manager.env
-ExecStart=/usr/local/bin/rf-button-manager --listen ${RFB_LISTEN} --data-dir /var/lib/rf-button-manager --rtl433 ${RFB_RTL433} --public-origin=${RFB_PUBLIC_ORIGIN}
-WorkingDirectory=/var/lib/rf-button-manager
-StateDirectory=rf-button-manager
+EnvironmentFile=-/etc/rf433-button-manager/manager.env
+ExecStart=/usr/local/bin/rf433-button-manager --listen ${RFB_LISTEN} --data-dir /var/lib/rf433-button-manager --rtl433 ${RFB_RTL433} --public-origin=${RFB_PUBLIC_ORIGIN}
+WorkingDirectory=/var/lib/rf433-button-manager
+StateDirectory=rf433-button-manager
 StateDirectoryMode=0700
 UMask=0077
 Restart=on-failure
@@ -39,10 +39,10 @@ LockPersonality=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
-ReadWritePaths=/var/lib/rf-button-manager
+ReadWritePaths=/var/lib/rf433-button-manager
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=rf-button-manager
+SyslogIdentifier=rf433-button-manager
 
 [Install]
 WantedBy=multi-user.target

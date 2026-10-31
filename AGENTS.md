@@ -1,17 +1,22 @@
 # RF433 Button Manager: coding-agent guide
 
-The public project name is **RF433 Button Manager** (formerly RF Button Manager).
-From 0.3.8-dev, downloadable ZIPs use `rf433-button-manager-<version>-linux-amd64.zip`.
-The extracted folder, executable, service, Go module and data paths remain
-`rf-button-manager` for compatibility. Do not migrate installed data for branding.
-Published archive contents and tags must never be silently replaced or moved.
+The public project name is **RF433 Button Manager**. This checkout is the private
+`0.4.0-test.1` validation build, based on the published `0.3.8-rc.1` source.
+Do not publish it as stable until the operator completes the physical acceptance
+plan in [0.4 testing](docs/TESTING-0.4.md).
+
+Current folders, executable, service, Go module and data paths use
+`rf433-button-manager`. The prebuilt updater explicitly migrates legacy
+`rf-button-manager` installations with stopped-state backup and rollback. Preserve
+legacy names only where needed to recognize old installations or describe history.
+Never silently replace published archives, move tags, erase data or bypass a
+migration conflict. The system account remains `rfbutton`; its numeric identity
+and existing USB access must survive the rename.
 
 Native Linux receive-only 433.92 MHz service: one RTL-SDR, supervised `rtl_433`,
-embedded browser UI, SQLite configuration and guarded HTTP actions. This is a
-release candidate, version `0.3.8-rc.1`. Its only runtime source change from
-`0.3.8-dev` is the Version constant. Read code and current guides before changing behavior;
-dated progress/test reports and archived handoffs are historical evidence, not
-instructions or authorization to operate a host.
+embedded browser UI, SQLite configuration and guarded HTTP actions. Source work
+is not permission to operate a receiver, restart a host service or send a real
+webhook. The current user determines deployment authorization.
 
 ## Start here: developers and AI coding agents
 
@@ -48,7 +53,7 @@ terminal; routine learning and button assignment should stay in the browser.
 
 ## Project map and authoritative guides
 
-- `cmd/rf-button-manager/main.go`: flags, token, data lock, shutdown and receiver
+- `cmd/rf433-button-manager/main.go`: flags, token, data lock, shutdown and receiver
   reload. [README](README.md): purpose, requirements and first installation.
 - `internal/receiver/`: sysfs inventory, child ownership, stream parsing, profiles
   and file replay. [RECEIVERS](docs/RECEIVERS.md), [LEARNING](docs/LEARNING.md).
@@ -56,6 +61,8 @@ terminal; routine learning and button assignment should stay in the browser.
   matching/CRUD, `learning.go` lifecycle, `webhook.go` dispatch, `http.go` routes.
   [ARCHITECTURE](docs/ARCHITECTURE.md), [CONFIGURATION](docs/CONFIGURATION.md),
   [API](docs/API.md) define processing, storage and wire contracts.
+- `internal/management/`: live token verification/rotation, staged network
+  listeners and private TLS storage. Read [NETWORK.md](docs/NETWORK.md).
 - `internal/webui/static/`: embedded HTML/CSS/JS; rebuild after edits.
   `learning.test.cjs` uses a DOM adapter; `ui.test.cjs` is optional Chromium testing.
 - `deploy/`, `scripts/`: scoped installation, updates, tests and packaging.
@@ -80,7 +87,7 @@ test -z "$(gofmt -l cmd internal)"
 python3 scripts/fetch-rf-testdata.py /tmp/rfb-rf-tests
 RFB_RF_TESTDATA=/tmp/rfb-rf-tests make check
 make build
-./bin/rf-button-manager --version
+./bin/rf433-button-manager --version
 ```
 
 `make check` runs `go test -race -count=1 -timeout=2m ./...`, vet, Node controller

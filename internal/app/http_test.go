@@ -40,6 +40,34 @@ func TestHTTPAuthenticationOriginAndStrictJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestManagementRoutesUseLiveCredentialAndOriginGuards(t *testing.T) {
+	a, _ := testApp(t)
+	current := "old-token"
+	called := 0
+	h := a.ManagedHandler(func(s string) bool { return s == current }, fstest.MapFS{}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called++; writeJSON(w, 200, map[string]bool{"ok": true}) }))
+	for _, tc := range []struct {
+		auth, origin string
+		status       int
+	}{{"Bearer old-token", "", 200}, {"old-token", "", 401}, {"Bearer old-token", "https://evil.invalid", 403}} {
+		r := httptest.NewRequest("POST", "http://localhost/api/manage/token/rotate", nil)
+		r.Header.Set("Authorization", tc.auth)
+		r.Header.Set("Origin", tc.origin)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != tc.status {
+			t.Fatal(w.Code, tc.status)
+		}
+	}
+	current = "new-token"
+	r := httptest.NewRequest("POST", "http://localhost/api/manage/network/stage", nil)
+	r.Header.Set("Authorization", "Bearer old-token")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 401 || called != 1 {
+		t.Fatal("stale token reached management API")
+	}
+}
 func TestWebhookDoesNotFollowRedirectOrRetry(t *testing.T) {
 	var source, target atomic.Int32
 	dest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { target.Add(1) }))

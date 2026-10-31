@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 )
 
 const learningPressWindow = 20 * time.Second
@@ -357,6 +357,16 @@ func (a *App) learningTick() {
 		return
 	}
 	now := a.now()
+	if len(l.pendingDecoded) > 0 {
+		if now.Sub(l.pendingDecodedAt) >= 350*time.Millisecond {
+			raw := append([]byte(nil), l.pendingDecoded...)
+			if sig, err := Signature(raw, l.Fields); err == nil {
+				a.acceptDecodedLocked(l, raw, sig)
+			}
+		}
+		a.mu.Unlock()
+		return
+	}
 	switch l.Stage {
 	case "preparing":
 		l.Message = "Receiver unavailable or preparing: " + a.receiver.Message

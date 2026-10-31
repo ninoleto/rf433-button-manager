@@ -29,4 +29,6 @@ jobs:
       - name: Build native executable
         run: make build
       - name: Smoke check binary
-        run: bin/rf-button-manager --version
+        run: bin/rf433-button-manager --version
+      - name: Verify actual HTTP and HTTPS management runtime
+        run: python3 scripts/test-management-runtime.py

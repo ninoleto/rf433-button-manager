@@ -1,6 +1,6 @@
 # Button compatibility and signal inspection
 
-RF Button Manager is not a universal Amazon-button receiver. Amazon is a retailer,
+RF433 Button Manager is not a universal Amazon-button receiver. Amazon is a retailer,
 not a radio protocol. Frequency, modulation, encoding, receiver hardware, decoder
 version and stable button identity all matter. A listing saying only "433 MHz" is
 not sufficient proof that its particular transmitter will work.

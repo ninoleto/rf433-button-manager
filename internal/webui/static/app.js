@@ -23,6 +23,27 @@
   let receiverDevices = [];
   let receiverListReady = false;
   let receiverScanGeneration = 0;
+  let activeView = 'remotes';
+  let settingsLoaded = false;
+  let networkLoaded = false;
+  let networkState = null;
+  let networkTimer = null;
+  let layout = 'classic';
+  try { layout = localStorage.getItem('rf433-layout') || 'classic'; } catch (_) {}
+  function applyLayout(value) {
+    layout = value === 'unified' ? 'unified' : 'classic';
+    document.documentElement.dataset.layout = layout;
+    $('layout-toggle').textContent = `Layout: ${layout === 'unified' ? 'Unified' : 'Classic'}`;
+    $('layout-toggle').setAttribute('aria-label', `Switch to ${layout === 'unified' ? 'Classic' : 'Unified'} desktop layout`);
+    try { localStorage.setItem('rf433-layout', layout); } catch (_) {}
+  }
+  function setView(value) {
+    activeView = value;
+    document.documentElement.dataset.view = value;
+    $('settings-dialog').open = value === 'settings';
+    for (const [id,view] of [['view-remotes','remotes'],['view-activity','activity'],['settings-open','settings']]) $(id).setAttribute('aria-current', value === view ? 'page' : 'false');
+  }
+  applyLayout(layout); setView('remotes');
 
   function node(tag, className, text) {
     const el = document.createElement(tag);
@@ -60,8 +81,8 @@
     $('toast').hidden = false;
     toastTimer = setTimeout(() => { $('toast').hidden = true; }, error ? 8500 : 4500);
   }
-  function show(dialog) { if (!$(dialog).open) $(dialog).showModal(); }
-  function close(dialog) { if ($(dialog).open) $(dialog).close(); }
+  function show(dialog) { if (dialog === 'settings-dialog') { setView('settings'); return; } if (!$(dialog).open) $(dialog).showModal(); }
+  function close(dialog) { if (dialog === 'settings-dialog') { settingsLoaded = false; setView('remotes'); return; } if ($(dialog).open) $(dialog).close(); }
   async function ask(title, message, label = 'Continue') {
     if (confirmResolve) return false;
     $('confirm-title').textContent = title;
@@ -83,6 +104,10 @@
 
   function lock(message = '') {
     token = '';
+    clearTimeout(networkTimer); settingsLoaded = false; networkLoaded = false; networkState = null;
+    $('new-management-token').value = ''; $('new-token-panel').hidden = true;
+    $('management-token').type = 'password'; $('token-visibility').textContent = 'Show';
+    setView('remotes'); document.documentElement.dataset.editor = 'closed';
     pollingGeneration++;
     clearTimeout(pollingTimer);
     try { sessionStorage.removeItem('rfbm-token'); } catch (_) { /* No persistent token fallback. */ }
@@ -103,7 +128,8 @@
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45000);
     try {
-      const headers = { Authorization: `Bearer ${token}` };
+      const requestToken = token;
+      const headers = { Authorization: `Bearer ${requestToken}` };
       if (body !== undefined) headers['Content-Type'] = 'application/json';
       const response = await fetch(`/api${path}`, {
         method, headers, body: body === undefined ? undefined : JSON.stringify(body),
@@ -112,7 +138,7 @@
       let result;
       try { result = await response.json(); } catch (_) { result = {}; }
       if (!response.ok) {
-        if (response.status === 401) lock('The management token was rejected. Enter the current token.');
+        if (response.status === 401 && token === requestToken) lock('The management token was rejected. Enter the current token.');
         throw new Error(result.error || `Request failed (HTTP ${response.status}).`);
       }
       return result;
@@ -181,12 +207,18 @@
   function fields(value) { return [...new Set(value.split(',').map((s) => s.trim()).filter(Boolean))]; }
 
   function renderNavigation() {
-    const key = JSON.stringify([selectedRemote, state.remotes.map((r) => [r.id, r.name, (r.buttons || []).length])]);
+    const search = $('remote-search').value.trim().toLowerCase();
+    const key = JSON.stringify([search, selectedRemote, state.remotes.map((r) => [r.id, r.name, (r.buttons || []).length])]);
     if (key === navKey) return;
     navKey = key;
     const fragment = document.createDocumentFragment();
     if (!state.remotes.length) fragment.append(node('p', 'sidebar-empty', 'No remotes yet. Add your first remote to get started.'));
+    const options = document.createDocumentFragment();
     for (const remote of state.remotes) {
+      const option = node('option', '', remote.name); option.value = remote.id; options.append(option);
+    }
+    $('remote-picker').replaceChildren(options); $('remote-picker').value = selectedRemote || '';
+    for (const remote of state.remotes.filter(r => r.name.toLowerCase().includes(search))) {
       const button = node('button', `remote-nav${remote.id === selectedRemote ? ' selected' : ''}`);
       button.type = 'button';
       if (remote.id === selectedRemote) button.setAttribute('aria-current', 'true');
@@ -195,9 +227,10 @@
       label.append(node('span', 'nav-label', remote.name), node('span', 'nav-count', `${(remote.buttons || []).length} buttons`));
       button.append(label);
       button.addEventListener('click', async () => {
-        if (remote.id === selectedRemote) return;
+        if (remote.id === selectedRemote) { setView('remotes'); return; }
         if (!(await mayDiscard())) return;
         selectedRemote = remote.id; selectedButton = null; editorDirty = false;
+        setView('remotes');
         render();
       });
       fragment.append(button);
@@ -228,6 +261,7 @@
       const indicator = node('span', 'button-indicator'); indicator.setAttribute('aria-hidden', 'true');
       item.append(indicator, node('span', 'rf-name', button.name), node('span', 'rf-sub', button.signature ? (button.enabled ? 'Ready' : 'Disabled') : 'Not learned'));
       item.addEventListener('click', async () => {
+        document.documentElement.dataset.editor = 'open';
         if (button.id === selectedButton) return;
         if (!(await mayDiscard())) return;
         selectedButton = button.id; editorDirty = false;
@@ -244,6 +278,7 @@
     $('button-name').value = button.name || '';
     $('button-enabled').checked = !!button.enabled;
     $('button-debounce').value = button.debounce_ms || 700;
+    $('learning-automatic-fields').checked = true;
     $('button-fields').value = (button.identity_fields?.length ? button.identity_fields : state.settings.identity_fields?.length ? state.settings.identity_fields : DEFAULT_FIELDS).join(', ');
     const hook = button.webhook || {};
     $('webhook-url').value = hook.url || '';
@@ -493,6 +528,7 @@
     $('receiver-message').textContent = state.receiver.message || (token ? 'Waiting for receiver status' : 'Enter a token to connect');
     $('receiver-dot').className = `status-dot ${['connected', 'disconnected', 'recovering', 'error'].includes(status) ? status : ''}`;
     renderReceiverIdentity();
+    $('login-version').textContent = state.version ? `Version ${state.version}` : '';
     $('version-label').textContent = state.version ? `RF433 Button Manager · ${state.version}` : 'RF433 Button Manager';
     renderNavigation(); renderRemote(); renderEditor(); renderEvents(); renderLearning(); updateActionAvailability();
   }
@@ -514,12 +550,14 @@
   function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
     $('theme-toggle').setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`);
+    $('appearance-theme').value = theme;
     try { localStorage.setItem('rfbm-theme', theme); } catch (_) { /* Nonessential preference. */ }
   }
   let theme = 'dark';
   try { theme = localStorage.getItem('rfbm-theme') || 'dark'; } catch (_) { /* Default dark. */ }
   applyTheme(theme === 'light' ? 'light' : 'dark');
   bindAction('theme-toggle', async () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+  $('appearance-theme').addEventListener('change', () => applyTheme($('appearance-theme').value));
   document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => close(button.dataset.close)));
 
   function openRemote(mode) {
@@ -647,7 +685,7 @@
   bindAction('learn-start', async () => {
     if (editorDirty) throw new Error('Save button changes before learning.');
     setError('learning-error', '');
-    await mutate('/learn/start', 'POST', { button_id: selectedButton, identity_fields: fields($('button-fields').value) });
+    await mutate('/learn/start', 'POST', { button_id: selectedButton, identity_fields: $('learning-automatic-fields').checked ? DEFAULT_FIELDS : fields($('button-fields').value) });
   }, 'editor-error');
   bindAction('inspect-open', async () => {
     setError('learning-error', '');
@@ -656,7 +694,7 @@
   bindAction('inspection-export', async () => {
     const report = await api('/inspect/result');
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2) + '\n'], {type: 'application/json'}));
-    const link = node('a'); link.href = url; link.download = 'rf-button-manager-inspection.json';
+    const link = node('a'); link.href = url; link.download = 'rf433-button-manager-inspection.json';
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('Inspection report downloaded. RF identifiers are included; application credentials are excluded.');
@@ -665,7 +703,7 @@
     const capture = await api('/learn/capture');
     const blob = new Blob([JSON.stringify(capture, null, 2) + '\n'], {type: 'application/json'});
     const url = URL.createObjectURL(blob);
-    const link = node('a'); link.href = url; link.download = 'rf-button-manager-capture.json';
+    const link = node('a'); link.href = url; link.download = 'rf433-button-manager-capture.json';
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('RF capture downloaded. It contains radio identifiers, without application credentials.');
@@ -693,6 +731,7 @@
   $('event-filter').addEventListener('change', renderEvents);
 
   bindAction('settings-open', async () => {
+    if (settingsLoaded) { show('settings-dialog'); await loadManagement(); return; }
     const settings = state.settings;
     receiverListReady = false;
     $('receiver-flex').value = settings.flex_decoder || '';
@@ -701,6 +740,8 @@
     $('allowed-origins').value = (settings.allowed_origins || []).join('\n');
     setError('settings-error', ''); show('settings-dialog');
     await refreshReceiverDevices(settings.receiver_serial || '');
+    settingsLoaded = true;
+    await loadManagement();
   });
   bindAction('receiver-refresh', () => refreshReceiverDevices(), 'settings-error');
   $('settings-form').addEventListener('submit', async (event) => {
@@ -728,7 +769,7 @@
     const backup = await api('/backup');
     const blob = new Blob([JSON.stringify(backup, null, 2) + '\n'], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const link = node('a'); link.href = url; link.download = `rf-button-manager-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const link = node('a'); link.href = url; link.download = `rf433-button-manager-backup-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('Backup downloaded. It contains secrets; store it privately.');
@@ -744,11 +785,109 @@
       if (![1, 2].includes(backup.schema_version) || !Array.isArray(backup.remotes) || !backup.settings) throw new Error('This file is not a supported RF433 Button Manager backup.');
       if (!(await ask('Replace current configuration?', `Restore ${file.name}? All current remotes and settings will be replaced. Restored actions remain disabled until you review and enable them.`, 'Restore backup'))) return;
       await mutate('/restore', 'POST', backup);
+      settingsLoaded = false;
       editorDirty = false; selectedButton = null; close('settings-dialog'); render();
       toast('Configuration restored. Review every action before enabling buttons.');
     } catch (error) { handleError(error, 'settings-error'); }
   });
+  async function copyText(text) {
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return; } } catch (_) {}
+    const previous = document.activeElement;
+    const field = node('textarea'); field.value = text; field.readOnly = true;
+    field.style.position = 'fixed'; field.style.opacity = '0'; document.body.append(field); field.select();
+    try { if (!document.execCommand('copy')) throw new Error('Select the text and copy it manually.'); }
+    finally { field.remove(); previous?.focus(); }
+  }
+  function showNetworkStatus() {
+    if (!networkState) return;
+    const pending = networkState.pending;
+    $('network-pending').hidden = !pending;
+    $('network-stage').disabled = !!pending;
+    $('network-links').replaceChildren();
+    if (pending) {
+      const seconds = Math.max(0, Math.ceil((new Date(pending.expires_at).getTime() - Date.now()) / 1000));
+      $('network-pending-message').textContent = `Test the new connection and confirm within ${seconds} seconds. Otherwise the previous settings are restored.`;
+      const c = pending.config, host = c.address.includes(':') ? `[${c.address}]` : c.address;
+      const urls = c.https ? [`https://${host}:${c.https_port}`] : [`http://${host}:${c.http_port}`];
+      for (const url of urls) { const a = node('a', '', url); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; $('network-links').append(a); }
+    }
+    const cert = networkState.certificate || {};
+    $('certificate-status').textContent = cert.expires_at ? `HTTPS certificate expires ${new Date(cert.expires_at).toLocaleDateString()}. Trust certificate SHA-256: ${cert.ca_sha256}` : 'A local trust certificate will be created when you enable HTTPS or download it.';
+  }
+  async function loadManagement(fill = false) {
+    try {
+      networkState = await api('/manage/network');
+      if (!networkLoaded || fill) {
+        const c = networkState.pending?.config || networkState.config;
+        $('network-address').value = c.address; $('network-http').checked = c.http; $('network-https').checked = c.https;
+        $('network-http-port').value = c.http_port; $('network-https-port').value = c.https_port;
+        $('network-addresses').replaceChildren();
+        for (const item of networkState.interfaces || []) { const option = node('option'); option.value = item.address; option.label = item.interface; $('network-addresses').append(option); }
+        networkLoaded = true;
+      }
+      showNetworkStatus(); setError('network-error', '');
+    } catch (error) { setError('network-error', error.message); }
+    clearTimeout(networkTimer);
+    if (token && activeView === 'settings') networkTimer = setTimeout(() => loadManagement(), 2000);
+  }
+  function initializeNavigation() {
+    bindAction('layout-toggle', () => applyLayout(layout === 'classic' ? 'unified' : 'classic'));
+    bindAction('view-remotes', () => setView('remotes'));
+    bindAction('view-activity', () => setView('activity'));
+    bindAction('editor-back', () => { document.documentElement.dataset.editor = 'closed'; });
+    bindAction('compact-add-remote', () => $('remote-create-open').click());
+    $('remote-search').addEventListener('input', renderNavigation);
+    $('remote-picker').addEventListener('change', async () => {
+      if (!(await mayDiscard())) { $('remote-picker').value = selectedRemote || ''; return; }
+      selectedRemote = $('remote-picker').value; selectedButton = null; editorDirty = false;
+      document.documentElement.dataset.editor = 'closed'; render();
+    });
+    bindAction('token-visibility', () => {
+      const show = $('management-token').type === 'password'; $('management-token').type = show ? 'text' : 'password';
+      $('token-visibility').textContent = show ? 'Hide' : 'Show'; $('token-visibility').setAttribute('aria-label', `${show ? 'Hide' : 'Show'} management token`);
+    });
+    bindAction('token-command-copy', async () => { await copyText($('token-command').textContent); $('copy-command-status').textContent = 'Command copied. Run it on your Linux server.'; }, 'copy-command-status');
+    $('login-transport').textContent = typeof location !== 'undefined' && location.protocol === 'https:' ? 'HTTPS connection. Verify that your browser trusts this server’s certificate.' : 'HTTP does not encrypt your token. Use HTTPS or a trusted VPN; keep this interface private.';
+    $('network-form').addEventListener('submit', async e => {
+      e.preventDefault(); setError('network-error', '');
+      try {
+        await api('/manage/network/stage', 'POST', { address: $('network-address').value.trim(), http: $('network-http').checked, https: $('network-https').checked, http_port: Number($('network-http-port').value), https_port: Number($('network-https-port').value) });
+        await loadManagement();
+      } catch (error) { setError('network-error', error.message); }
+    });
+    bindAction('network-confirm', async () => {
+      if (!networkState?.pending) throw new Error('No pending network change.');
+      await api('/manage/network/confirm', 'POST', {id: networkState.pending.id}); await loadManagement(true); toast('Connection confirmed and saved.');
+    }, 'network-error');
+    bindAction('network-cancel', async () => { await api('/manage/network/cancel', 'POST', {}); await loadManagement(true); toast('Previous network settings retained.'); }, 'network-error');
+    bindAction('certificate-download', async () => {
+      await api('/manage/certificate/prepare', 'POST', {});
+      const response = await fetch('/api/manage/certificate', {headers:{Authorization:`Bearer ${token}`},cache:'no-store',redirect:'error',credentials:'same-origin'});
+      if (!response.ok) throw new Error('Certificate download failed.');
+      const url = URL.createObjectURL(await response.blob()), a = node('a'); a.href = url; a.download = 'rf433-button-manager-ca.crt'; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+      await loadManagement();
+    }, 'network-error');
+    bindAction('certificate-renew', async () => {
+      if (!(await ask('Renew HTTPS certificate?', 'Generate a new server certificate using the existing trust authority. Your installed trust certificate remains valid.', 'Renew certificate'))) return;
+      await api('/manage/certificate/renew', 'POST', {}); await loadManagement(); toast('HTTPS certificate renewed.');
+    }, 'network-error');
+    bindAction('token-rotate', async () => {
+      if (!(await ask('Replace management token?', 'The current token will stop working in all browser tabs. This tab will receive the new token. Buttons and webhooks keep working.', 'Replace token'))) return;
+      pollingGeneration++; clearTimeout(pollingTimer); clearTimeout(networkTimer);
+      try {
+        const result = await api('/manage/token/rotate', 'POST', {confirm:true});
+        token = result.token;
+        try { sessionStorage.setItem('rfbm-token', token); } catch (_) {}
+        $('new-management-token').type = 'password'; $('new-management-token').value = token; $('new-token-panel').hidden = false;
+        toast('Token replaced. Other tabs must reconnect.');
+      } finally { if (token) startPolling(); }
+    }, 'token-error');
+    bindAction('new-token-copy', async () => { await copyText($('new-management-token').value); toast('Token copied. Keep it private.'); }, 'token-error');
+    bindAction('new-token-show', () => { const show = $('new-management-token').type === 'password'; $('new-management-token').type = show ? 'text' : 'password'; $('new-token-show').textContent = show ? 'Hide' : 'Show'; });
+    bindAction('new-token-dismiss', () => { $('new-management-token').value = ''; $('new-token-panel').hidden = true; });
+  }
   window.addEventListener('beforeunload', (event) => { if (editorDirty) { event.preventDefault(); event.returnValue = ''; } });
+  initializeNavigation();
   render();
   if (token) startPolling(); else show('login-dialog');
 })();

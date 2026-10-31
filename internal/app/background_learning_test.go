@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 )
 
 // Reproduces the operator's 0/3 failure: three excluded FSK packets and one

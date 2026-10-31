@@ -32,7 +32,16 @@ func readJSON(w http.ResponseWriter, r *http.Request, out any) error {
 	return nil
 }
 func (a *App) Handler(token string, static fs.FS, publicOrigins ...string) http.Handler {
+	return a.ManagedHandler(func(provided string) bool {
+		return token != "" && len(provided) == len(token) && subtle.ConstantTimeCompare([]byte(provided), []byte(token)) == 1
+	}, static, nil, publicOrigins...)
+}
+
+func (a *App) ManagedHandler(valid func(string) bool, static fs.FS, management http.Handler, publicOrigins ...string) http.Handler {
 	mux := http.NewServeMux()
+	if management != nil {
+		mux.Handle("/api/manage/", management)
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"status": "running", "version": Version})
 	})
@@ -127,7 +136,7 @@ func (a *App) Handler(token string, static fs.FS, publicOrigins ...string) http.
 	handle("GET /api/inspect/result", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		result, err := a.InspectionResult()
 		if err == nil {
-			w.Header().Set("Content-Disposition", `attachment; filename="rf-button-manager-inspection.json"`)
+			w.Header().Set("Content-Disposition", `attachment; filename="rf433-button-manager-inspection.json"`)
 		}
 		return result, err
 	})
@@ -137,7 +146,7 @@ func (a *App) Handler(token string, static fs.FS, publicOrigins ...string) http.
 	handle("GET /api/learn/capture", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		capture, err := a.ExportRFCapture()
 		if err == nil {
-			w.Header().Set("Content-Disposition", `attachment; filename="rf-button-manager-capture.json"`)
+			w.Header().Set("Content-Disposition", `attachment; filename="rf433-button-manager-capture.json"`)
 		}
 		return capture, err
 	})
@@ -150,7 +159,7 @@ func (a *App) Handler(token string, static fs.FS, publicOrigins ...string) http.
 		return s, e
 	})
 	mux.HandleFunc("GET /api/backup", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Disposition", `attachment; filename="rf-button-manager-backup.json"`)
+		w.Header().Set("Content-Disposition", `attachment; filename="rf433-button-manager-backup.json"`)
 		writeJSON(w, 200, a.Backup())
 	})
 	handle("POST /api/restore", func(w http.ResponseWriter, r *http.Request) (any, error) {
@@ -169,7 +178,7 @@ func (a *App) Handler(token string, static fs.FS, publicOrigins ...string) http.
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-			if token == "" || len(provided) != len(token) || subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
+			if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") || valid == nil || !valid(provided) {
 				writeJSON(w, 401, map[string]string{"error": "Management token required"})
 				return
 			}

@@ -3,18 +3,16 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/ninoleto/rf-button-manager/internal/app"
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
-	"github.com/ninoleto/rf-button-manager/internal/webui"
+	"github.com/ninoleto/rf433-button-manager/internal/app"
+	"github.com/ninoleto/rf433-button-manager/internal/management"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/webui"
 	"io/fs"
 	"log"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -24,47 +22,6 @@ import (
 	"time"
 )
 
-func tokenFile(dir string) (string, error) {
-	path := filepath.Join(dir, "management.token")
-	raw, e := os.ReadFile(path)
-	if e == nil {
-		s := strings.TrimSpace(string(raw))
-		if len(s) != 64 {
-			return "", errors.New("invalid management.token; expected 64 hex characters")
-		}
-		if _, e = hex.DecodeString(s); e != nil {
-			return "", e
-		}
-		if e = os.Chmod(path, 0600); e != nil {
-			return "", e
-		}
-		return s, nil
-	}
-	if !os.IsNotExist(e) {
-		return "", e
-	}
-	b := make([]byte, 32)
-	if _, e = rand.Read(b); e != nil {
-		return "", e
-	}
-	s := hex.EncodeToString(b)
-	f, e := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if e != nil {
-		return "", e
-	}
-	if _, e = f.WriteString(s + "\n"); e != nil {
-		f.Close()
-		return "", e
-	}
-	if e = f.Sync(); e != nil {
-		f.Close()
-		return "", e
-	}
-	if e = f.Close(); e != nil {
-		return "", e
-	}
-	return s, nil
-}
 func validListen(address string) error {
 	host, _, e := net.SplitHostPort(address)
 	if e != nil {
@@ -118,7 +75,7 @@ func run() error {
 		return errors.New("another RF433 Button Manager owns this data directory")
 	}
 	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
-	token, e := tokenFile(*dir)
+	credential, e := management.OpenToken(*dir)
 	if e != nil {
 		return e
 	}
@@ -144,29 +101,23 @@ func run() error {
 	receiverDone := make(chan struct{})
 	go func() { defer close(receiverDone); runReceiver(ctx, manager, *rtl, *demo) }()
 	defer func() { stop(); <-receiverDone }()
-	server := &http.Server{Addr: *listen, Handler: manager.Handler(token, static, *publicOrigin), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
-	ln, e := net.Listen("tcp", *listen)
+	server, e := management.NewServer(*dir, *listen, credential)
 	if e != nil {
 		return e
 	}
-	finished := make(chan error, 1)
-	go func() { finished <- server.Serve(ln) }()
-	log.Printf("RF433 Button Manager %s listening on http://%s; management token: %s", app.Version, *listen, filepath.Join(*dir, "management.token"))
-	select {
-	case e = <-finished:
-		if errors.Is(e, http.ErrServerClosed) {
-			return nil
-		}
-		return e
-	case <-ctx.Done():
-		shutdown, cancel := context.WithTimeout(context.Background(), 35*time.Second)
-		defer cancel()
-		e = server.Shutdown(shutdown)
-		if e != nil {
-			_ = server.Close()
-		}
+	if e = server.Start(manager.ManagedHandler(credential.Valid, static, server.Handler(), *publicOrigin)); e != nil {
+		server.Close()
 		return e
 	}
+	defer server.Close()
+	log.Printf("RF433 Button Manager %s listening on %s; management token: %s", app.Version, strings.Join(server.URLs(), ", "), filepath.Join(*dir, "management.token"))
+	select {
+	case e = <-server.Errors:
+		return e
+	case <-ctx.Done():
+		return nil
+	}
+
 }
 func runReceiver(ctx context.Context, a *app.App, binary string, demo bool) {
 	if demo {

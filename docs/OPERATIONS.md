@@ -5,7 +5,7 @@
 Use the test records to distinguish observed deployment from unperformed physical
 checks. Apply a reviewed concrete plan only within the operator's authorization;
 existing authorization for that scope does not require a redundant confirmation. Run
-`scripts/inspect-zorin.sh`; it reads system details, `rtl_433` version/help, supported
+`scripts/inspect-linux.sh`; it reads system details, `rtl_433` version/help, supported
 USB IDs/serials, process names and config filenames. It does not open the receiver,
 read webhook configurations, install packages or stop anything. Review the output
 before sharing it because serial numbers identify hardware.
@@ -32,13 +32,13 @@ to work around an agent sandbox. A dry run never installs packages or opens USB.
 
 | Path | Purpose | Upgrade / uninstall behavior |
 | --- | --- | --- |
-| `/usr/local/bin/rf-button-manager` | Application executable | Atomic replacement / removed |
-| `/usr/local/bin/rf-button-manager.previous` | Previous executable | Replaced on each upgrade / removed |
-| `/etc/systemd/system/rf-button-manager.service` | Owned systemd unit | Replaced / removed |
-| `/etc/udev/rules.d/70-rf-button-manager.rules` | Receiver group access | Replaced / removed |
-| `/etc/rf-button-manager/manager.env` | Listener/decoder binary settings | Preserved / preserved |
-| `/var/lib/rf-button-manager/manager.db` | SQLite application data | Preserved / preserved |
-| `/var/lib/rf-button-manager/management.token` | Management credential | Preserved / preserved |
+| `/usr/local/bin/rf433-button-manager` | Application executable | Atomic replacement / removed |
+| `/usr/local/bin/rf433-button-manager.previous` | Previous executable | Replaced on each upgrade / removed |
+| `/etc/systemd/system/rf433-button-manager.service` | Owned systemd unit | Replaced / removed |
+| `/etc/udev/rules.d/70-rf433-button-manager.rules` | Receiver group access | Replaced / removed |
+| `/etc/rf433-button-manager/manager.env` | Listener/decoder binary settings | Preserved / preserved |
+| `/var/lib/rf433-button-manager/manager.db` | SQLite application data | Preserved / preserved |
+| `/var/lib/rf433-button-manager/management.token` | Management credential | Preserved / preserved |
 
 The dedicated `rfbutton` system account has no login shell and owns the private
 state directory. The installer preserves it on uninstall so retained files keep
@@ -46,7 +46,7 @@ their owner. Inspect the unit or use a systemd drop-in for service customization
 the managed unit itself is replaced on upgrade.
 
 `rtl_433` is not bundled or upgraded. The initial target is the existing 23.11
-installation. `/etc/rf-button-manager/manager.env` can override its absolute path.
+installation. `/etc/rf433-button-manager/manager.env` can override its absolute path.
 The service's `-c /dev/null` decoder invocation intentionally does not inherit
 unrelated `rtl_433` configurations. Use **Learn** for supported signals; existing
 advanced decoder settings are preserved. See [LEARNING.md](LEARNING.md).
@@ -56,18 +56,19 @@ advanced decoder settings are preserved. See [LEARNING.md](LEARNING.md).
 Let the terminal rtl_433/rtl_test command finish, then run
 `bash scripts/check-receiver-owners.sh` from the update package. It refuses a known
 competing receiver process without stopping it. If the app was stopped for that
-test, start only `rf-button-manager.service`, then run the prebuilt updater. The
+test, start only `rf433-button-manager.service`, then run the prebuilt updater. The
 updater briefly waits for the existing listener before reading authenticated
-state; it still requires disabled actions and backs up stopped application data.
+state, records the original enabled flags, temporarily disables actions and backs
+up stopped application data. Previously enabled actions are restored after verification.
 No Go installation or receiver reconnect is needed for this update.
 
 ## Start, stop and access
 
 ```sh
-sudo systemctl status rf-button-manager.service --no-pager
-sudo journalctl -u rf-button-manager.service --since '10 minutes ago' --no-pager
+sudo systemctl status rf433-button-manager.service --no-pager
+sudo journalctl -u rf433-button-manager.service --since '10 minutes ago' --no-pager
 curl --fail http://127.0.0.1:8787/healthz
-sudo systemctl restart rf-button-manager.service
+sudo systemctl restart rf433-button-manager.service
 ```
 
 `/healthz` answers application liveness; it does not promise receiver connectivity
@@ -81,14 +82,12 @@ encrypted management access without opening another LAN port:
 ssh -N -L 8787:127.0.0.1:8787 nino@ZORIN
 ```
 
-For deliberate direct LAN access, set `RFB_LISTEN` in the owned environment file to
-ZORIN's actual private address, such as `192.168.1.20:8787`, then restart only this
-service. Replace the example address with the verified server address. The token
-remains required. Plain HTTP on the LAN exposes credentials to an on-path observer;
-use the tunnel or an explicitly configured HTTPS reverse proxy. Never use a public
-bind, router port forward or remote tunnel for this management service by default.
-Proxy configuration and firewall changes are separate approved tasks. Keep
-same-origin browser checks intact; do not add permissive CORS headers.
+For direct LAN access use **Settings → Network access** and select this server's
+actual private address. HTTP/HTTPS changes are staged while the old connection
+stays available, then confirmed at the new address. Read [NETWORK.md](NETWORK.md)
+for HTTPS trust and recovery. The token remains required; the app does not edit
+firewall, proxy or router rules. `RFB_LISTEN` is the initial default only after a
+confirmed `network.json` exists. Keep same-origin checks intact.
 
 For an explicitly configured HTTPS reverse proxy, keep `RFB_LISTEN` on loopback
 and set `RFB_PUBLIC_ORIGIN` to the exact browser origin, for example
@@ -135,7 +134,7 @@ whole service process group on shutdown. `PrivateDevices=no` is intentional: a
 private device namespace would hide the receiver and hot-plug nodes. Do not add a
 static `DeviceAllow` entry with a USB minor number that changes after reconnect.
 
-After a configured restart, inspect `systemctl show rf-button-manager.service`
+After a configured restart, inspect `systemctl show rf433-button-manager.service`
 for `MainPID`, `ControlGroup`, `ActiveState` and `NRestarts`. Verify one decoder
 child's parent PID and service cgroup without publishing full arguments. Check
 the authenticated receiver state over at least a heartbeat interval. An enabled
@@ -165,9 +164,9 @@ For an exact rollback snapshot, stop **only this service**, archive its whole
 state directory with numeric ownership and permissions, and restart it:
 
 ```sh
-sudo systemctl stop rf-button-manager.service
-sudo sh -c 'umask 077; tar --numeric-owner -C /var/lib -czf /root/rf-button-manager-state.tar.gz rf-button-manager'
-sudo systemctl start rf-button-manager.service
+sudo systemctl stop rf433-button-manager.service
+sudo sh -c 'umask 077; tar --numeric-owner -C /var/lib -czf /root/rf433-button-manager-state.tar.gz rf433-button-manager'
+sudo systemctl start rf433-button-manager.service
 ```
 
 Do not copy only a live SQLite database file: its WAL may contain recent writes.
@@ -185,30 +184,10 @@ before starting. Do not overlay only `manager.db` over live WAL/SHM files. A
 full-state snapshot restores the token it contains and may restore enabled actions;
 plan the first start accordingly. GUI logical restore instead disables actions.
 
-1. Read the new release notes and export a configuration backup. Take a stopped
-   state-directory snapshot when a schema migration is involved.
-2. Build/download the new executable and verify its published SHA-256.
-3. Run the installer without `--apply` and review the plan.
-4. Apply the approved upgrade. Only this service is stopped; binary replacement is
-   atomic, and the data directory and environment file remain intact.
-5. Check service health, saved mappings, one safe webhook and one receiver reconnect.
-
-An install failure is reported, and the data is retained; it is not silently
-declared successful. A previously active service may remain stopped after failure.
-Inspect the journal before deciding whether to start it or roll back.
-
-To roll back an executable without a schema change:
-
-```sh
-sudo systemctl stop rf-button-manager.service
-sudo install -m 0755 /usr/local/bin/rf-button-manager.previous /usr/local/bin/rf-button-manager.rollback
-sudo mv -f /usr/local/bin/rf-button-manager.rollback /usr/local/bin/rf-button-manager
-sudo systemctl start rf-button-manager.service
-```
-
-If a schema changed incompatibly, restore the matching stopped snapshot as well;
-do not run an old binary against an unsupported new schema. Retain the newer data
-directory separately before replacement. Future releases must document migrations.
+For prebuilt upgrades, use [UPGRADING.md](UPGRADING.md) and the package updater,
+which takes a matching stopped snapshot and verifies the live application. Do not
+use an old `.previous` executable alone to undo the 0.4 name migration. Preserve
+the matching old unit, state, environment and account home as described there.
 
 ## Uninstall
 
@@ -239,7 +218,7 @@ manual decision; no purge flag is provided.
 | Webhook busy/rejected | One request is already pending for that button, or eight requests are active globally. Check slow endpoints; rejected actions are not queued or retried. |
 | GUI authorization failure | Use the current token from the service's data directory; avoid embedding tokens in URLs. |
 | HTTPS proxy origin rejected | Set the exact trusted `RFB_PUBLIC_ORIGIN` including any non-default port; keep token authentication and same-origin checks enabled. |
-| Service restart limit reached | Inspect the journal, fix the startup cause, then `systemctl reset-failed rf-button-manager.service` and start it. |
+| Service restart limit reached | Inspect the journal, fix the startup cause, then `systemctl reset-failed rf433-button-manager.service` and start it. |
 | Database write failure | Check free space, permissions and storage health. Preserve the database and logs; do not delete the database as a first repair. |
 
 ## Learning diagnostics
@@ -293,23 +272,28 @@ snapshot on internal storage. A rollback to 0.1 requires that matching snapshot
 as well as the old executable; retain the newer state separately. Do not edit
 SQLite or delete profiles to force an old executable to start.
 
-## Prebuilt 0.3.x update
+## Prebuilt updates and legacy name migration
 
-For an existing active managed service, use `sudo python3 scripts/update-prebuilt.py`
-from an extracted binary package for a read-only preflight. Add `--apply` for the
-already-reviewed update. Close learning and disable actions in the GUI first.
-The helper verifies package hashes, keeps the listener/token/settings and takes a
-private stopped-state snapshot before replacing the executable. It then checks
-the running HTTP version, authentication, unchanged configuration, 20 seconds of
-stable service operation, and ownership of the live decoder child. A receiver that
-was connected before the update must reconnect for verification to pass. Failure
-restores the old executable and stopped-state snapshot; the failed state is retained
-for investigation. No compiler or old /tmp helper is needed.
+Follow [UPGRADING.md](UPGRADING.md). The updater checks the active managed service,
+source and executable hashes, receiver ownership, private listener and available
+space before changing anything. It preserves the numeric `rfbutton` identity,
+state, environment, token, mappings and action flags. An ordinary legacy service
+is migrated to the current paths. Custom unit contents/drop-ins and path conflicts
+stop migration for review instead of being overwritten.
 
-The report gives the snapshot path. For a deliberate later rollback, stop only
-`rf-button-manager.service`, preserve current state separately, restore `binary`
-and `state` from that same snapshot to the standard paths with ownership preserved,
-and start only this service. Never mix a binary with an incompatible database.
+The helper checks live version, authentication, unchanged configuration, twenty
+seconds of sustained service operation, decoder ownership and a second service
+restart. It restores original enabled flags only after those checks. Failures
+attempt to restore the old executable, stopped state and migrated paths. The
+failed attempt's state is retained privately. No receiver reconnect, package
+installation or real webhook test is part of this procedure.
+
+
+
+Keep the printed snapshot path. Rollback across the name migration must restore
+the old service paths and account home as well as the old binary/data; do not just
+copy an old executable over the new one. See [UPGRADING.md](UPGRADING.md#rollback).
+
 The helper leaves the existing development checkout unchanged. Its bundled Git
-history can be cloned with `git clone --branch main rf-button-manager.git.bundle`
+history can be cloned with `git clone --branch main rf433-button-manager.git.bundle`
 or fetched/fast-forwarded into a clean existing checkout; do not reset local edits.

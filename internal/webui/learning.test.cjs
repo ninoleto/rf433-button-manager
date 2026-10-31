@@ -30,13 +30,20 @@ async function harness() {
   const button={id:'fixture-button',name:'A ON',enabled:false,signature:'',identity_fields:['codes'],webhook:{url:''}};
   let state={remotes:[{id:'fixture-remote',name:'Synthetic remote',columns:2,buttons:[button]}],settings:{},receiver:{state:'connected',message:'Synthetic samples'},events:[],version:'test',learning:null,learning_notice:null,actions_paused:false};
   let devices=[]; let scanError=false;
+  let network={config:{address:'127.0.0.1',http:true,http_port:8787,https:false,https_port:8788},interfaces:[],pending:null};
+  const local=new Map(), sessionValues=new Map([['rfbm-token','synthetic-test-token']]);
   const calls=[];
   let timerID=0; const timers=new Map();
   const session=()=>({session_id:'fixture-session',button_id:button.id,identity_fields:['codes'],automatic:true,stage:'waiting',message:'Receiver ready. Press once.',presses:0,required:3,candidate:'',expires_at:new Date(Date.now()+180000).toISOString(),diagnostics:{}});
-  const context={document:{getElementById:el,createElement:()=>new Element(),createDocumentFragment:()=>Object.assign(new Element(),{fragment:true}),querySelectorAll:()=>[],documentElement:new Element()},window:{addEventListener(){}},sessionStorage:{getItem:()=> 'synthetic-test-token',setItem(){},removeItem(){}},localStorage:{getItem:()=>null,setItem(){}},AbortController,URL,Blob,Date,console,
+  const context={document:{getElementById:el,createElement:()=>new Element(),createDocumentFragment:()=>Object.assign(new Element(),{fragment:true}),querySelectorAll:()=>[],documentElement:new Element()},window:{addEventListener(){}},sessionStorage:{getItem:k=>sessionValues.get(k),setItem:(k,v)=>sessionValues.set(k,v),removeItem:k=>sessionValues.delete(k)},localStorage:{getItem:k=>local.get(k),setItem:(k,v)=>local.set(k,v)},AbortController,URL,Blob,Date,console,
     setTimeout:(fn,delay)=>{timers.set(++timerID,{fn,delay});return timerID;},clearTimeout:id=>timers.delete(id),
     fetch:async(url,options)=>{
-      calls.push({url,method:options.method,body:options.body?JSON.parse(options.body):null});
+      calls.push({url,method:options.method,body:options.body?JSON.parse(options.body):null,authorization:options.headers?.Authorization});
+      if(url==='/api/manage/network') return {ok:true,json:async()=>structuredClone(network)};
+      if(url==='/api/manage/token/rotate') return {ok:true,json:async()=>({token:'replacement-synthetic-test-token'})};
+      if(url==='/api/manage/network/stage') {network.pending={id:'pending-fixture',config:JSON.parse(options.body),expires_at:new Date(Date.now()+180000).toISOString()};return {ok:true,json:async()=>structuredClone(network)};}
+      if(url==='/api/manage/network/cancel') {network.pending=null;return {ok:true,json:async()=>({ok:true})};}
+      if(url==='/api/manage/network/confirm') {network.config=network.pending.config;network.pending=null;return {ok:true,json:async()=>({ok:true})};}
       if(url==='/api/receivers') return scanError ? {ok:false,status:500,json:async()=>({error:'Scan unavailable'})} : {ok:true,json:async()=>({devices:structuredClone(devices)})};
       if(url==='/api/state') return {ok:true,json:async()=>structuredClone(state)};
       if(url==='/api/settings' && options.method==='PUT') state={...state,settings:JSON.parse(options.body)};
@@ -58,8 +65,56 @@ async function harness() {
   const flush=async()=>{for(let i=0;i<20;i++) await Promise.resolve();};
   await flush();
   const refresh=async()=>{const entry=[...timers.entries()].find(([,v])=>v.delay===1000);assert.ok(entry,'poll scheduled');timers.delete(entry[0]);await entry[1].fn();await flush();};
-  return {el,calls,session,button,devices:value=>{devices=value;},scanError:value=>{scanError=value;},set:patch=>{state={...state,...patch};},refresh};
+  return {el,calls,session,button,devices:value=>{devices=value;},scanError:value=>{scanError=value;},set:patch=>{state={...state,...patch};},refresh,flush,root:context.document.documentElement,local,sessionValues};
 }
+
+test('layout and page navigation preserve selected button and unsaved fields',async()=>{
+  const h=await harness();
+  await h.el('button-grid').children[0].click();
+  h.el('button-name').value='Unsaved kitchen name';await h.el('button-editor').emit('input');
+  await h.el('layout-toggle').click();
+  assert.equal(h.root.dataset.layout,'unified');assert.equal(h.local.get('rf433-layout'),'unified');
+  await h.el('view-activity').click();assert.equal(h.root.dataset.view,'activity');
+  await h.el('view-remotes').click();assert.equal(h.root.dataset.view,'remotes');
+  await h.refresh();
+  assert.equal(h.el('button-name').value,'Unsaved kitchen name');
+  assert.equal(h.root.dataset.editor,'open');
+  await h.el('editor-back').click();assert.equal(h.root.dataset.editor,'closed');
+  await h.el('button-grid').children[0].click();assert.equal(h.root.dataset.editor,'open');
+  assert.equal(h.el('button-name').value,'Unsaved kitchen name');
+  assert.equal(h.calls.some(c=>c.method==='PUT' || c.method==='POST'),false);
+});
+
+test('network stage is explicit, preserves receiver settings and can be cancelled',async()=>{
+  const h=await harness();
+  await h.el('settings-open').click();
+  h.el('network-address').value='192.168.50.20';h.el('network-https').checked=true;
+  h.el('receiver-flex').value='unsaved decoder draft';
+  await h.el('view-activity').click();await h.el('settings-open').click();
+  assert.equal(h.el('receiver-flex').value,'unsaved decoder draft');
+  assert.equal(h.el('network-address').value,'192.168.50.20');
+  await h.el('network-form').emit('submit');
+  assert.equal(h.el('network-stage').disabled,true);assert.equal(h.el('network-pending').hidden,false);
+  assert.equal(h.el('network-links').children[0].href,'https://192.168.50.20:8788');
+  assert.equal(h.calls.some(c=>c.url==='/api/settings' && c.method==='PUT'),false);
+  await h.el('network-cancel').click();
+  assert.equal(h.el('network-stage').disabled,false);assert.equal(h.el('network-address').value,'127.0.0.1');
+});
+
+test('token rotation requires confirmation and updates subsequent authenticated requests',async()=>{
+  const h=await harness();
+  await h.el('settings-open').click();
+  const rotate=h.el('token-rotate').click();await h.flush();
+  assert.equal(h.el('confirm-dialog').open,true);
+  assert.equal(h.calls.some(c=>c.url==='/api/manage/token/rotate'),false);
+  await h.el('confirm-yes').click();await rotate;await h.flush();
+  assert.equal(h.el('new-management-token').type,'password');
+  assert.equal(h.sessionValues.get('rfbm-token'),'replacement-synthetic-test-token');
+  await h.refresh();
+  assert.equal(h.calls.filter(c=>c.url==='/api/state').at(-1).authorization,'Bearer replacement-synthetic-test-token');
+  await h.el('new-token-dismiss').click();assert.equal(h.el('new-management-token').value,'');
+  assert.equal(h.calls.some(c=>c.url.endsWith('/test')),false);
+});
 
 test('browser controller learns without decoder setup and exposes progress, diagnostics and retry',async()=>{
   const h=await harness();

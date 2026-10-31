@@ -3,12 +3,12 @@
 set -Eeuo pipefail
 if [[ ${1:-} == -h || ${1:-} == --help || $# -gt 2 ]]; then
   echo 'Usage: scripts/restore-history.sh [workspace [bundle]]'
-  echo 'Defaults: current directory and workspace/rf-button-manager.git.bundle.'
+  echo 'Defaults: current directory and workspace/rf433-button-manager.git.bundle.'
   echo 'Refuses an existing .git; preserves every workspace file and edit.'
   [[ $# -le 2 ]] && exit 0 || exit 2
 fi
 target=$(realpath -- "${1:-.}")
-bundle=$(realpath -- "${2:-$target/rf-button-manager.git.bundle}")
+bundle=$(realpath -- "${2:-$target/rf433-button-manager.git.bundle}")
 [[ -d "$target" && -f "$bundle" ]] || { echo 'Workspace and Git bundle required.' >&2; exit 1; }
 [[ ! -e "$target/.git" && ! -L "$target/.git" ]] || { echo 'Existing .git preserved; inspect/import history manually.' >&2; exit 1; }
 scratch=$(mktemp -d)

@@ -1,3 +1,11 @@
+# 0.4 validation work
+
+Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
+The historical record below describes earlier versions. It is not evidence that
+0.4 passed hardware tests, and historical file names have been preserved.
+
+---
+
 # Verification reports
 
 ## 0.3.8-rc.1 version-only rebuild (2026-10-30)

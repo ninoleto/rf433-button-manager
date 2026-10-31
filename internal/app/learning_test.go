@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ninoleto/rf-button-manager/internal/receiver"
+	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 )
 
 func captureApp(t *testing.T) (*App, *clock, Remote) {

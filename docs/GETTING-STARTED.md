@@ -5,7 +5,7 @@ through a USB RTL-SDR receiver. Once installed, the app runs in the background;
 you learn buttons and assign webhook URLs in your browser.
 
 **Physical testing is limited to Zorin OS 18.1, Linux x86_64**, one RTL2838/R820T
-receiver, rtl_433 23.11 and three home buttons. Other distributions and hardware
+receiver, rtl_433 23.11 and nine home buttons. Other distributions and hardware
 combinations are not physically verified. Automated Ubuntu CI is separate software
 evidence. This is an AI-assisted ("vibe coded") development prerelease, shared for
 review, testing and improvement. It cannot learn every signal sold as "433 MHz".
@@ -126,10 +126,12 @@ it does not automatically create RF devices/entities in Home Assistant. See
 
 ## Download and unpack
 
-1. Open the [0.3.8-rc.1 release page](https://github.com/ninoleto/rf433-button-manager/releases/tag/v0.3.8-rc.1).
-2. Under **Assets**, download both:
-   - **rf433-button-manager-0.3.8-rc.1-linux-amd64.zip** — the application, source and documentation.
-   - **rf433-button-manager-0.3.8-rc.1-linux-amd64.zip.sha256** — its integrity checksum.
+1. For this private validation build, use the supplied **0.4.0-test.1** package.
+   It is not a published stable release. RC1 users must use the instructions
+   included in their older package, whose internal paths differ.
+2. Obtain both files:
+   - **rf433-button-manager-0.4.0-test.1-linux-amd64.zip** — the application, source and documentation.
+   - **rf433-button-manager-0.4.0-test.1-linux-amd64.zip.sha256** — its integrity checksum.
 3. Put both files in the same folder on the Linux computer where the app will run.
    GitHub's automatic **Source code** downloads do not contain the prebuilt executable.
 4. Open a terminal in that folder and run:
@@ -137,36 +139,35 @@ it does not automatically create RF devices/entities in Home Assistant. See
 ```sh
 (
   set -e
-  sha256sum -c rf433-button-manager-0.3.8-rc.1-linux-amd64.zip.sha256
+  sha256sum -c rf433-button-manager-0.4.0-test.1-linux-amd64.zip.sha256
   rfb_extract_dir=$(mktemp -d "$HOME/rf433-button-manager.XXXXXX")
-  unzip -q rf433-button-manager-0.3.8-rc.1-linux-amd64.zip -d "$rfb_extract_dir"
-  cd "$rfb_extract_dir/rf-button-manager"
+  unzip -q rf433-button-manager-0.4.0-test.1-linux-amd64.zip -d "$rfb_extract_dir"
+  cd "$rfb_extract_dir/rf433-button-manager"
   sha256sum -c SHA256SUMS
-  chmod u+x bin/rf-button-manager
-  ./bin/rf-button-manager --version
+  chmod u+x bin/rf433-button-manager
+  ./bin/rf433-button-manager --version
   printf 'Extracted project folder: %s\n' "$PWD"
 )
 ```
 
-Every checksum must report **OK**, and the version must be **0.3.8-rc.1**. Stop on
+Every checksum must report **OK**, and the version must be **0.4.0-test.1**. Stop on
 an error. Copy the printed project folder and `cd` into it for the next steps.
-The inner folder is still called `rf-button-manager` for compatibility; this is
-intentional. Extraction leaves existing installations and workspaces untouched.
+The inner folder is now called `rf433-button-manager`. Extraction leaves existing installations and workspaces untouched.
 
 ## First installation
 
 Run these from the extracted project folder **on the Linux server**:
 
 ```sh
-bash scripts/inspect-zorin.sh
-bash scripts/install.sh --binary "$PWD/bin/rf-button-manager"
+bash scripts/inspect-linux.sh
+bash scripts/install.sh --binary "$PWD/bin/rf433-button-manager"
 ```
 
 The second command only shows the installation plan. Check receiver ownership,
 port 8787 availability and the listed changes. When ready to install:
 
 ```sh
-sudo bash scripts/install.sh --binary "$PWD/bin/rf-button-manager" --apply
+sudo bash scripts/install.sh --binary "$PWD/bin/rf433-button-manager" --apply
 ```
 
 It installs the app as a background system service, creates its `rfbutton` account
@@ -190,7 +191,9 @@ ssh -N -L 8787:127.0.0.1:8787 YOUR_USER@YOUR_SERVER
 Leave that terminal open, then visit **http://127.0.0.1:8787** in the PC's browser.
 The forwarding terminal may look idle; that is normal. If you already configured
 a private LAN address for the app, continue using that existing URL instead.
-[Operations](OPERATIONS.md#start-stop-and-access) explains deliberate LAN binding.
+After login, **Settings → Network access** lets you select the server's private
+address and enable HTTPS. Follow [NETWORK.md](NETWORK.md) to test and confirm the
+new connection. Never copy another person's server address.
 Do not expose the management interface publicly.
 
 ## Find your management token and log in
@@ -198,17 +201,19 @@ Do not expose the management interface publicly.
 Run this in a terminal **on the Linux server**, including over SSH:
 
 ```sh
-sudo cat /var/lib/rf-button-manager/management.token
+sudo cat /var/lib/rf433-button-manager/management.token
 ```
 
 Copy the token it prints into **Management token** in the browser and select
 **Connect**. Keep the token private; do not put it in an issue, screenshot or chat.
 It is the app's own login credential, **not** a Home Assistant token or webhook ID.
-The login screen contains the same instructions.
+Expand **Where do I find my token?** on the login screen to see the same
+instructions. **Copy command** copies the command, not the secret token.
+To replace a token later, use **Settings → Management token → Replace token**.
 
 The token is created at first startup and preserved across reboots and updates.
 Run the command again whenever you need it. If the file is missing, check that
-installation finished and `rf-button-manager.service` is running. Do not disable
+installation finished and `rf433-button-manager.service` is running. Do not disable
 authentication or create an empty file. With a custom source-run `--data-dir`, read
 `management.token` inside that chosen folder instead.
 
@@ -317,38 +322,11 @@ Assistant are running. Closing the browser does not turn off enabled button acti
 
 ## Update an existing installation
 
-**Already using 0.3.8-dev successfully? You can keep it.** The 0.3.8-rc.1 update
-only aligns the version label and packaging; it adds no behavior changes or fixes.
-Use the steps below only if you choose to update.
-
-1. Leave the existing app running. In its browser interface, finish or cancel any
-   learning/inspection. For each enabled button, turn **Enabled** off and click
-   **Save button** to temporarily disable its action.
-2. Follow **Download and unpack** above. Use a fresh folder; do not extract over
-   an old checkout. From the printed project folder, review the update plan:
-
-   ```sh
-   sudo python3 scripts/update-prebuilt.py
-   ```
-
-3. Apply that plan:
-
-   ```sh
-   sudo python3 scripts/update-prebuilt.py --apply
-   ```
-
-4. Wait for **Update verified**, then refresh the browser. Confirm **0.3.8-rc.1**
-   and the expected receiver status. Use the same address and management token.
-5. Re-enable the button actions you want to use and click **Save button** for each.
-   The updater leaves actions disabled so they do not trigger unexpectedly during
-   verification.
-
-The updater backs up the stopped app's data and old executable, replaces only the
-executable, restarts only this service and verifies the live version, authentication,
-configuration and token. It rolls back if verification fails. It does not call real
-webhooks, change the listener/service/USB rule or update a separate development
-checkout. Keep the printed snapshot path for [rollback](OPERATIONS.md).
-Downloading or publishing a GitHub release alone does not update your server.
+Use [UPGRADING.md](UPGRADING.md) for the migration from an older managed
+installation. Leave the app running, finish learning/inspection, unpack the new
+package into a fresh directory and run the supplied updater. It records, disables
+and restores enabled actions automatically. Keep the printed rollback snapshot.
+Downloading a package does not change your running server.
 
 ## Developers and AI coding agents
 

@@ -25,13 +25,13 @@ provides the reference Git 2.43, Make 4.3, Bash 5.2 and GCC 13 environment. Pyth
 ## Recover a source package's history
 
 A package can contain source files but no `.git`, plus
-`rf-button-manager.git.bundle`. Prefer a new checkout, preserving the extracted
+`rf433-button-manager.git.bundle`. Prefer a new checkout, preserving the extracted
 package and any older development work:
 
 ```sh
-git clone --branch main /path/to/rf-button-manager/rf-button-manager.git.bundle ./rf-button-manager-dev
-cd rf-button-manager-dev
-git bundle verify /path/to/rf-button-manager/rf-button-manager.git.bundle
+git clone --branch main /path/to/rf433-button-manager/rf433-button-manager.git.bundle ./rf433-button-manager-dev
+cd rf433-button-manager-dev
+git bundle verify /path/to/rf433-button-manager/rf433-button-manager.git.bundle
 git log --oneline --all --decorate
 git status --short
 ```
@@ -85,8 +85,8 @@ go mod verify
 test -z "$(gofmt -l cmd internal)"
 make check
 make build
-./bin/rf-button-manager --version
-sha256sum bin/rf-button-manager
+./bin/rf433-button-manager --version
+sha256sum bin/rf433-button-manager
 ```
 
 The status must be empty before building. Keep the command output and commit SHA
@@ -125,7 +125,7 @@ For an interactive preview, use a fresh isolated directory and non-production po
 
 ```sh
 rfb_demo_dir=$(mktemp -d)
-./bin/rf-button-manager --demo --data-dir "$rfb_demo_dir" --listen 127.0.0.1:18788
+./bin/rf433-button-manager --demo --data-dir "$rfb_demo_dir" --listen 127.0.0.1:18788
 ```
 
 Read its token privately from `$rfb_demo_dir/management.token`. Demo emits one
@@ -141,7 +141,7 @@ rfb_ui_tools=$(mktemp -d)
 npm install --prefix "$rfb_ui_tools" --save-exact playwright@1.56.1
 "$rfb_ui_tools/node_modules/.bin/playwright" install chromium
 CODEX_PRIMARY_RUNTIME_NODE_MODULES="$rfb_ui_tools/node_modules" \
-  RFB_UI_BINARY="$PWD/bin/rf-button-manager" \
+  RFB_UI_BINARY="$PWD/bin/rf433-button-manager" \
   node internal/webui/ui.test.cjs
 ```
 
@@ -269,3 +269,24 @@ The package updater is deliberately independent of Git checkout state and Go.
 `python3 scripts/test-update-prebuilt.py` tests dispatch and rollback with temporary
 files and simulated systemd/API responses. It must fail if only the source or
 package binary is updated while the HTTP service still reports an older version.
+
+
+## 0.4 management, migration and private RF checks
+
+`make check` includes the management unit tests and isolated Python updater/name
+migration simulations. After `make build`, run `python3 scripts/test-management-runtime.py`
+to check the actual demo executable's HTTP/HTTPS, trust, confirmation, rotation and
+restart persistence. It opens only disposable loopback sockets; it uses no USB or
+real webhooks. Use `RFB_MANAGEMENT_BINARY` to select a clean-build executable.
+
+`RFB_WEAK_CAPTURE=/private/other-room-export.json go test -race -count=1 ./internal/app -run TestPrivateWeakCaptureBuiltinToWebhook -v`
+is an optional, specific operator regression for the nine-burst recording. It
+performs file-only rtl_433 replay, three-arm learning and local webhook counting.
+The recording is not distributed; absence is a skip, not a pass. Test logs report
+counts without identifiers. Never commit the private capture or create a fixture
+by copying its identifiers.
+
+For frontend changes run both Node controller tests and the optional Playwright
+`internal/webui/ui.test.cjs` suite, then inspect real screen sizes and coarse-pointer
+use. A DOM adapter cannot establish rendered layout. See TESTING-0.4.md for blocked
+and pending acceptance checks.

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Isolated updater integration tests. Temporary files; no host services or USB."""
 import importlib.util
+import copy
 import json
 from pathlib import Path
 import subprocess
@@ -17,14 +18,22 @@ class FakeAPI:
     def __init__(self, version='0.3.0-dev'):
         self.version = version
         self.token = 'fixture-token'
+        self.remotes = [{'buttons': [{'enabled': False, 'last_received': 'new'}]}]
     def get(self, path):
         if path == '/healthz':
             return {'version': self.version}
         if path == '/api/backup':
-            return {'remotes': [{'buttons': [{'enabled': False, 'last_received': 'new'}]}]}
-        return {'version': self.version, 'receiver': {'state': 'connected'}}
+            return {'remotes': copy.deepcopy(self.remotes)}
+        return {'version': self.version, 'receiver': {'state': 'connected'}, 'remotes': copy.deepcopy(self.remotes)}
     def request(self, path, authenticated=True):
+        if path == '/api/manage/network': return 404, None
         return (200, self.get(path)) if authenticated and self.token == 'fixture-token' else (401, None)
+    def actions(self, flags):
+        for remote in self.remotes:
+            for button in remote['buttons']:
+                button['enabled'] = flags.get(button['id'], False)
+    def wait_ready(self):
+        return self.get('/api/state')
 
 class UpdateTests(unittest.TestCase):
     def test_listener_startup_wait_and_auth_failure(self):
@@ -41,15 +50,15 @@ class UpdateTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         package = self.root / 'package'
         (package / 'bin').mkdir(parents=True)
-        (package / 'bin/rf-button-manager').write_bytes(b'new binary')
-        (package / 'rf-button-manager.git.bundle').write_bytes(b'fixture bundle')
-        (package / 'release.json').write_text(json.dumps({'version': '0.3.0-dev', 'commit': 'fixture', 'binary_sha256': updater.sha(package / 'bin/rf-button-manager'), 'bundle_sha256': updater.sha(package / 'rf-button-manager.git.bundle')}))
+        (package / 'bin/rf433-button-manager').write_bytes(b'new binary')
+        (package / 'rf433-button-manager.git.bundle').write_bytes(b'fixture bundle')
+        (package / 'release.json').write_text(json.dumps({'version': '0.3.0-dev', 'commit': 'fixture', 'binary_sha256': updater.sha(package / 'bin/rf433-button-manager'), 'bundle_sha256': updater.sha(package / 'rf433-button-manager.git.bundle')}))
         self.update = updater.Update(package, self.root, self.root / 'proc')
         process = self.root / 'proc/456'
         process.mkdir(parents=True)
         (process / 'comm').write_text('rtl_433\n')
         (process / 'status').write_text('PPid:\t123\n')
-        (process / 'cgroup').write_text('0::/system.slice/rf-button-manager.service\n')
+        (process / 'cgroup').write_text('0::/system.slice/rf433-button-manager.service\n')
         u = self.update
         u.state.mkdir(parents=True)
         u.installed.parent.mkdir(parents=True)
@@ -111,6 +120,120 @@ class UpdateTests(unittest.TestCase):
         self.update.binary.write_bytes(b'corrupt')
         with self.assertRaisesRegex(RuntimeError, 'checksum mismatch'):
             updater.Update(self.update.package, self.root)
+
+    def legacy(self):
+        u = self.update
+        u.state.rename(self.root / 'var/lib/rf-button-manager')
+        u.env.parent.rename(self.root / 'etc/rf-button-manager')
+        u.installed.rename(self.root / 'usr/local/bin/rf-button-manager')
+        service = self.root / 'etc/systemd/system/rf-button-manager.service'
+        service.parent.mkdir(parents=True)
+        sources = Path(__file__).resolve().parent.parent / 'deploy'
+        (u.package / 'deploy').mkdir()
+        for name in ('rf433-button-manager.service', '70-rf433-button-manager.rules'):
+            (u.package / 'deploy' / name).write_bytes((sources / name).read_bytes())
+        service.write_text((sources / updater.UNIT).read_text().replace('rf433-button-manager', 'rf-button-manager'))
+        rules = self.root / 'etc/udev/rules.d/70-rf-button-manager.rules'
+        rules.parent.mkdir(parents=True)
+        rules.write_bytes(b'old USB rule')
+        u = updater.Update(u.package, self.root, self.root / 'proc')
+        u.old_home = '/var/lib/rf-button-manager'
+        u.token = (u.state / 'management.token').read_bytes()
+        u.environment = u.env.read_bytes()
+        u.address = '127.0.0.1:8787'
+        u.api = FakeAPI()
+        u.api.remotes = [{'buttons': [{'id': 'on', 'enabled': True}, {'id': 'off', 'enabled': False}]}]
+        u.original_flags = {'on': True, 'off': False}
+        u.config = updater.stable(u.api.get('/api/backup'))
+        u.was_connected = True
+        self.update = u
+        return u
+
+    def migration_command(self, *args):
+        self.commands.append(args)
+        if args[0] == 'cp':
+            return subprocess.run(args, check=True, capture_output=True, text=True).stdout.strip()
+        if args[0] == 'systemctl':
+            if args[1] == 'show': return '123'
+            if args[1] == 'is-enabled': return 'enabled'
+            return 'active'
+        if args[0] in ('usermod', 'udevadm'): return ''
+        if args[0] == 'getent': return 'rfbutton:x:991:991::/var/lib/rf-button-manager:/usr/sbin/nologin'
+        if args[-1] == '--version': return self.update.manifest['version']
+        self.fail('Unexpected host command: ' + repr(args))
+
+    def test_migration_preserves_data_environment_token_and_enabled_flags(self):
+        u = self.legacy()
+        api = u.api
+        with patch.object(updater, 'run', self.migration_command), patch.object(updater, 'API', return_value=api), patch.object(updater.time, 'sleep'):
+            u.apply()
+        self.assertEqual(u.service_name, updater.UNIT)
+        self.assertEqual(u.installed.read_bytes(), b'new binary')
+        self.assertEqual((u.state / 'manager.db').read_bytes(), b'old database')
+        self.assertEqual((u.state / 'management.token').read_bytes(), u.token)
+        self.assertEqual(u.env.read_bytes(), u.environment)
+        self.assertEqual(api.get('/api/state')['remotes'][0]['buttons'], [{'id': 'on', 'enabled': True}, {'id': 'off', 'enabled': False}])
+        self.assertFalse((self.root / 'var/lib/rf-button-manager').exists())
+        self.assertFalse((self.root / 'etc/systemd/system/rf-button-manager.service').exists())
+        self.assertEqual((u.snapshot / 'retired-usb-rule').read_bytes(), b'old USB rule')
+        self.assertIn(('systemctl', 'restart', updater.UNIT), self.commands)
+        self.assertFalse(any('trigger' in c or 'reboot' in c or 'pkill' in c for c in self.commands))
+
+    def test_failed_migration_restores_old_paths_and_enabled_flags(self):
+        u = self.legacy()
+        old = (u.installed, u.state, u.env, u.unit, u.rules)
+        api = u.api
+        def fail_verify():
+            (u.state / 'manager.db').write_bytes(b'failed new database')
+            raise RuntimeError('simulated verification failure')
+        with patch.object(updater, 'run', self.migration_command), patch.object(updater, 'API', return_value=api), patch.object(u, 'verify', fail_verify):
+            with self.assertRaisesRegex(RuntimeError, 'simulated'):
+                u.apply()
+        self.assertEqual((u.installed, u.state, u.env, u.unit, u.rules), old)
+        self.assertEqual(u.installed.read_bytes(), b'old binary')
+        self.assertEqual((u.state / 'manager.db').read_bytes(), b'old database')
+        self.assertEqual((u.snapshot / 'failed-state/manager.db').read_bytes(), b'failed new database')
+        self.assertTrue(api.remotes[0]['buttons'][0]['enabled'])
+        self.assertFalse((self.root / 'etc/systemd/system' / updater.UNIT).exists())
+        self.assertIn(('usermod', '--home', '/var/lib/rf-button-manager', 'rfbutton'), self.commands)
+
+    def test_stop_failure_restores_temporarily_disabled_actions(self):
+        u = self.legacy()
+        api = u.api
+        def fail_stop(*args):
+            if args[:2] == ('systemctl', 'stop'): raise RuntimeError('simulated stop failure')
+            return self.migration_command(*args)
+        with patch.object(updater, 'run', fail_stop):
+            with self.assertRaisesRegex(RuntimeError, 'stop failure'):
+                u.apply()
+        self.assertTrue(api.remotes[0]['buttons'][0]['enabled'])
+        self.assertEqual(u.installed.read_bytes(), b'old binary')
+
+    def test_partial_migration_failure_restores_every_moved_path(self):
+        # Fail after moving just the database directory, before changing the unit.
+        u = self.legacy()
+        api = u.api
+        rename = Path.rename
+        def failing_rename(path, destination):
+            if path == self.root / 'etc/rf-button-manager': raise OSError('simulated rename failure')
+            return rename(path, destination)
+        with patch.object(updater, 'run', self.migration_command), patch.object(updater, 'API', return_value=api), patch.object(Path, 'rename', failing_rename):
+            with self.assertRaisesRegex(OSError, 'rename failure'):
+                u.apply()
+        self.assertEqual(u.service_name, 'rf-button-manager.service')
+        self.assertEqual((u.state / 'manager.db').read_bytes(), b'old database')
+        self.assertTrue(u.unit.exists())
+        self.assertTrue(api.remotes[0]['buttons'][0]['enabled'])
+        self.assertFalse((self.root / 'var/lib/rf433-button-manager').exists())
+
+    def test_customized_legacy_unit_is_preserved(self):
+        u = self.legacy()
+        u.unit.write_text(u.unit.read_text() + '\n# private extension\nEnvironment=CUSTOM=1\n')
+        with patch.object(updater, 'run', self.migration_command):
+            with self.assertRaisesRegex(RuntimeError, 'customized'):
+                u.preflight()
+        self.assertEqual(u.installed.read_bytes(), b'old binary')
+        self.assertFalse(any(c[:2] == ('systemctl', 'stop') for c in self.commands))
 
 if __name__ == '__main__':
     unittest.main()

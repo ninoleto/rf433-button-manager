@@ -1,4 +1,4 @@
-# RF Button Manager architecture
+# RF433 Button Manager architecture
 
 Status: development implementation. Physical acceptance is tracked separately in
 [HARDWARE-TESTS.md](HARDWARE-TESTS.md); software tests do not establish USB reliability.
@@ -13,11 +13,11 @@ MIT license for our code; rtl_433 is installed separately and retains its own li
 
 ## Components
 
-- cmd/rf-button-manager: flags, startup, shutdown and single-instance lock.
+- cmd/rf433-button-manager: flags, startup, shutdown and single-instance lock.
 - internal/app: SQLite, configuration validation, learning, debounce, webhook dispatch and API.
 - internal/receiver: Linux USB discovery, supervised live rtl_433, bounded pulse capture and offline analysis/replay.
 - internal/webui: embedded remote editor and live monitor.
-- deploy, scripts: systemd, install/uninstall, read-only ZORIN inspection.
+- deploy, scripts: systemd, install/uninstall, read-only Linux inspection.
 - docs: architecture, API, operations, hardware acceptance and persistent progress.
 
 ## RF and recovery
@@ -70,7 +70,7 @@ network management credential exposure. Tests and explicit limits document each.
 
 | Source | Responsibility and entry points |
 | --- | --- |
-| `cmd/rf-button-manager/main.go` | CLI validation, token creation, data lock, startup/shutdown, receiver configuration reload |
+| `cmd/rf433-button-manager/main.go` | CLI validation, token creation, data lock, startup/shutdown, receiver configuration reload |
 | `internal/receiver/receiver.go` | `Run`, device selection, argv construction, JSON classification, recovery state machine |
 | `internal/receiver/linux.go` | Compatible USB ID table, sysfs enumeration, subprocess pipes and process groups |
 | `internal/receiver/devices.go` | Display-only inventory and validation of an explicit serial selection |
@@ -221,3 +221,25 @@ one administrative credential, no per-user roles, no TLS server, no action queue
 and no automatic retries. RF is unauthenticated/replayable. HTTP 2xx establishes
 acceptance by an endpoint, not a physical outcome. See [DEVELOPMENT.md](DEVELOPMENT.md)
 for extension examples and [RELEASING.md](RELEASING.md) for release gates.
+
+
+## Management listeners and credentials (0.4)
+
+`internal/management` owns the live token verifier and web listeners separately
+from `runReceiverLoop`. `App.ManagedHandler` applies bearer authentication and
+same-origin checks before routing `/api/manage/` to it. Static assets and health
+remain public. Token rotation writes the replacement privately before swapping
+the in-memory credential. It does not restart RF reception.
+
+The network manager opens proposed listeners while retaining the current ones.
+Only confirmation from the proposed endpoint persists `network.json`; when HTTPS
+is selected, confirmation must use HTTPS. A three-minute timer or cancellation
+closes proposed listeners. Unconfirmed settings are never written, so restart
+returns to the last confirmed configuration. Listener failure does not silently
+fall back to a public or wildcard address. TLS certificate/key data is private
+`tls.json`; only the public CA is downloadable through authentication.
+
+The frontend uses one set of fields and changes layout through CSS media queries
+and `data-layout` / `data-view`. Layout preference is local to the browser; remotes
+and actions remain server configuration. No separate mobile application or API
+copy is maintained. See NETWORK.md and TESTING-0.4.md.

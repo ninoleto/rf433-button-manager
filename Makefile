@@ -3,15 +3,17 @@ NODE ?= node
 TEST_FLAGS ?= -race -count=1 -timeout=2m
 TEST_PACKAGES ?= ./...
 
-.PHONY: build test test-ui test-deploy vet check clean
+.PHONY: build test test-ui test-deploy test-management vet check clean
 build:
 	mkdir -p bin
-	GOTOOLCHAIN=local CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o bin/rf-button-manager ./cmd/rf-button-manager
+	GOTOOLCHAIN=local CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o bin/rf433-button-manager ./cmd/rf433-button-manager
 test:
 	GOTOOLCHAIN=local $(GO) test $(TEST_FLAGS) $(TEST_PACKAGES)
 test-ui:
 	$(NODE) --check internal/webui/static/app.js
 	$(NODE) --test internal/webui/learning.test.cjs
+test-management: build
+	python3 scripts/test-management-runtime.py
 test-deploy:
 	for script in scripts/*.sh; do bash -n "$$script"; done
 	bash scripts/test-deploy.sh

@@ -12,7 +12,7 @@ button assignments and webhook configuration are preserved when switching.
 
 ## Process configuration
 
-The installed unit reads `/etc/rf-button-manager/manager.env` and translates its
+The installed unit reads `/etc/rf433-button-manager/manager.env` and translates its
 variables into CLI flags. A directly launched executable does not read this file.
 
 | Flag | Default | Installed unit input |
@@ -20,15 +20,16 @@ variables into CLI flags. A directly launched executable does not read this file
 | `--listen` | `127.0.0.1:8787` | `RFB_LISTEN` |
 | `--rtl433` | `/usr/bin/rtl_433` | `RFB_RTL433` |
 | `--public-origin` | empty | `RFB_PUBLIC_ORIGIN` |
-| `--data-dir` | `./data` | Unit fixes `/var/lib/rf-button-manager` |
+| `--data-dir` | `./data` | Unit fixes `/var/lib/rf433-button-manager` |
 | `--demo` | false | Not enabled by supplied unit |
 | `--version` | Prints version and exits | Not a runtime setting |
 
-For direct LAN access, verify the server's actual private address and unused port,
-set `RFB_LISTEN` to that specific address and restart only this service. Wildcard
-and public binds are rejected. Code also accepts loopback/private IPs and
-`100.64.0.0/10`; acceptance does not configure routing or exposure. HTTP is
-unencrypted. The management token remains required on every interface.
+`--listen` / `RFB_LISTEN` supplies the initial HTTP listener. Once a change in
+**Settings → Network access** is confirmed, private `network.json` in the data
+directory takes precedence. The file includes only the explicit address, enabled
+protocols and their ports. Use the GUI/API to change it; see [NETWORK.md](NETWORK.md)
+for confirmation, HTTPS trust and local recovery. Wildcard and public binds are
+rejected. Management authentication remains required on every listener.
 
 ## Saved settings
 
@@ -52,7 +53,7 @@ acquisition then does not establish that Switch433 is supported.
 
 ## Receiver ownership and decoder provenance
 
-Run `scripts/inspect-zorin.sh` in a normal host terminal. The basic script lists
+Run `scripts/inspect-linux.sh` in a normal host terminal. The basic script lists
 Realtek receivers and known RF process names without opening hardware. It cannot
 establish host ownership inside a restricted process namespace. Inspect
 `rtl_433`, `rtl_tcp`, `rtl_test`, other SDR programs, relevant service units, and
