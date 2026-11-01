@@ -12,11 +12,21 @@ Linux server**, or first use the SSH tunnel in [Getting started](GETTING-STARTED
 `localhost` and `127.0.0.1` always mean the device opening the address: typing them
 on your Windows PC or phone does not connect to the Linux server.
 
-An upgrade preserves your existing address, ports and HTTP/HTTPS choices. No
-maintainer's LAN address is supplied as a default. From test.2, each enabled
-protocol also listens on `127.0.0.1` at its configured port. This local listener
-remains available when remote network access is disabled. It still requires the
-management token; it is not an authentication bypass.
+An upgrade preserves your existing address, ports and network protocol. No
+maintainer's LAN address is supplied as a default. From test.3, HTTP on
+`127.0.0.1` remains available independently of the network connection type.
+It still requires the management token; it is not an authentication bypass.
+
+| Network setting | On the Linux server | On other devices |
+| --- | --- | --- |
+| Network access off | HTTP on `127.0.0.1:8787` | No access |
+| Network access on, HTTP selected | HTTP on `127.0.0.1:8787` | HTTP at the selected server address |
+| Network access on, HTTPS selected | HTTP on `127.0.0.1:8787` | HTTPS at the selected server address; network HTTP is closed |
+
+The table uses the default local HTTP port. The advanced HTTP / localhost port
+changes that port. A saved test.2 configuration that enabled both network
+protocols remains readable and keeps both until you apply and confirm a new
+choice; the interface explains this. There is no separate “keep HTTP” checkbox.
 
 ## Allow access from your home network
 
@@ -26,9 +36,9 @@ management token; it is not an authentication bypass.
    the large list. Each row names its network interface. A Docker bridge normally
    is not reachable from another PC. Choose a VPN address only if both devices
    already use that VPN. The app never guesses or switches interfaces for you.
-3. Choose **HTTP** or **HTTPS**. Prepare client trust first if choosing HTTPS,
-   using the instructions below. Existing installations that allow both retain
-   both until changed; **Advanced → Also keep HTTP available** controls this.
+3. Choose **HTTP** or **HTTPS** for other devices. Prepare client trust first if
+   choosing HTTPS, using the instructions below. Localhost HTTP does not need
+   a separate switch and does not expose HTTP to other computers.
 4. Leave the ports alone unless needed. Defaults are 8787 for HTTP and 8788 for
    HTTPS. **Advanced: address and ports** also allows a manual address.
 5. Select **Apply network settings**. Open the proposed URL in another tab, log

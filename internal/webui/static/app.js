@@ -824,14 +824,14 @@
     return [...(c.http ? [`http://${host}:${c.http_port}`] : []), ...(c.https ? [`https://${host}:${c.https_port}`] : [])];
   }
   function networkDraft() {
-    return {address: $('network-enabled').checked ? $('network-address').value.trim() : '127.0.0.1', http: $('network-http').checked || ($('network-https').checked && $('network-keep-http').checked), https: $('network-https').checked, http_port: Number($('network-http-port').value), https_port: Number($('network-https-port').value)};
+    const enabled = $('network-enabled').checked;
+    return {address: enabled ? $('network-address').value.trim() : '127.0.0.1', http: !enabled || $('network-http').checked, https: enabled && $('network-https').checked, http_port: Number($('network-http-port').value), https_port: Number($('network-https-port').value)};
   }
   function networkKey(c) { return JSON.stringify([c.address,c.http,c.http_port,c.https,c.https_port]); }
   function fillNetwork(c) {
     $('network-enabled').checked = !isLoopback(c.address);
     $('network-address').value = c.address;
     $('network-http').checked = !c.https; $('network-https').checked = c.https;
-    $('network-keep-http').checked = c.http && c.https;
     $('network-http-port').value = c.http_port; $('network-https-port').value = c.https_port;
   }
   function renderNetworkDraft() {
@@ -842,8 +842,9 @@
     $('network-address-label').textContent = address && !isLoopback(address) ? address : 'Choose a LAN or VPN address';
     $('network-interface-label').textContent = info && !isLoopback(address) ? info.interface : 'An address assigned to the Linux server';
     $('network-address').disabled = !enabled;
-    $('network-keep-http-row').hidden = !$('network-https').checked;
-    $('network-https-help').hidden = !$('network-https').checked;
+    $('network-http').disabled = !enabled; $('network-https').disabled = !enabled;
+    $('network-https-help').hidden = !enabled || !$('network-https').checked;
+    $('network-legacy-both').hidden = !(networkState.config.http && networkState.config.https);
     const pending = !!networkState.pending;
     const changed = networkKey(networkDraft()) !== networkKey(networkState.config);
     $('network-fields').disabled = pending;
@@ -868,7 +869,7 @@
   }
   function showURLCards() {
     const c = networkState.config, remoteURLs = isLoopback(c.address) ? [] : configURLs(c);
-    const localURLs = networkState.local_urls || configURLs({...c,address:'127.0.0.1'});
+    const localURLs = networkState.local_urls || configURLs({...c,address:'127.0.0.1',http:true,https:false});
     const key = JSON.stringify([remoteURLs,localURLs]);
     if (key === networkURLKey) return;
     networkURLKey = key;

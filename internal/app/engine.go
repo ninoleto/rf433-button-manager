@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.4.0-test.2"
+const Version = "0.4.0-test.3"
 
 type App struct {
 	discoverReceivers                   func() ([]receiver.DeviceInfo, error)
@@ -474,14 +474,6 @@ func (a *App) ConfirmLearning() error {
 	if b == nil {
 		return errors.New("button not found")
 	}
-	for _, r := range next.Remotes {
-		for _, other := range r.Buttons {
-			if other.ID != b.ID && other.Signature != "" &&
-				(signaturesOverlap(other.Signature, l.Candidate) || decoderMappingsOverlap(other.Signature, l.Candidate, other.IdentityFields, l.Fields)) {
-				return errors.New("signal overlaps an existing button mapping; clear that mapping first")
-			}
-		}
-	}
 	b.Signature = l.Candidate
 	b.DecoderProfileID = ""
 	if l.Profile != nil {
@@ -501,6 +493,16 @@ func (a *App) ConfirmLearning() error {
 	}
 	b.IdentityFields = append([]string{}, l.Fields...)
 	b.Enabled = false
+	for _, r := range next.Remotes {
+		for _, other := range r.Buttons {
+			if other.ID != b.ID && other.Signature != "" &&
+				(signaturesOverlap(other.Signature, l.Candidate) ||
+					decoderMappingsOverlap(other.Signature, l.Candidate, other.IdentityFields, l.Fields) ||
+					profileMappingsOverlap(other.Signature, l.Candidate, other.IdentityFields, l.Fields, next.DecoderProfiles)) {
+				return errors.New("signal overlaps an existing button mapping; clear that mapping first")
+			}
+		}
+	}
 	if e := validateConfig(next); e != nil {
 		return e
 	}

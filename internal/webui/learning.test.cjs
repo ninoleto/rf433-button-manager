@@ -103,22 +103,37 @@ test('network stage is explicit, preserves receiver settings and can be cancelle
   assert.equal(h.el('network-enabled').checked,false);
 });
 
-test('network polling preserves drafts and resets expired tests without losing dual protocol settings',async()=>{
+test('network polling preserves drafts and requires explicit replacement of legacy dual protocol settings',async()=>{
   const h=await harness();
   const config={address:'192.168.50.20',http:true,http_port:8787,https:true,https_port:8788};
   h.network({config,interfaces:[{address:config.address,interface:'eth0'},{address:'100.64.5.1',interface:'tailscale0'}],pending:null});
   await h.el('settings-open').click();
-  assert.equal(h.el('network-https').checked,true);assert.equal(h.el('network-keep-http').checked,true);
+  assert.equal(h.el('network-https').checked,true);assert.equal(h.el('network-legacy-both').hidden,false);
+  assert.equal(h.calls.some(c=>c.url.endsWith('/stage')),false);
   h.el('network-https-port').value=8789;await h.el('network-form').emit('input');
   await h.refreshNetwork();assert.equal(h.el('network-https-port').value,8789);
   await h.el('network-form').emit('submit');
   const staged=h.calls.find(c=>c.url.endsWith('/stage')).body;
-  assert.equal(staged.http,true);assert.equal(staged.https,true);
+  assert.equal(staged.http,false);assert.equal(staged.https,true);
   assert.equal(h.el('network-fields').disabled,true);
   assert.equal(h.el('network-confirm').disabled,true,'old origin cannot confirm a new TLS origin');
   h.network({config,interfaces:[],pending:null});await h.refreshNetwork();
   assert.equal(h.el('network-https-port').value,8788);
-  assert.equal(h.el('network-fields').disabled,false);assert.equal(h.el('network-stage').disabled,true);
+  assert.equal(h.el('network-fields').disabled,false);assert.equal(h.el('network-stage').disabled,false);
+  assert.equal(h.el('network-legacy-both').hidden,false);
+});
+
+test('turning network access off selects localhost HTTP independently of the former HTTPS choice',async()=>{
+  const h=await harness();
+  h.network({config:{address:'192.168.50.20',http:false,http_port:8787,https:true,https_port:8788},interfaces:[],pending:null});
+  await h.el('settings-open').click();
+  assert.match(h.el('network-local-urls').children[0].children[0].textContent,/^http:\/\/127\.0\.0\.1:8787$/);
+  h.el('network-enabled').checked=false;await h.el('network-enabled').emit('change');
+  assert.equal(h.el('network-http').disabled,true);assert.equal(h.el('network-https').disabled,true);
+  const submitted=h.el('network-form').emit('submit');await h.flush();
+  await h.el('confirm-yes').click();await submitted;
+  const staged=h.calls.find(c=>c.url.endsWith('/stage')).body;
+  assert.equal(staged.address,'127.0.0.1');assert.equal(staged.http,true);assert.equal(staged.https,false);
 });
 
 test('local network switch requires an explicit server address and never stages automatically',async()=>{

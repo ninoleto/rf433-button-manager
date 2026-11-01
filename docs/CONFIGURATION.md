@@ -116,8 +116,8 @@ A saved `Akhan-100F14` button may also receive the identical reported payload as
 `Smoke-GS558`. Normal reception has a narrowly bounded fallback for this pair:
 all 24 code bits must reverse to the exact saved 20-bit ID and one of the four
 known command values. The GS558 ID/unit fields must agree with that code and its
-pairing flag must be zero. Unknown shapes and other decoder families remain
-exact-only. This does not change stored signatures or guess missing/corrupt bits.
+pairing flag must be zero. Unknown shapes remain exact-only. This does not change
+stored signatures or guess missing/corrupt bits.
 The two reports share the button's normal debounce and produce an explanatory
 matched event when the fallback is used. No additional press or wait is required.
 
@@ -125,9 +125,18 @@ If both representations are assigned to different saved buttons, the app reports
 `rf_ambiguous` and sends no action for that payload, even if one button is disabled.
 Review the duplicate in the interface; Clear also removes that button's saved
 webhook, so retain its setup if needed. Old configuration remains readable;
-new learning refuses the conflicting assignment. A mapping saved under Smoke
-alone retains its existing direct matching behavior. This is equality of reported
+new learning refuses the conflicting assignment. This is equality of reported
 payloads, not proof of the transmitter model, framing or radio coverage.
+
+Test.3 additionally accepts the same complete payload from a **registered,
+three-press-validated 25-bit OOK PWM profile** when a button is saved under Smoke,
+and vice versa. The conversion requires all 24 payload bits plus the expected
+trailing mark and zero hex padding. All four-bit command values remain distinct,
+including values the four-command Akhan decoder does not report. No saved profile,
+unknown model, different bits, extra required identity field or conflicting saved
+button means no fallback action. Existing direct matching is unchanged. This
+requires a profile already in the configuration; it does not create a decoder or
+guess missing timings. An existing qualifying mapping needs no relearning.
 
 ## Learn A ON with three separate presses
 

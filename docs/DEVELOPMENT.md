@@ -305,3 +305,13 @@ The public synthetic tests cover each changed payload bit, unsupported shapes,
 collision refusal, shared sliding debounce, additional selected identity fields
 and action gates. Keep source decoder references pinned to rtl_433 23.11 when
 extending this relation; JSON does not prove the original packet's full framing.
+
+For the saved-Smoke/profile regression, set
+`RFB_SMOKE_PROFILE_CAPTURE=/private/recording.json` and run
+`go test -race -count=1 ./internal/app -run TestPrivateSavedSmokeProfileCapture -v`.
+This specific three-burst recording test feeds recorded live JSON into the real
+normalization/matching path. The export omits profile timing configuration, so its
+custom model label is substituted with a registered synthetic 25-bit PWM profile;
+payload bits, fragment rows, order and timestamps remain unchanged. Separate
+filtered scenarios simulate missing custom or Smoke reports. They do not prove
+the exact deployed profile's timing configuration or physical receive range.

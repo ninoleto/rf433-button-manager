@@ -13,7 +13,8 @@ import (
 // GS558 JSON does not retain its original row length, so this is equivalence of
 // the reported payload, not proof of transmitter model or complete RF framing.
 // Keep the original event and saved signature. Only an existing complete Akhan
-// mapping can use the GS558 fallback; other decoder families remain exact-only.
+// mapping can use this GS558 fallback. Registered 25-bit PWM profiles have a
+// separate bounded conversion in profile_equivalence.go; all others stay exact.
 var akhanCommands = map[uint32]string{
 	1: "0x1 (Lock)", 2: "0x2 (Unlock)", 4: "0x4 (Mute)", 8: "0x8 (Alarm)",
 }
@@ -70,28 +71,11 @@ func decodedRemotePair(raw []byte) (native, alternate []byte, fromAlternate bool
 			}
 		}
 	case "Smoke-GS558":
-		for key := range event {
-			if key != "id" && key != "unit" && key != "learn" && key != "code" && !volatile[key] {
-				return nil, nil, false
-			}
-		}
-		var code string
-		id, validID := decoderUint(event["id"])
-		unit, validUnit := decoderUint(event["unit"])
-		learn, validLearn := decoderUint(event["learn"])
-		if json.Unmarshal(event["code"], &code) != nil || len(code) != 6 ||
-			!validID || !validUnit || !validLearn || learn != 0 {
+		var valid bool
+		payload, valid = smokePayload(event)
+		if !valid {
 			return nil, nil, false
 		}
-		data, err := hex.DecodeString(code)
-		if err != nil {
-			return nil, nil, false
-		}
-		encoded := uint32(data[0])<<16 | uint32(data[1])<<8 | uint32(data[2])
-		if id == 0 || id == 0x7fff || id != (encoded>>5)&0x7fff || unit != encoded&31 {
-			return nil, nil, false
-		}
-		payload = bits.Reverse32(encoded) >> 8
 		fromAlternate = true
 	default:
 		return nil, nil, false
@@ -126,6 +110,7 @@ type receivedButton struct {
 // config readable but block this ambiguous payload, even if one action is off.
 func (a *App) matchReceivedButtonsLocked(raw []byte) ([]receivedButton, bool) {
 	native, alternate, fromAlternate := decodedRemotePair(raw)
+	profileAlternates := profileEquivalentEvents(raw, a.config.DecoderProfiles)
 	var matches []receivedButton
 	related := 0
 	for ri := range a.config.Remotes {
@@ -134,10 +119,14 @@ func (a *App) matchReceivedButtonsLocked(raw []byte) ([]receivedButton, bool) {
 			direct := matchesButton(raw, b)
 			nativeMatch := matchesButton(native, b)
 			alternateMatch := matchesButton(alternate, b)
-			if nativeMatch || alternateMatch {
+			profileMatch := false
+			for _, event := range profileAlternates {
+				profileMatch = profileMatch || matchesButton(event, b)
+			}
+			if direct || nativeMatch || alternateMatch || profileMatch {
 				related++
 			}
-			if direct || (fromAlternate && nativeMatch) {
+			if direct || (fromAlternate && nativeMatch) || profileMatch {
 				matches = append(matches, receivedButton{b, !direct})
 			}
 		}

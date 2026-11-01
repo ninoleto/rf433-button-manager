@@ -28,7 +28,8 @@ and explains that path in the message. `kind:rf_ambiguous` means the decoded pay
 could address more than one saved button and **no action was scheduled**. It has
 no selected `button_id`; use the All events or RF signals filter to see it. Stored
 identities and schema are unchanged. See CONFIGURATION.md for the narrowly scoped
-GS558-to-Akhan fallback; unrelated decoder models remain exact-only.
+GS558-to-Akhan fallback and test.3's registered 25-bit PWM payload conversion;
+unrelated decoder models remain exact-only.
 
 
 All /api routes require `Authorization: Bearer <token>`; JSON bodies, errors
@@ -371,11 +372,15 @@ Network object example (replace with the actual host's private address):
 {"address":"192.168.50.20","http":false,"http_port":8787,"https":true,"https_port":8788}
 ```
 
-Test.2 adds a companion `127.0.0.1` listener for every enabled protocol. `urls`
-keeps the configured address first, followed by the companion local URLs without
-duplicates. `local_urls` lists these local-only endpoints. `network_enabled` is
-false when the configured address is loopback. The network object is unchanged:
-to disable remote access, stage `address: "127.0.0.1"` and confirm at that endpoint.
+Test.3 keeps authenticated HTTP on `127.0.0.1:http_port` independently of the
+selected network protocol. `urls` keeps the configured address first, followed
+by local HTTP without duplicates. `local_urls` contains that HTTP endpoint.
+`network_enabled` is false when the configured address is loopback. To disable
+network access, stage `address: "127.0.0.1", http: true, https: false` and confirm
+at that endpoint. New staged settings must choose HTTP or HTTPS, never both.
+Saved test.2 dual-protocol settings remain loadable and unchanged until an
+explicit replacement is confirmed. Selecting network HTTPS does not enable
+network HTTP just to preserve localhost access.
 A companion loopback endpoint cannot confirm a proposed non-loopback endpoint;
 the selected network address must be tested. Certificates cover the selected and
 pending addresses plus `localhost`, `127.0.0.1` and `::1`. Local URLs use IPv4

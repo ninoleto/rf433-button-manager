@@ -1,6 +1,6 @@
 # 0.4 validation record and operator test plan
 
-Version: **0.4.0-test.2**. Base: published RC1 commit
+Version: **0.4.0-test.3**. Base: published RC1 commit
 `e1822594297c0d5b208c22b671a3be0f7a183445`. No production host change or GitHub
 publication is performed by building this package.
 
@@ -318,6 +318,51 @@ Software validation for this build:
 No physical receiver, Home Assistant action, USB reconnect, ZORIN service restart,
 Windows/phone CA installation, new RF range test or soak test was performed here.
 
+## Test.3: saved Smoke/profile matching and independent localhost HTTP
+
+The latest saved-button screenshot identifies the problem mapping as Smoke,
+not Akhan. Its command is outside Akhan's four supported command values. Two
+private recordings include both Smoke reports and a registered custom 25-bit
+PWM representation of the same complete payload. The previous fallback only
+addressed an existing Akhan mapping, so it did not cover this saved button.
+
+A regression test failed against test.2: retaining only the custom reports
+produced zero requests for the saved Smoke mapping. The new bounded conversion
+produces three isolated requests, one per recorded matching burst, from either
+representation or both together. This does not establish that all reported
+misses had this cause: the unfiltered recordings also contain direct Smoke
+reports and already produced three requests before the fix. No attempted-press
+count or radio range is inferred from unrelated traffic in a recording.
+
+The conversion requires a registered, persisted, three-press-validated 25-bit
+PWM profile and all 24 payload bits, the trailing mark and zero hex padding.
+GS558's redundant identity fields and zero pairing flag are validated. Commands
+remain distinct; no error correction, guessed timings, RF gain/sample changes,
+new receiver process or dispatch delay is introduced. A conflicting saved mapping
+blocks dispatch with an explanation. Existing saved mappings and actions remain
+unchanged; this retest should not start with another relearning cycle.
+
+New synthetic tests cover each changed bit, unknown and invalid profiles, valid
+profiles of another width/modulation, additional identity fields, all command
+values, mixed-report/hold debounce, action gates, legacy duplicate configurations,
+atomic learning overlap rejection and reopening the saved database. The private
+recording tests substitute only the custom model label with a valid synthetic
+profile because exports omit timing configuration. Payload bits, fragments,
+timestamps and event order are unchanged. Filtering out one decoder's output
+is explicitly simulated missing-output coverage, not a new physical test.
+
+The network correction removes “Also keep HTTP available”. Local HTTP on
+`127.0.0.1` stays authenticated and available independently of the selected LAN
+protocol. New network choices are HTTP or HTTPS exclusively. Turning network
+access off selects local HTTP only. Test.2's saved dual-protocol settings load
+unchanged until an explicit replacement is applied and confirmed. Staged rollback
+and certificate trust still apply; no firewall, router or VPN is configured.
+
+Software checks for this private build are recorded in TEST-REPORT.md. Actual
+room-by-room reception, nine button assignments and Windows/phone certificate
+trust remain operator acceptance tasks. Test.1/test.2 downloads and the published
+RC1 remain unchanged.
+
 ## ZORIN acceptance — in progress
 
 Use the private package and UPGRADING.md. Keep the rollback snapshot. Record the
@@ -329,11 +374,10 @@ browser/screen was tested. Never include tokens or webhook URLs in shared report
    service is enabled and owns one decoder child. Confirm the renamed paths.
 2. **Reboot:** with operator approval, confirm service and receiver recover after
    a host reboot. An enabled service alone is not evidence of receiver recovery.
-3. **Problem button:** inspect its saved mapping first. A complete learned Akhan
-   identity receives the exact alternate-report fix without relearning. If it is
-   still a custom-profile mapping, use three separate Learn presses to verify the
-   intended native identity before saving; do not remap unrelated sensor traffic.
-   Re-enable a newly learned action only after deliberate validation.
+3. **Problem button:** keep the existing mapping for this retest. Test.3 supports
+   the saved Smoke representation and the registered 25-bit PWM profile without
+   relearning, as well as the earlier complete Akhan fallback. Close learning or
+   inspection and wait for normal reception; actions are paused during capture.
    Test one press at a time from each room, with someone watching the monitor.
    Record attempted presses, recognized bursts and resulting actions separately.
    Check different buttons do not trigger each other's actions and a held press
@@ -346,7 +390,11 @@ browser/screen was tested. Never include tokens or webhook URLs in shared report
    320–430 px phone widths, tablet rotation, keyboard navigation and browser zoom.
 6. **Network:** test HTTP/HTTPS on the actual LAN, certificate trust on Windows
    and phone, cancel/timeout of an unconfirmed change, secure confirmation,
-   persistence and local recovery. Check RF receiving continues during changes.
+   persistence and local recovery. In all three network modes, authenticate through
+   localhost HTTP on the server. With HTTPS selected and confirmed, verify LAN
+   HTTP closes. With network access off, verify only local HTTP remains. A legacy
+   dual-protocol setup changes only after Apply and confirmation. Check RF
+   receiving continues during changes.
 7. **Token:** replace it, reconnect a second tab using the new token, confirm the
    old one fails and local retrieval still works. Do not paste the value into chat.
 8. **Recovery:** only with the operator, test receiver-only unplug/replug and

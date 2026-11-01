@@ -41,6 +41,14 @@ block dispatch with `rf_ambiguous`; existing state remains loadable. No generic
 model removal, fuzzy matching, timing changes or retries are introduced. See
 [configuration](CONFIGURATION.md#known-decoder-equivalent-reports-after-test1).
 
+Test.3's `profile_equivalence.go` also connects a registered, three-press-validated
+25-bit OOK PWM profile with the exact GS558 payload in either direction. It checks
+every payload bit, the trailing mark and hex padding, keeps all command values
+distinct, and uses the same saved button's debounce and dispatch gates. It does
+not enable arbitrary flex names, infer timing settings or accept bit errors.
+Legacy cross-format collisions remain loadable but block actions. Learning checks
+the prospective profile and mapping together before an atomic save.
+
 USB discovery re-runs across port/hub changes. Select unique serial where available;
 automatic selection is permitted only with exactly one supported receiver. Ambiguous
 receivers block acquisition. Never persist USB bus/device numbers. Supervise process

@@ -4,18 +4,21 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
-Test.2 groups the exact alternate RF payload match with responsive navigation and
-network-access improvements. It adds companion local listeners, a network switch,
-address and remote pickers, explicit confirmation/rollback, and platform-specific
-certificate help. Existing schema/configuration, action flags, token, migrations,
-RF decoder settings and webhook behavior are preserved except for the documented
-matching correction. The runtime version is `0.4.0-test.2`.
+Test.3 fixes a reproduced dispatch gap: a saved Smoke mapping ignored the same
+complete payload when only a registered 25-bit PWM profile reported it. The bounded
+conversion now works in both directions, retains all command values, shares
+normal debounce and refuses conflicting mappings. No RF gain, sample rate, timing
+profile, webhook configuration or saved identity is changed. It also corrects
+network choices: authenticated localhost HTTP is independent of the selected LAN
+HTTP or HTTPS mode. The confusing “keep HTTP” option is removed. Existing legacy
+dual-protocol settings await explicit Apply/confirmation. The runtime version is
+`0.4.0-test.3`.
 
 Full race/static/controller/deployment/updater checks, private recording replay
 and real demo HTTP/TLS/token lifecycle checks pass. Chromium rendering is now
 available and has been checked; detailed evidence and remaining operator gates
 are recorded in TESTING-0.4.md. This is a private test build, not a stable release
-or proof of physical reception range. The test.1 archive and published GitHub
+or proof of physical reception range. The test.1/test.2 archives and published GitHub
 release remain unchanged. No ZORIN deployment or real webhook is performed here.
 
 ---

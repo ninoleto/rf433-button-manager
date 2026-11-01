@@ -4,6 +4,44 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
+## 0.4.0-test.3 software verification (2026-11-01)
+
+This private build fixes a reproduced saved-Smoke / registered-PWM dispatch gap
+and separates localhost HTTP from the network protocol choice. It does not claim
+to solve every missed physical press. TESTING-0.4.md records the evidence limits
+and the remaining Zorin acceptance plan.
+
+- Full uncached Go race tests, vet, JavaScript syntax, **19 controller tests**,
+  deployment/history checks and **10 updater/migration simulations** passed with
+  Go 1.27.3. All four pinned public RF fixtures and the earlier private three/nine
+  burst replay inputs were supplied. No private recording is distributed.
+- Both newer private recordings passed the saved-Smoke regression: respectively
+  16 and 17 recorded messages each produce three isolated local requests. Keeping
+  only the 10/12 custom reports or only the three Smoke reports also produces
+  three requests. The custom-only case failed on test.2 before this fix. Exports
+  omit profile configuration, so only the model label is substituted with a
+  registered synthetic 25-bit PWM profile; payload bits and event order are kept.
+  These filtered cases simulate missing decoder output, not new RF reception.
+- Synthetic checks reject every changed payload/trailing/padding bit, unknown or
+  invalid profiles, valid profiles of another width/modulation, extra identity
+  fields and pairing reports. Commands stay distinct. Mixed reports share debounce;
+  action gates, legacy collision refusal, atomic learning and saved-state reopening
+  pass without changing mappings or webhook configuration.
+- The built demo executable passes network HTTP, network HTTPS with LAN HTTP
+  closed, and network-off modes, each with authenticated localhost HTTP retained.
+  CA verification, confirmation at the proposed endpoint, token rotation/revocation,
+  restart persistence and certificate renewal passed. Management tests also cover
+  preserved legacy dual-protocol settings and rejected ambiguous new settings.
+- Chromium 141 passed **12 browser groups**, including real network staging and
+  cancellation, certificate download, desktop/tablet/phone layouts and a touch
+  picker with many remotes. Desktop and phone network screens were inspected.
+  The harness now checks disabled protocol controls when network access is off.
+
+Package extraction, clean-history build reproduction and checksums are verified
+separately at packaging. There is no new GitHub CI or publication claim. No real
+receiver, Home Assistant endpoint, host service, Windows/phone trust store or
+physical range test was operated by this verification.
+
 ---
 
 # Verification reports

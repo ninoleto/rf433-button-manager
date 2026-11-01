@@ -3,6 +3,7 @@ package management
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"io"
 	"net"
@@ -206,6 +207,7 @@ func TestCertificateDownloadPreparationRetainsPendingAddress(t *testing.T) {
 	s, _ := testServer(t)
 	c := s.config
 	c.Address, c.HTTPS, c.HTTPSPort = "127.0.0.2", true, freePort(t)
+	c.HTTP = false
 	if _, err := s.Stage(c); err != nil {
 		t.Fatal(err)
 	}
@@ -300,12 +302,12 @@ func TestSelectedListenerAlsoKeepsLocalAccess(t *testing.T) {
 	if err = s.confirm(pending.ID, net.JoinHostPort(c.Address, strconv.Itoa(c.HTTPSPort)), true); err != nil {
 		t.Fatal(err)
 	}
-	c.Address = "127.0.0.1"
+	c.Address, c.HTTP, c.HTTPS = "127.0.0.1", true, false
 	pending, err = s.Stage(c)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = s.confirm(pending.ID, net.JoinHostPort(c.Address, strconv.Itoa(c.HTTPSPort)), true); err != nil {
+	if err = s.confirm(pending.ID, net.JoinHostPort(c.Address, strconv.Itoa(c.HTTPPort)), false); err != nil {
 		t.Fatal(err)
 	}
 	if len(s.URLs()) != 1 || s.URLs()[0] != c.LocalURLs()[0] {
@@ -339,4 +341,68 @@ func TestBusyCompanionLoopbackCannotReplaceCurrentListener(t *testing.T) {
 		t.Fatal("failed staging lost current access", err)
 	}
 	resp.Body.Close()
+}
+
+func TestHTTPSNetworkModeKeepsOnlyLocalHTTPCompanion(t *testing.T) {
+	s, _ := testServer(t)
+	c := s.config
+	c.Address = "127.0.0.2"
+	c.HTTP = false
+	c.HTTPS = true
+	c.HTTPSPort = freePort(t)
+	pending, err := s.Stage(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.confirm(pending.ID, net.JoinHostPort(c.Address, strconv.Itoa(c.HTTPSPort)), true); err != nil {
+		t.Fatal(err)
+	}
+	wantNetwork := "https://" + net.JoinHostPort(c.Address, strconv.Itoa(c.HTTPSPort))
+	wantLocal := "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(c.HTTPPort))
+	urls := s.URLs()
+	if len(urls) != 2 || urls[0] != wantNetwork || urls[1] != wantLocal {
+		t.Fatal("unexpected selected/local protocols", urls)
+	}
+	resp, err := http.Get(wantLocal)
+	if err != nil {
+		t.Fatal("localhost HTTP was removed", err)
+	}
+	resp.Body.Close()
+	if c.HTTP {
+		t.Fatal("localhost HTTP enabled network HTTP")
+	}
+}
+
+func TestExistingDualProtocolConfigurationLoadsButNewChoiceIsExclusive(t *testing.T) {
+	dir := t.TempDir()
+	token, err := OpenToken(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := Network{Address: "127.0.0.2", HTTP: true, HTTPPort: freePort(t), HTTPS: true, HTTPSPort: freePort(t)}
+	if c.HTTPSPort == c.HTTPPort {
+		c.HTTPSPort = freePort(t)
+	}
+	raw, _ := json.Marshal(c)
+	if err = AtomicPrivate(filepath.Join(dir, "network.json"), raw); err != nil {
+		t.Fatal(err)
+	}
+	s, err := NewServer(dir, "127.0.0.1:18788", token)
+	if err != nil {
+		t.Fatal("legacy settings no longer load", err)
+	}
+	if s.config != c {
+		t.Fatal("legacy settings silently changed")
+	}
+	if err = s.Start(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	c.HTTPSPort = freePort(t)
+	if _, err = s.Stage(c); err == nil {
+		t.Fatal("new network choice allowed both protocols")
+	}
+	if s.pending != nil {
+		t.Fatal("rejected choice changed current configuration")
+	}
 }

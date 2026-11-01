@@ -245,6 +245,17 @@ after migration and expect the old application to accept new data.
 
 ## Evidence and extension points
 
+The decoded model label is the decoder's interpretation, not proof of the remote's
+brand or device type. In test.3, a saved Smoke mapping and a registered, validated
+25-bit PWM profile can recognize the same exact reported payload without
+relearning. Both forms share debounce and produce at most one action for a burst.
+This addresses differing decoder output; it cannot recover a press for which no
+valid matching data was decoded. See [matching rules](CONFIGURATION.md#known-decoder-equivalent-reports-after-test1).
+
+Use normal reception to test an existing assignment. Learning and inspection
+pause webhook actions until capture and cleanup finish. Close those dialogs and
+wait for normal reception before testing the physical button's action.
+
 `internal/receiver/analysis_test.go` replays an explicitly synthetic pulse fixture
 through an installed rtl_433 without USB. Application tests cover lifecycle,
 timeouts, inconsistent captures, late results, collisions, persistence and profile

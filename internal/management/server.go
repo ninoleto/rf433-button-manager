@@ -71,7 +71,7 @@ func (c Network) Validate() error {
 	if c.HTTPPort < 1024 || c.HTTPPort > 65535 || c.HTTPSPort < 1024 || c.HTTPSPort > 65535 {
 		return errors.New("ports must be between 1024 and 65535")
 	}
-	if c.HTTP && c.HTTPS && c.HTTPPort == c.HTTPSPort {
+	if c.HTTPS && (c.HTTP || c.Address == "127.0.0.1") && c.HTTPPort == c.HTTPSPort {
 		return errors.New("HTTP and HTTPS require different ports")
 	}
 	return nil
@@ -79,14 +79,24 @@ func (c Network) Validate() error {
 func (c Network) URLs() []string {
 	// Keep the configured address first for existing callers and update tools.
 	urls := c.primaryURLs()
-	if c.Address != "127.0.0.1" {
-		urls = append(urls, c.LocalURLs()...)
+	for _, local := range c.LocalURLs() {
+		found := false
+		for _, existing := range urls {
+			found = found || local == existing
+		}
+		if !found {
+			urls = append(urls, local)
+		}
 	}
 	return urls
 }
 func (c Network) LocalURLs() []string {
-	c.Address = "127.0.0.1"
-	return c.primaryURLs()
+	if c.Address == "" || c.HTTPPort == 0 {
+		return nil
+	}
+	// Local HTTP is independent of the selected LAN protocol. HTTPS on the
+	// network must not require also exposing HTTP on the network.
+	return []string{"http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(c.HTTPPort))}
 }
 func (c Network) primaryURLs() []string {
 	var urls []string
@@ -210,6 +220,9 @@ func (s *Server) Stage(c Network) (*Pending, error) {
 	}
 	if err := c.Validate(); err != nil {
 		return nil, err
+	}
+	if c.HTTP && c.HTTPS {
+		return nil, errors.New("choose either HTTP or HTTPS for network access; localhost HTTP remains available automatically")
 	}
 	if c == s.config {
 		return nil, errors.New("network settings are unchanged")

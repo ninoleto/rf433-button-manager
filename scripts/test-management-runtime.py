@@ -38,6 +38,13 @@ def ready(opener, base):
         time.sleep(.1)
     raise RuntimeError('isolated management server did not become ready')
 
+def closed(opener, base):
+    for _ in range(60):
+        try: request(opener, base, '/healthz')
+        except (URLError, OSError): return
+        time.sleep(.05)
+    raise RuntimeError('removed network listener is still reachable')
+
 def stop(process):
     process.terminate()
     try: process.wait(timeout=5)
@@ -51,7 +58,6 @@ with tempfile.TemporaryDirectory(prefix='rf433-management-test-') as directory:
     base = 'http://127.0.0.2:' + str(http_port)
     secure = 'https://127.0.0.2:' + str(https_port)
     local = 'http://127.0.0.1:' + str(http_port)
-    local_secure = 'https://127.0.0.1:' + str(https_port)
     opener = build_opener(ProxyHandler({}))
     def start():
         return subprocess.Popen([str(binary), '--demo', '--listen', '127.0.0.2:'+str(http_port), '--data-dir', directory], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -74,10 +80,12 @@ with tempfile.TemporaryDirectory(prefix='rf433-management-test-') as directory:
         assert status == 200 and b'PRIVATE KEY' not in certificate
         tls = build_opener(ProxyHandler({}), HTTPSHandler(context=ssl.create_default_context(cadata=certificate.decode())))
         ready(tls, secure)
-        ready(tls, local_secure)
-        assert request(tls, local_secure, '/api/manage/network/confirm', token, {'id':pending['id']})[0] == 400
-        assert request(tls, local_secure, '/api/state')[0] == 401
+        ready(opener, local)
+        assert request(opener, local, '/api/manage/network/confirm', token, {'id':pending['id']})[0] == 400
+        assert request(opener, local, '/api/state')[0] == 401
         assert request(tls, secure, '/api/manage/network/confirm', token, {'id':pending['id']})[0] == 200
+        closed(opener, base)
+        ready(opener, local)
         status, raw = request(tls, secure, '/api/manage/token/rotate', token, {'confirm':True})
         assert status == 200
         new_token = json.loads(raw)['token']
@@ -89,16 +97,31 @@ with tempfile.TemporaryDirectory(prefix='rf433-management-test-') as directory:
         stop(process)
         process = start()
         ready(tls, secure)
-        ready(tls, local_secure)
+        ready(opener, local)
+        closed(opener, base)
         network = json.loads(request(tls, secure, '/api/manage/network', new_token)[1])
         assert network['config'] == proposed and network['pending'] is None
         assert request(tls, secure, '/api/state', token)[0] == 401
         assert request(tls, secure, '/api/state', new_token)[0] == 200
-        assert request(tls, local_secure, '/api/state', new_token)[0] == 200
-        assert request(tls, local_secure, '/api/state', token)[0] == 401
+        assert request(opener, local, '/api/state', new_token)[0] == 200
+        assert request(opener, local, '/api/state', token)[0] == 401
         assert request(tls, secure, '/api/manage/certificate/renew', new_token, {})[0] == 200
         assert request(tls, secure, '/api/manage/certificate', new_token)[1] == certificate
-        print('PASS: real demo executable enforces authentication on selected and companion loopback listeners, stages HTTPS, verifies CA trust, requires confirmation on the proposed listener, rotates/revokes tokens, preserves settings across restart and renews without changing trust.')
+        local_only={**proposed,'address':'127.0.0.1','http':True,'https':False}
+        assert request(tls,secure,'/api/manage/network/stage',new_token,local_only)[0]==200
+        pending=json.loads(request(opener,local,'/api/manage/network',new_token)[1])['pending']
+        assert request(opener,local,'/api/manage/network/confirm',new_token,{'id':pending['id']})[0]==200
+        closed(tls,secure)
+        assert request(opener,local,'/api/state')[0]==401
+        assert request(opener,local,'/api/state',new_token)[0]==200
+        http_only={**local_only,'address':'127.0.0.2'}
+        assert request(opener,local,'/api/manage/network/stage',new_token,http_only)[0]==200
+        pending=json.loads(request(opener,local,'/api/manage/network',new_token)[1])['pending']
+        assert request(opener,base,'/api/manage/network/confirm',new_token,{'id':pending['id']})[0]==200
+        assert request(opener,base,'/api/state',new_token)[0]==200
+        assert request(opener,local,'/api/state',new_token)[0]==200
+        closed(tls,secure)
+        print('PASS: network HTTP, network HTTPS without network HTTP, and network-off modes all preserve authenticated localhost HTTP. CA trust, staged confirmation, token rotation/revocation, restart persistence and certificate renewal also passed.')
         print('No USB receiver or external webhook was used; no browser rendering claim.')
     finally:
         stop(process)
