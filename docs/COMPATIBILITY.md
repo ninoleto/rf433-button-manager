@@ -1,9 +1,9 @@
 # Button compatibility and signal inspection
 
-RF433 Button Manager is not a universal Amazon-button receiver. Amazon is a retailer,
-not a radio protocol. Frequency, modulation, encoding, receiver hardware, decoder
-version and stable button identity all matter. A listing saying only "433 MHz" is
-not sufficient proof that its particular transmitter will work.
+RF433 Button Manager receives supported 433.92 MHz buttons and remotes through
+an RTL-SDR receiver and rtl_433. Compatibility depends on frequency, modulation,
+encoding, receiver hardware, decoder version and a stable button identity. A
+product listing saying only "433 MHz" does not establish compatibility.
 
 ## Current scope
 
@@ -27,14 +27,14 @@ traffic even when the intended button was not received.
 
 | Evidence | What has been checked |
 | --- | --- |
+| 0.4.0 on the maintainer's equipment | Zorin OS 18.1, one RTL2838/R820T receiver and rtl_433 23.11. Nine configured button assignments; the latest detailed trials exercised one six-button remote. Occasional missed presses remain unresolved. See [hardware observations](HARDWARE-TESTS.md). |
 | Three assigned buttons at the original operator's home | Operator tested all three and their webhooks and accepted the latest interface within available testing for 0.3.6-dev publication. Commercial model/revision identifiers were not supplied, so these are not a purchase recommendation or named-model guarantee. |
 | First-switch/front-door recordings | Private offline PWM replay, three software-armed observations, persistence and local webhook routing. Private RF IDs are not distributed. |
 | EV1527, PT2262, Akhan and HT680 example recordings | Checksum-pinned public IQ files pass software tests. This validates those recordings, not every product sharing a chipset or listing name. |
-| Future six-button Amazon remote | Not yet available for physical testing. |
 | Physical multi-tuner selection, USB hub/port recovery, soak and wider receiver/platform combinations | Unverified; consult HARDWARE-TESTS.md. |
 
-An honest public release describes this as a development tool for supported
-433.92 MHz buttons. Community reports should name the exact product/revision,
+Version 0.4.0 is a regular release for supported 433.92 MHz buttons; it does not
+establish universal compatibility. Community reports should name the exact product/revision,
 receiver, rtl_433 version, app version and completed tests. Device support may
 differ between rtl_433 releases. This app does not silently replace rtl_433.
 

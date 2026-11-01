@@ -5,7 +5,9 @@ through a USB RTL-SDR receiver. Once installed, the app runs in the background;
 you learn buttons and assign webhook URLs in your browser.
 
 **Physical testing is limited to Zorin OS 18.1, Linux x86_64**, one RTL2838/R820T
-receiver, rtl_433 23.11 and nine home buttons. Other distributions and hardware
+receiver and rtl_433 23.11. The maintainer's setup has nine configured button
+assignments; the latest detailed trials exercised one six-button remote, with
+occasional missed presses still observed. Other distributions and hardware
 combinations are not physically verified. Automated Ubuntu CI is separate software
 evidence. This is an AI-assisted open-source project. It cannot learn every signal
 sold as "433 MHz"; check [compatibility](COMPATIBILITY.md) before choosing hardware.

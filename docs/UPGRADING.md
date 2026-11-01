@@ -117,5 +117,6 @@ For a deliberate rollback, use an operator-reviewed procedure:
    SQLite or blindly restore flags from an unrelated snapshot.
 
 Do not run these recovery operations against a live SQLite directory or mix files
-from different snapshots. The release remains a test build until migration and
-rollback have also been validated on the real host with the operator.
+from different snapshots. Version 0.4.0 is a regular release. Its migration and
+rollback simulations do not establish recovery on every physical host; the
+remaining hardware checks are recorded in [HARDWARE-TESTS.md](HARDWARE-TESTS.md).
