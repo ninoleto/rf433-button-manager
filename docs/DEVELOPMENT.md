@@ -290,3 +290,15 @@ For frontend changes run both Node controller tests and the optional Playwright
 `internal/webui/ui.test.cjs` suite, then inspect real screen sizes and coarse-pointer
 use. A DOM adapter cannot establish rendered layout. See TESTING-0.4.md for blocked
 and pending acceptance checks.
+
+For the post-test.1 exact decoder-equivalence regression, set
+`RFB_EQUIVALENT_CAPTURE=/private/recording.json` and run
+`go test -race -count=1 ./internal/app -run TestPrivateEquivalentCaptureToWebhook -v`.
+This optional test replays raw OOK packets with `rtl_433 -r` and checks isolated
+HTTP request counts. It then deliberately removes the native messages to test
+the alternate-only dispatch case. That second scenario is a simulation, not a
+claim that the unmodified recording contains an alternate-only physical failure.
+The public synthetic tests cover each changed payload bit, unsupported shapes,
+collision refusal, shared sliding debounce, additional selected identity fields
+and action gates. Keep source decoder references pinned to rtl_433 23.11 when
+extending this relation; JSON does not prove the original packet's full framing.

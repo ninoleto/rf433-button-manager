@@ -33,6 +33,14 @@ of one candidate and explicit confirmation, and checks mapping uniqueness atomic
 No webhook dispatch during learning. Sliding silence-based debounce prevents a held
 button from retriggering continuously. Actions are not replayed across restarts.
 
+After test.1, `internal/app/decoder_equivalence.go` adds one exact payload fallback
+from GS558 JSON to an already saved Akhan mapping. It validates the full reported
+24-bit code and consistent ancillary fields, preserves the original event/signature,
+and shares the normal debounce/action gates. Potentially colliding saved mappings
+block dispatch with `rf_ambiguous`; existing state remains loadable. No generic
+model removal, fuzzy matching, timing changes or retries are introduced. See
+[configuration](CONFIGURATION.md#known-decoder-equivalent-reports-after-test1).
+
 USB discovery re-runs across port/hub changes. Select unique serial where available;
 automatic selection is permitted only with exactly one supported receiver. Ambiguous
 receivers block acquisition. Never persist USB bus/device numbers. Supervise process

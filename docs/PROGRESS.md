@@ -4,6 +4,14 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
+Post-test.1 source work on 1 November adds a bounded exact-payload fallback from
+GS558 reports to existing Akhan mappings, shared debounce and collision refusal.
+The original bug was reproduced against the packaged commit; synthetic and private
+recording regressions and the full checks pass. The operator confirmed three
+presses in the latest capture, all three represented. No new package, ZORIN update,
+physical range/latency claim or publication is made. Pending UI/network feedback
+and physical acceptance remain in TESTING-0.4.md.
+
 ---
 
 # Project progress

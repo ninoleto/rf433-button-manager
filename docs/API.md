@@ -23,6 +23,13 @@ the last decoded RF event, not a sample heartbeat, button match or webhook resul
 New `rf`, `matched` and `receiver` events optionally include a `receiver` object
 with `name`, `serial`, `usb_port`; historical events need not have it.
 
+After test.1, an exact supported decoder-equivalence match retains `kind:matched`
+and explains that path in the message. `kind:rf_ambiguous` means the decoded payload
+could address more than one saved button and **no action was scheduled**. It has
+no selected `button_id`; use the All events or RF signals filter to see it. Stored
+identities and schema are unchanged. See CONFIGURATION.md for the narrowly scoped
+GS558-to-Akhan fallback; unrelated decoder models remain exact-only.
+
 
 All /api routes require `Authorization: Bearer <token>`; JSON bodies, errors
 `{"error":"message"}`. UI login stores token in sessionStorage. GET /healthz is

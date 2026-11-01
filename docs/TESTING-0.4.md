@@ -54,7 +54,214 @@ The packaged commit and binary hash are recorded in `release.json`; packaging an
 clean-build checks must be completed against that commit before delivery. No new
 GitHub CI run is claimed while this remains an unpublished local branch.
 
-## ZORIN acceptance — pending
+## Operator feedback — 31 October 2026
+
+The operator applied `0.4.0-test.1` on ZORIN. The supplied updater reported a
+successful migration from `0.3.8-dev`, the live packaged commit, 20 seconds of
+stable running, authentication enforcement, configuration/token/environment and
+enabled-flag preservation, persistence after service restart, and a connected
+receiver owned by `rf433-button-manager.service`. This is host update evidence;
+it does not establish reboot recovery, physical action success or full acceptance.
+
+The following issues are **open**. The operator requested notes only; no code,
+installed application, published release or distributed package was changed in
+response to this feedback.
+
+1. **Desktop editor navigation and scrolling.** The screenshots show **Back to
+   remote** even while the remote and its editor are visible side by side. Hide
+   that control in this arrangement; reserve it for the compact view where the
+   editor replaces the remote. The desktop scrollbar also appears displaced from
+   the content boundary. Review the content width, scroll-container boundaries
+   and sidebar spacing together in a real browser. Desktop layout acceptance is
+   not complete.
+2. **Touch remote selection.** The native dropdown at smaller screen widths was
+   rejected as insufficiently touch friendly. Review the established LRBridge
+   interaction before implementing a replacement. The picker needs clear, large
+   touch targets and practical navigation with many remotes, while preserving
+   the selected button and unsaved fields. Do not treat the current dropdown as
+   an accepted tablet solution.
+3. **Missed presses in another room.** The operator still reports intermittent
+   missed presses and positions where no presses work. The physical reliability
+   issue remains unresolved. The nine-burst recording regression is not proof
+   that this real-world problem is fixed. Position dependence makes the radio
+   path a relevant hypothesis; it does not by itself distinguish missing RF from
+   failed decoding, identity matching, debounce or action dispatch. Compare those
+   stages for deliberately counted presses at known positions. Do not compensate
+   by accepting ambiguous identities or promise software can recover an absent
+   signal. The screenshots still show a saved custom PWM profile; whether this
+   button was relearned after the update and what alternative decoder events were
+   present are not established by the screenshots.
+4. **Network settings are not understandable or touch friendly.** The operator
+   rejected the raw IP field/native suggestion dropdown, the lack of a visible
+   localhost option and an **Allow network access** switch, and the vague
+   certificate instructions. The current warning is insufficiently prominent.
+   This is an open usability issue even though isolated network/TLS tests passed.
+
+### Requirements for the network settings redesign
+
+- Provide a prominent **Allow network access** control. Off means **Only on the
+  Linux computer running this app**; on allows the deliberately selected LAN/VPN
+  address. Keep local access available and show its URL explicitly. Preserve an
+  existing installation's access settings during upgrades; do not silently switch
+  a remote-managed server to local-only access.
+- Explain that `localhost` refers to the computer opening the URL. A localhost
+  link opened on the operator's Windows PC or phone does not reach the Linux
+  server. Label and copy local URLs without presenting them as remote shortcuts.
+- Replace the browser-native IP suggestions with a touch-friendly picker of
+  server addresses. Use large targets and understandable labels for this computer,
+  LAN and VPN, retaining the interface name as secondary detail. Offer manual
+  address entry under Advanced. Do not bind to every interface as a shortcut.
+- Show the resulting complete browser URLs, protocol and connection scope, with
+  copy/open controls where appropriate. Separate ordinary connection choices
+  from advanced port configuration. Preserve the timed test/confirmation rollback;
+  explain the loss of remote access before a local-only change and require a
+  reachable confirmation path rather than locking out the operator.
+- Replace generic "import into your certificate store" wording with expandable,
+  numbered instructions for Windows (including Chrome/Edge), Linux (including
+  Zorin/Ubuntu and Chrome/Chromium), and browsers with a separate trust store such
+  as Firefox. Include mobile guidance for the supported phone flow. Verify exact
+  current steps against official platform/browser documentation before writing
+  the final guide. Explain which device needs the certificate, download/import,
+  the correct trust category, reopening the browser if required and how to verify
+  the HTTPS connection. Do not imply a download automatically establishes trust
+  or instruct people to bypass certificate errors as the normal setup.
+- Explain what the downloaded public trust certificate does, how to verify its
+  fingerprint through a trusted source, and that the server's private key is never
+  downloaded. Keep renewal and expiration information in Advanced unless action
+  is required. Check certificate names cover every offered local/LAN/VPN URL.
+- Put a readable warning beside the access controls: HTTP does not encrypt the
+  management token or settings; do not use plain HTTP on public/untrusted networks
+  or expose the application directly to the internet. Recommend Tailscale or
+  WireGuard for remote access, with HTTPS where practical. Explain that a VPN only
+  protects traffic actually routed through its tunnel. These settings must not
+  enable router forwarding or change firewalls/proxies/other services.
+- Verify the entire flow on actual desktop and touch browsers with a first-time
+  user, including changing scope, importing trust, confirming HTTPS and recovering
+  from an unconfirmed connection change. Documentation links alone do not satisfy
+  the in-app guidance requirement.
+
+Production screenshots include private webhook details and signal identifiers;
+they are not copied into the repository or repeated in these notes.
+
+## RF investigation — 1 November 2026
+
+Read-only comparison of the three existing private recordings found a concrete
+mapping difference. The custom PWM profile and exact 25-bit code in the operator's
+latest screenshot match the earlier close-range recording. In the latest of the
+three recordings, that exact custom identity appears in three JSON events across
+two burst times. The existing `Akhan-100F14` decoder emits 27 frames across nine
+burst times, with one consistent device ID and command. Other emitted decoder
+names do not independently identify additional physical devices.
+
+The production `Receive` path matches the saved canonical identity including its
+decoder model. An event emitted only by the built-in decoder cannot trigger a
+button still mapped to the custom model. This explains a decoding/mapping loss
+in those recorded bursts before webhook dispatch, even though the tuner received
+enough signal for another decoder. It does not establish how many physical presses
+never reached the receiver or what happened during the new positional failures.
+
+The distributed test build changes **new learning selection**, not existing saved
+identities. The pending live check is to use Relearn with automatic identity
+fields, inspect the chosen model and download that attempt's RF capture before
+confirming a replacement. A fresh capture from the installed version is needed
+if it still selects the custom profile or fails. After a verified replacement,
+count physical presses, matched events and action outcomes at the problem location.
+Do not change antenna placement or gain during that initial comparison.
+
+The recordings include pulse-level RSSI/SNR/noise headers, but they are not a
+calibrated field-strength survey. rtl_433's maintainer explains that level values
+are relative to full scale and depend on current gain:
+[upstream measurement guidance](https://github.com/merbanan/rtl_433/discussions/2076).
+No receiver setting, host service, saved mapping or webhook was changed during
+this source/recording investigation. Private radio identities remain outside Git.
+
+The operator subsequently supplied a fresh `0.4.0-test.1` capture and a learning
+screenshot showing **3 of 3 matching presses**, ready to save, with the built-in
+`Akhan-100F14` candidate. The exported file contains eight native frames in three
+timestamp groups (4, 2, 2), all with the same identity, matching the earlier
+other-room recording. No capture limit was reached. This confirms the installed
+learning path selected that decoder in this attempt. Saving the replacement,
+reenabling the action and counted presses at the troublesome position remain
+pending; the live capture does not yet establish improved room coverage.
+
+Follow-up normal-reception screenshots show unmatched RF events and three visible
+matched/start/HTTP-200 sequences. Those sequences establish accepted HTTP requests,
+not independently observed light states. The RF-only filter hides matching and
+webhook events, so absence in that filtered view alone is not a dispatch diagnosis.
+
+One expanded unmatched `Smoke-GS558` event has the same complete 24-bit payload as
+the learned native button: reversing its code's 24 bits yields the native 20-bit
+device ID followed by the four command bits, without discarding or changing bits.
+This same alternate code is present with the native decoder in all three earlier
+recordings. File-only replay of one OOK packet from the fresh capture produced
+both representations with exact payload equivalence. Thus this decoder label
+must not be dismissed as proof of an unrelated smoke detector. The expanded
+Toyota TPMS and Nexus sensor events do not match the learned button identity.
+
+The current matcher includes the model name and has no verified cross-decoder
+equivalence path. Consequently the shown alternate representation does not match
+an Akhan-only binding. Native-only relearning is incomplete for such a burst.
+The failed-location raw pulse capture is still needed to examine the timing and
+framing that caused the alternate-only decode, and to verify the correction on
+actual failed input. Any correction must retain the complete intended payload,
+reject unrelated identities, handle mapping collisions and share per-button
+debounce so two decoder outputs do not send two toggles. Do not blindly map all
+Smoke/Nexus/Toyota events, remove model checks globally or infer a transmitter's
+identity from temporal proximity alone. No updated executable has been deployed.
+
+The next supplied raw capture began at 00:56:46 Europe/Zagreb on 1 November. It is
+a valid `0.4.0-test.1` export with raw pulses, 11 packets (10 OOK, one FSK) and no
+capture-limit flag. Nine native frames and three equivalent Smoke frames form
+three time groups; every native identity matches the previously learned button.
+This file contains no observed Smoke-only decoded group. The operator confirmed
+exactly **three physical presses**, so all three are represented in this capture.
+That does not measure action latency, Home Assistant outcomes or coverage at
+other positions, and does not reproduce an alternate-only physical failure.
+
+### Post-test.1 matching correction — source validation
+
+The targeted review found no alternate-decoder matching path in test.1. The
+source now has one explicit, one-way fallback: a complete, internally consistent
+`Smoke-GS558` report can satisfy an existing `Akhan-100F14` mapping only when
+reversing all 24 reported code bits produces its exact 20-bit ID and supported
+four-bit command. Pairing reports, malformed/inconsistent fields, changed bits,
+unknown decoder names and additional required mapping fields are not relaxed.
+The saved identity, schema, profiles, receiver configuration and enabled flags
+are preserved. There is no new waiting window or action retry.
+
+Both reports use the same button's existing sliding debounce and dispatch gates.
+An ambiguous payload associated with two saved buttons is blocked, including
+when one action is disabled. Existing configurations remain readable; new learning
+cannot save this cross-decoder collision. Direct Smoke-only mappings are not
+broadened to accept native Akhan messages.
+
+This is equivalence of the **reported payload**, not proof of transmitter model
+or complete RF framing: GS558's JSON does not preserve its original row length.
+It does not recover unreceived/undecodable data or establish universal RF safety.
+The receiver is still a receive-only, unauthenticated fixed-code system.
+
+Software validation on 1 November:
+
+- A fresh checkout of the unchanged test.1 packaged commit reproduced the bug:
+  one synthetic alternate-only report produced zero isolated HTTP requests when
+  one was expected. The same case in corrected source produces one.
+- Replaying the latest private recording's raw OOK packets with rtl_433 23.11
+  yields three target bursts / 12 decoder messages and exactly three isolated
+  requests. Deliberately retaining only its three alternate reports also yields
+  three requests. The latter is a simulation, not an observed physical failure.
+- The earlier other-room recording yields nine target bursts / 36 messages and
+  nine requests. Retaining only its nine alternate reports yields nine requests.
+  These are recorded-burst counts, not a newly established physical press count.
+- Full `make check` passed with both private regressions and public replay fixtures
+  supplied: race tests, vet, 15 Node controller checks, deployment/history tests
+  and 10 updater/migration simulations. Synthetic negatives cover every changed
+  payload bit, unrelated models, malformed fields and extra saved identity fields.
+  Mixed decoder output/held bursts, collision refusal and action gates pass too.
+
+The next executable/package and ZORIN deployment remain pending. The distributed
+test.1 archive has not been overwritten. UI/network feedback above is still open.
+
+## ZORIN acceptance — in progress
 
 Use the private package and UPGRADING.md. Keep the rollback snapshot. Record the
 app commit/version, OS/kernel, rtl_433 version, receiver identity and which client

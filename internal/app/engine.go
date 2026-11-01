@@ -476,7 +476,8 @@ func (a *App) ConfirmLearning() error {
 	}
 	for _, r := range next.Remotes {
 		for _, other := range r.Buttons {
-			if other.ID != b.ID && other.Signature != "" && signaturesOverlap(other.Signature, l.Candidate) {
+			if other.ID != b.ID && other.Signature != "" &&
+				(signaturesOverlap(other.Signature, l.Candidate) || decoderMappingsOverlap(other.Signature, l.Candidate, other.IdentityFields, l.Fields)) {
 				return errors.New("signal overlaps an existing button mapping; clear that mapping first")
 			}
 		}
@@ -584,33 +585,33 @@ func (a *App) Receive(raw []byte) {
 	if a.captureSuppressed {
 		return
 	}
-	for ri := range a.config.Remotes {
-		for bi := range a.config.Remotes[ri].Buttons {
-			b := &a.config.Remotes[ri].Buttons[bi]
-			if b.Signature == "" {
-				continue
-			}
-			sig, e := Signature(raw, b.IdentityFields)
-			if e != nil || sig != b.Signature {
-				continue
-			}
-			prior := a.lastSeen[b.ID]
-			a.lastSeen[b.ID] = now
-			b.LastReceived = now.UTC().Format(time.RFC3339Nano)
-			if !prior.IsZero() && now.Sub(prior) < time.Duration(b.DebounceMS)*time.Millisecond {
-				continue
-			}
-			if e = a.store.Save(a.config); e != nil {
-				a.storageErr = true
-			}
-			a.eventLocked("matched", "Physical button received", b.ID, nil)
-			if !b.Enabled || b.Webhook.URL == "" || now.Before(a.muteUntil) || a.storageErr {
-				continue
-			}
-			id, epoch := b.ID, a.epoch
-			if e := a.scheduleLocked(id, epoch, false); e != nil {
-				a.eventLocked("webhook_busy", e.Error(), id, nil)
-			}
+	matches, ambiguous := a.matchReceivedButtonsLocked(raw)
+	if ambiguous {
+		a.eventLocked("rf_ambiguous", "Signal matches more than one saved button; no action sent. Clear the duplicate mapping before using this signal.", "", nil)
+		return
+	}
+	for _, match := range matches {
+		b := match.button
+		prior := a.lastSeen[b.ID]
+		a.lastSeen[b.ID] = now
+		b.LastReceived = now.UTC().Format(time.RFC3339Nano)
+		if !prior.IsZero() && now.Sub(prior) < time.Duration(b.DebounceMS)*time.Millisecond {
+			continue
+		}
+		if e := a.store.Save(a.config); e != nil {
+			a.storageErr = true
+		}
+		message := "Physical button received"
+		if match.equivalent {
+			message += " (verified decoder equivalent)"
+		}
+		a.eventLocked("matched", message, b.ID, nil)
+		if !b.Enabled || b.Webhook.URL == "" || now.Before(a.muteUntil) || a.storageErr {
+			continue
+		}
+		id, epoch := b.ID, a.epoch
+		if e := a.scheduleLocked(id, epoch, false); e != nil {
+			a.eventLocked("webhook_busy", e.Error(), id, nil)
 		}
 	}
 }

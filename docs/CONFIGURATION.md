@@ -110,6 +110,25 @@ rejects such overlaps. Changing a button's identity fields clears its mapping an
 disables it. Changing global defaults affects newly created buttons, not existing
 ones. Ordinary button PUT requests cannot assign a signature; use learning.
 
+### Known decoder-equivalent reports (after test.1)
+
+A saved `Akhan-100F14` button may also receive the identical reported payload as
+`Smoke-GS558`. Normal reception has a narrowly bounded fallback for this pair:
+all 24 code bits must reverse to the exact saved 20-bit ID and one of the four
+known command values. The GS558 ID/unit fields must agree with that code and its
+pairing flag must be zero. Unknown shapes and other decoder families remain
+exact-only. This does not change stored signatures or guess missing/corrupt bits.
+The two reports share the button's normal debounce and produce an explanatory
+matched event when the fallback is used. No additional press or wait is required.
+
+If both representations are assigned to different saved buttons, the app reports
+`rf_ambiguous` and sends no action for that payload, even if one button is disabled.
+Review the duplicate in the interface; Clear also removes that button's saved
+webhook, so retain its setup if needed. Old configuration remains readable;
+new learning refuses the conflicting assignment. A mapping saved under Smoke
+alone retains its existing direct matching behavior. This is equality of reported
+payloads, not proof of the transmitter model, framing or radio coverage.
+
 ## Learn A ON with three separate presses
 
 Prerequisites: intended receiver acquiring samples, actions kept
