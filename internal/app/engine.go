@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.4.0-test.1"
+const Version = "0.4.0-test.2"
 
 type App struct {
 	discoverReceivers                   func() ([]receiver.DeviceInfo, error)

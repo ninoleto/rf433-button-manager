@@ -4,13 +4,19 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
-Post-test.1 source work on 1 November adds a bounded exact-payload fallback from
-GS558 reports to existing Akhan mappings, shared debounce and collision refusal.
-The original bug was reproduced against the packaged commit; synthetic and private
-recording regressions and the full checks pass. The operator confirmed three
-presses in the latest capture, all three represented. No new package, ZORIN update,
-physical range/latency claim or publication is made. Pending UI/network feedback
-and physical acceptance remain in TESTING-0.4.md.
+Test.2 groups the exact alternate RF payload match with responsive navigation and
+network-access improvements. It adds companion local listeners, a network switch,
+address and remote pickers, explicit confirmation/rollback, and platform-specific
+certificate help. Existing schema/configuration, action flags, token, migrations,
+RF decoder settings and webhook behavior are preserved except for the documented
+matching correction. The runtime version is `0.4.0-test.2`.
+
+Full race/static/controller/deployment/updater checks, private recording replay
+and real demo HTTP/TLS/token lifecycle checks pass. Chromium rendering is now
+available and has been checked; detailed evidence and remaining operator gates
+are recorded in TESTING-0.4.md. This is a private test build, not a stable release
+or proof of physical reception range. The test.1 archive and published GitHub
+release remain unchanged. No ZORIN deployment or real webhook is performed here.
 
 ---
 

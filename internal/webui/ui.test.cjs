@@ -34,7 +34,7 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
   }
   const token = fs.readFileSync(path.join(data, 'management.token'), 'utf8').trim();
   browser = await chromium.launch({headless:true, executablePath:browserPath, args:['--no-sandbox', '--disable-dev-shm-usage']});
-  const context = await browser.newContext({viewport:{width:1440,height:1100}, acceptDownloads:true});
+  const context = await browser.newContext({viewport:{width:1440,height:1100}, acceptDownloads:true, hasTouch:true});
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -178,6 +178,7 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     await page.locator('.rf-button').first().click();
   });
   await check('desktop and mobile layout; light and dark themes', async () => {
+    await hidden(page.locator('#editor-back'));
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     const screenshots = path.resolve(__dirname, '../../docs/screenshots');
     fs.mkdirSync(screenshots, {recursive:true});
@@ -186,6 +187,9 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     await page.locator('#button-name').fill('Unsaved layout check');
     await page.locator('#layout-toggle').click();
     assert.equal(await page.locator('html').getAttribute('data-layout'), 'unified');
+    await hidden(page.locator('#editor-back'));
+    const mainBox=await page.locator('#main-content').boundingBox();
+    assert.ok(Math.abs(mainBox.x+mainBox.width-1440)<2,'main scrollbar must reach the viewport edge');
     await page.locator('#view-activity').click();
     await visible(page.locator('#activity-view'));
     await page.locator('#view-remotes').click();
@@ -197,12 +201,22 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     await page.locator('#theme-toggle').click();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
     await page.setViewportSize({width:820,height:1180});
+    await visible(page.locator('#editor-back'));
+    await page.locator('#editor-back').click();
     await visible(page.locator('#remote-picker'));
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.screenshot({path:path.join(screenshots,'tablet.png'),fullPage:true});
+    await page.locator('#remote-picker').click();
+    await visible(page.locator('#remote-picker-dialog'));
+    const option=page.locator('#remote-picker-list button').first();
+    assert.ok((await option.boundingBox()).height>=48);
+    await page.locator('#remote-picker-search').fill('no such remote');
+    assert.equal(await page.locator('#remote-picker-list button').count(),0);
+    await page.locator('#remote-picker-search').fill('');
+    await option.click();
+    await hidden(page.locator('#remote-picker-dialog'));
     await page.setViewportSize({width:390,height:844});
     await delay(250);
-    await page.locator('#editor-back').click();
     await visible(page.locator('#receiver-state'));
     assert.equal(await page.locator('.rf-button').nth(1).evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -217,8 +231,103 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     await visible(page.locator('#editor-back'));
     await hidden(page.locator('.remote-panel'));
   });
+  await check('network workflow, certificate download and touch address selection', async () => {
+    await page.locator('#settings-open').click();
+    await page.locator('#network-heading').scrollIntoViewIfNeeded();
+    assert.equal(await page.locator('#network-enabled').isChecked(),false);
+    assert.equal(await page.locator('#network-stage').isDisabled(),true);
+    assert.match(await page.locator('#network-local-urls').textContent(),new RegExp(`127.0.0.1:${port}`));
+    await page.locator('#network-enabled').check();
+    await visible(page.locator('#network-address-dialog'));
+    await page.keyboard.press('Escape');
+    await page.locator('#network-enabled').uncheck();
+    await page.locator('#connection-security').evaluate(el=>{el.open=true;});
+    await page.locator('#network-https').check();
+    assert.equal(await page.locator('#network-stage').isDisabled(),false);
+    await page.locator('#network-http').check();
+    await page.locator('#certificate-guide').evaluate(el=>{el.open=true;});
+    const downloadEvent=page.waitForEvent('download');
+    await page.locator('#certificate-download').click();
+    const download=await downloadEvent;
+    const certificate=fs.readFileSync(await download.path(),'utf8');
+    assert.match(certificate,/BEGIN CERTIFICATE/);assert.doesNotMatch(certificate,/PRIVATE KEY/);
+    await page.waitForFunction(()=>document.getElementById('certificate-fingerprint').textContent.length>0);
+    assert.match(await page.locator('#certificate-fingerprint').textContent(),/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/);
+    for(const text of ['Windows — Chrome and Edge','Linux — Chrome and Chromium','Firefox — desktop','Android — Chrome']){
+      const summary=page.locator('#certificate-guide summary').filter({hasText:text});
+      await summary.click();
+      assert.ok(await summary.locator('..').locator('li').count()>=3);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      await summary.click();
+    }
+    await page.locator('#network-advanced').evaluate(el=>{el.open=true;});
+    await page.locator('#network-http-port').fill('18789');
+    await delay(2200);
+    assert.equal(await page.locator('#network-http-port').inputValue(),'18789','poll must retain draft');
+    await page.locator('#network-stage').click();
+    await visible(page.locator('#network-pending'));
+    assert.equal(await page.locator('#network-confirm').isDisabled(),true);
+    assert.equal(await page.locator('#network-enabled').isDisabled(),true);
+    await page.locator('#network-cancel').click();
+    await hidden(page.locator('#network-pending'));
+    assert.equal(await page.locator('#network-http-port').inputValue(),port);
+    assert.equal(await page.locator('#network-stage').isDisabled(),true);
+    await page.locator('#network-advanced').evaluate(el=>{el.open=false;});
+    await page.locator('#certificate-guide').evaluate(el=>{el.open=false;});
+    await page.setViewportSize({width:1440,height:1100});
+    for(const size of [{width:1440,height:1100},{width:820,height:1180},{width:390,height:844},{width:320,height:740}]) {
+      await page.setViewportSize(size);
+      assert.equal(await page.locator('#main-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,`content overflow at ${size.width}`);
+      for(const card of await page.locator('.security-choices .choice-card').all()) {
+        assert.equal(await card.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,'radio labels must fit inside the card');
+        assert.ok((await card.locator('input').boundingBox()).width<=24,'native radio must not inherit full text-input width');
+      }
+    }
+    await page.setViewportSize({width:1440,height:1100});
+    await page.locator('#network-heading').evaluate(el=>el.scrollIntoView({block:'start'}));
+    await hidden(page.locator('#toast'));
+    await page.screenshot({path:path.join(qa,'network-desktop.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});
+    await page.locator('#network-heading').evaluate(el=>el.scrollIntoView({block:'start'}));
+    await page.screenshot({path:path.join(qa,'network-phone.png'),fullPage:true});
+  });
+  await check('many remotes remain searchable and scrollable on a touch phone', async () => {
+    for(let i=1;i<=30;i++) {
+      const response=await fetch(`${base}/api/remotes`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({name:`Test remote ${String(i).padStart(2,'0')}`,columns:2,button_count:1})});
+      assert.equal(response.status,200);
+    }
+    const phone=page;
+    {
+      await phone.setViewportSize({width:390,height:844});
+      await phone.locator('#view-remotes').tap();
+      if(await phone.locator('#editor-back').isVisible()) await phone.locator('#editor-back').tap();
+      await phone.waitForFunction(()=>document.querySelectorAll('#remote-list .remote-nav').length===32);
+      assert.equal(await phone.evaluate(()=>matchMedia('(pointer:coarse)').matches),true);
+      await phone.locator('#remote-picker').tap();
+      await visible(phone.locator('#remote-picker-dialog'));
+      assert.equal(await phone.locator('#remote-picker-list button').count(),32);
+      const last=phone.locator('#remote-picker-list button').last();await last.scrollIntoViewIfNeeded();
+      const box=await last.boundingBox();assert.ok(box.height>=48&&box.y>=0&&box.y+box.height<=844);
+      await phone.locator('#remote-picker-search').fill('Test remote 30');
+      assert.equal(await phone.locator('#remote-picker-list button').count(),1);
+      assert.ok((await phone.locator('#remote-picker-dialog').boundingBox()).height<600,'filtered picker must shrink instead of leaving a full blank sheet');
+      await phone.screenshot({path:path.join(qa,'remote-picker-phone.png')});
+      await phone.locator('#remote-picker-list button').tap();await hidden(phone.locator('#remote-picker-dialog'));
+      assert.equal(await phone.locator('#remote-title').textContent(),'Test remote 30');
+      await phone.locator('.rf-button').tap();await visible(phone.locator('#editor-back'));await hidden(phone.locator('.remote-panel'));
+      await phone.locator('#button-name').fill('Touch draft');await phone.locator('#editor-back').tap();
+      await phone.locator('.rf-button').tap();assert.equal(await phone.locator('#button-name').inputValue(),'Touch draft');
+      await phone.locator('#settings-open').tap();await phone.locator('#network-enabled').check();
+      await visible(phone.locator('#network-address-dialog'));
+      for(const choice of await phone.locator('#network-address-list button').all()) assert.ok((await choice.boundingBox()).height>=48);
+      await phone.locator('[data-close="network-address-dialog"]').tap();await phone.locator('#network-enabled').uncheck();
+      assert.equal(await phone.locator('#network-stage').isDisabled(),true,'selecting network draft must not silently apply it');
+    }
+  });
   await check('lock removes token and clears visible secrets', async () => {
     await page.locator('#logout').click();
+    await visible(page.locator('#confirm-dialog'));
+    await page.locator('#confirm-yes').click();
     await visible(page.locator('#login-dialog'));
     assert.equal(await page.evaluate(() => sessionStorage.getItem('rfbm-token')), null);
     assert.equal(await page.locator('#webhook-url').inputValue(), '');

@@ -65,7 +65,8 @@ async function harness() {
   const flush=async()=>{for(let i=0;i<20;i++) await Promise.resolve();};
   await flush();
   const refresh=async()=>{const entry=[...timers.entries()].find(([,v])=>v.delay===1000);assert.ok(entry,'poll scheduled');timers.delete(entry[0]);await entry[1].fn();await flush();};
-  return {el,calls,session,button,devices:value=>{devices=value;},scanError:value=>{scanError=value;},set:patch=>{state={...state,...patch};},refresh,flush,root:context.document.documentElement,local,sessionValues};
+  const refreshNetwork=async()=>{const entry=[...timers.entries()].find(([,v])=>v.delay===2000);assert.ok(entry,'network poll scheduled');timers.delete(entry[0]);await entry[1].fn();await flush();};
+  return {el,calls,session,button,devices:value=>{devices=value;},scanError:value=>{scanError=value;},set:patch=>{state={...state,...patch};},network:value=>{network=value;},refreshNetwork,refresh,flush,root:context.document.documentElement,local,sessionValues};
 }
 
 test('layout and page navigation preserve selected button and unsaved fields',async()=>{
@@ -88,7 +89,7 @@ test('layout and page navigation preserve selected button and unsaved fields',as
 test('network stage is explicit, preserves receiver settings and can be cancelled',async()=>{
   const h=await harness();
   await h.el('settings-open').click();
-  h.el('network-address').value='192.168.50.20';h.el('network-https').checked=true;
+  h.el('network-enabled').checked=true;h.el('network-address').value='192.168.50.20';h.el('network-https').checked=true;h.el('network-http').checked=false;
   h.el('receiver-flex').value='unsaved decoder draft';
   await h.el('view-activity').click();await h.el('settings-open').click();
   assert.equal(h.el('receiver-flex').value,'unsaved decoder draft');
@@ -98,7 +99,48 @@ test('network stage is explicit, preserves receiver settings and can be cancelle
   assert.equal(h.el('network-links').children[0].href,'https://192.168.50.20:8788');
   assert.equal(h.calls.some(c=>c.url==='/api/settings' && c.method==='PUT'),false);
   await h.el('network-cancel').click();
-  assert.equal(h.el('network-stage').disabled,false);assert.equal(h.el('network-address').value,'127.0.0.1');
+  assert.equal(h.el('network-stage').disabled,true);assert.equal(h.el('network-address').value,'127.0.0.1');
+  assert.equal(h.el('network-enabled').checked,false);
+});
+
+test('network polling preserves drafts and resets expired tests without losing dual protocol settings',async()=>{
+  const h=await harness();
+  const config={address:'192.168.50.20',http:true,http_port:8787,https:true,https_port:8788};
+  h.network({config,interfaces:[{address:config.address,interface:'eth0'},{address:'100.64.5.1',interface:'tailscale0'}],pending:null});
+  await h.el('settings-open').click();
+  assert.equal(h.el('network-https').checked,true);assert.equal(h.el('network-keep-http').checked,true);
+  h.el('network-https-port').value=8789;await h.el('network-form').emit('input');
+  await h.refreshNetwork();assert.equal(h.el('network-https-port').value,8789);
+  await h.el('network-form').emit('submit');
+  const staged=h.calls.find(c=>c.url.endsWith('/stage')).body;
+  assert.equal(staged.http,true);assert.equal(staged.https,true);
+  assert.equal(h.el('network-fields').disabled,true);
+  assert.equal(h.el('network-confirm').disabled,true,'old origin cannot confirm a new TLS origin');
+  h.network({config,interfaces:[],pending:null});await h.refreshNetwork();
+  assert.equal(h.el('network-https-port').value,8788);
+  assert.equal(h.el('network-fields').disabled,false);assert.equal(h.el('network-stage').disabled,true);
+});
+
+test('local network switch requires an explicit server address and never stages automatically',async()=>{
+  const h=await harness();await h.el('settings-open').click();
+  h.el('network-enabled').checked=true;await h.el('network-enabled').emit('change');
+  assert.equal(h.el('network-address-dialog').open,true);
+  assert.equal(h.calls.some(c=>c.method==='POST'),false);
+  await h.el('network-form').emit('submit');
+  assert.match(h.el('network-error').textContent,/LAN or VPN/);
+  assert.equal(h.calls.some(c=>c.url.endsWith('/stage')),false);
+});
+
+test('touch remote picker searches and retains an unsaved editor on cancelling a change',async()=>{
+  const h=await harness();
+  h.set({remotes:[{id:'fixture-remote',name:'Kitchen',buttons:[h.button]},{id:'second',name:'Balcony',buttons:[]}]});await h.refresh();
+  await h.el('button-grid').children[0].click();h.el('button-name').value='Draft';await h.el('button-editor').emit('input');
+  await h.el('remote-picker').click();h.el('remote-picker-search').value='bal';await h.el('remote-picker-search').emit('input');
+  assert.equal(h.el('remote-picker-list').children.length,1);
+  const choose=h.el('remote-picker-list').children[0].click();await h.flush();
+  assert.equal(h.el('confirm-dialog').open,true);await h.el('confirm-no').click();await choose;
+  assert.equal(h.el('button-name').value,'Draft');assert.equal(h.el('remote-picker-dialog').open,true);
+  assert.equal(h.calls.some(c=>c.method==='PUT'||c.method==='POST'),false);
 });
 
 test('token rotation requires confirmation and updates subsequent authenticated requests',async()=>{

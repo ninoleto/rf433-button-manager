@@ -77,6 +77,18 @@ func (c Network) Validate() error {
 	return nil
 }
 func (c Network) URLs() []string {
+	// Keep the configured address first for existing callers and update tools.
+	urls := c.primaryURLs()
+	if c.Address != "127.0.0.1" {
+		urls = append(urls, c.LocalURLs()...)
+	}
+	return urls
+}
+func (c Network) LocalURLs() []string {
+	c.Address = "127.0.0.1"
+	return c.primaryURLs()
+}
+func (c Network) primaryURLs() []string {
 	var urls []string
 	if c.HTTP {
 		urls = append(urls, "http://"+net.JoinHostPort(c.Address, strconv.Itoa(c.HTTPPort)))
@@ -128,6 +140,8 @@ func (s *Server) Start(handler http.Handler) error {
 	return nil
 }
 func (s *Server) certificateLocked(renew bool, hosts ...string) error {
+	// Local access remains available when the chosen LAN/VPN listener changes.
+	hosts = append(hosts, "127.0.0.1", "::1", "localhost")
 	files, pair, err := loadCertificate(s.dir, hosts, renew)
 	if err != nil {
 		return err
@@ -333,7 +347,7 @@ func (s *Server) status() any {
 		sum := sha256.Sum256(block.Bytes)
 		cert["ca_sha256"] = hex.EncodeToString(sum[:])
 	}
-	return map[string]any{"config": s.config, "urls": s.config.URLs(), "pending": pending, "interfaces": interfaces(), "certificate": cert}
+	return map[string]any{"config": s.config, "urls": s.config.URLs(), "local_urls": s.config.LocalURLs(), "network_enabled": !net.ParseIP(s.config.Address).IsLoopback(), "pending": pending, "interfaces": interfaces(), "certificate": cert}
 }
 
 // Handler is mounted ONLY beneath App's authenticated, same-origin /api/ wrapper.

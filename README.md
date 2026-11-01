@@ -21,7 +21,7 @@ physical button press to that automation.
 > hardware combinations remain unverified. Software CI and recorded-signal replay
 > are not physical receiver tests.
 >
-> **This checkout is 0.4.0-test.1, for private upgrade and hardware validation.**
+> **This checkout is 0.4.0-test.2, for private upgrade and hardware validation.**
 > The published RC1 remains unchanged. The new receiver preference, renamed
 > installation, HTTPS, token rotation and responsive interface need operator
 > acceptance before a stable release.
@@ -144,7 +144,9 @@ See the [test report](docs/TEST-REPORT.md) and [hardware test plan](docs/HARDWAR
 - **Interface:** Classic or Unified sidebar on desktop, a remote picker on
   tablets, and Remotes / Activity / Settings navigation on phones. Switching
   layouts preserves the selected remote and unsaved button edits.
-- **Access:** choose a private address and HTTP/HTTPS ports in Settings. New
+- **Access:** use the local-network switch and large address picker in Settings.
+  Localhost stays available on the server; HTTP/HTTPS and certificate setup have
+  step-by-step help. New
   listeners require confirmation within three minutes. Download the local trust
   certificate, renew the server certificate, or replace the login token.
 - **Installation:** current paths use `rf433-button-manager`. The updater migrates
@@ -233,14 +235,14 @@ RTL-SDR and a remote using a supported signal format. Runtime state belongs on
 reliable internal storage. A browser is the management client; no Node server,
 Go compiler, Docker container or MQTT broker is required to install the binary.
 
-The private test package is `rf433-button-manager-0.4.0-test.1-linux-amd64.zip`.
+The private test package is `rf433-button-manager-0.4.0-test.2-linux-amd64.zip`.
 Use the package supplied for this validation round. Download its matching `.zip.sha256` asset as well, then
 verify before extracting into a fresh directory:
 
 ```sh
-sha256sum -c rf433-button-manager-0.4.0-test.1-linux-amd64.zip.sha256
+sha256sum -c rf433-button-manager-0.4.0-test.2-linux-amd64.zip.sha256
 rfb_extract_dir=$(mktemp -d "$HOME/rf433-button-manager.XXXXXX")
-unzip rf433-button-manager-0.4.0-test.1-linux-amd64.zip -d "$rfb_extract_dir"
+unzip rf433-button-manager-0.4.0-test.2-linux-amd64.zip -d "$rfb_extract_dir"
 cd "$rfb_extract_dir/rf433-button-manager"
 ```
 

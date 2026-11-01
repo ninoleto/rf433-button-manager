@@ -48,18 +48,23 @@ with tempfile.TemporaryDirectory(prefix='rf433-management-test-') as directory:
     root = Path(directory)
     http_port, https_port = free_port(), free_port()
     while https_port == http_port: https_port = free_port()
-    base = 'http://127.0.0.1:' + str(http_port)
-    secure = 'https://127.0.0.1:' + str(https_port)
+    base = 'http://127.0.0.2:' + str(http_port)
+    secure = 'https://127.0.0.2:' + str(https_port)
+    local = 'http://127.0.0.1:' + str(http_port)
+    local_secure = 'https://127.0.0.1:' + str(https_port)
     opener = build_opener(ProxyHandler({}))
     def start():
-        return subprocess.Popen([str(binary), '--demo', '--listen', '127.0.0.1:'+str(http_port), '--data-dir', directory], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return subprocess.Popen([str(binary), '--demo', '--listen', '127.0.0.2:'+str(http_port), '--data-dir', directory], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     process = start()
     try:
         ready(opener, base)
+        ready(opener, local)
         token = (root / 'management.token').read_text().strip()
         assert request(opener, base, '/api/manage/network')[0] == 401
         assert request(opener, base, '/api/manage/network', 'bad-token')[0] == 401
-        proposed = {'address':'127.0.0.1','http':False,'http_port':http_port,'https':True,'https_port':https_port}
+        assert request(opener, local, '/api/manage/network')[0] == 401
+        assert request(opener, local, '/api/state', token)[0] == 200
+        proposed = {'address':'127.0.0.2','http':False,'http_port':http_port,'https':True,'https_port':https_port}
         status, raw = request(opener, base, '/api/manage/network/stage', token, proposed)
         assert status == 200
         pending = json.loads(request(opener, base, '/api/manage/network', token)[1])['pending']
@@ -69,6 +74,9 @@ with tempfile.TemporaryDirectory(prefix='rf433-management-test-') as directory:
         assert status == 200 and b'PRIVATE KEY' not in certificate
         tls = build_opener(ProxyHandler({}), HTTPSHandler(context=ssl.create_default_context(cadata=certificate.decode())))
         ready(tls, secure)
+        ready(tls, local_secure)
+        assert request(tls, local_secure, '/api/manage/network/confirm', token, {'id':pending['id']})[0] == 400
+        assert request(tls, local_secure, '/api/state')[0] == 401
         assert request(tls, secure, '/api/manage/network/confirm', token, {'id':pending['id']})[0] == 200
         status, raw = request(tls, secure, '/api/manage/token/rotate', token, {'confirm':True})
         assert status == 200
@@ -81,13 +89,16 @@ with tempfile.TemporaryDirectory(prefix='rf433-management-test-') as directory:
         stop(process)
         process = start()
         ready(tls, secure)
+        ready(tls, local_secure)
         network = json.loads(request(tls, secure, '/api/manage/network', new_token)[1])
         assert network['config'] == proposed and network['pending'] is None
         assert request(tls, secure, '/api/state', token)[0] == 401
         assert request(tls, secure, '/api/state', new_token)[0] == 200
+        assert request(tls, local_secure, '/api/state', new_token)[0] == 200
+        assert request(tls, local_secure, '/api/state', token)[0] == 401
         assert request(tls, secure, '/api/manage/certificate/renew', new_token, {})[0] == 200
         assert request(tls, secure, '/api/manage/certificate', new_token)[1] == certificate
-        print('PASS: real demo executable enforces authentication, stages HTTPS, verifies CA trust, requires secure confirmation, rotates/revokes tokens, preserves settings across restart and renews without changing trust.')
+        print('PASS: real demo executable enforces authentication on selected and companion loopback listeners, stages HTTPS, verifies CA trust, requires confirmation on the proposed listener, rotates/revokes tokens, preserves settings across restart and renews without changing trust.')
         print('No USB receiver or external webhook was used; no browser rendering claim.')
     finally:
         stop(process)

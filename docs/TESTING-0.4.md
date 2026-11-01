@@ -1,6 +1,6 @@
 # 0.4 validation record and operator test plan
 
-Version: **0.4.0-test.1**. Base: published RC1 commit
+Version: **0.4.0-test.2**. Base: published RC1 commit
 `e1822594297c0d5b208c22b671a3be0f7a183445`. No production host change or GitHub
 publication is performed by building this package.
 
@@ -21,7 +21,7 @@ publication is performed by building this package.
   Three separate matching presses and exact identities remain required. No saved
   mapping or RF timing is silently rewritten; relearn a problematic button.
 
-## Software evidence in this workspace
+## Initial test.1 software evidence (historical)
 
 - Full Go race tests, static analysis, **15 Node controller checks** and deployment/
   history simulations passed. **10 updater checks** passed against temporary data
@@ -63,9 +63,9 @@ enabled-flag preservation, persistence after service restart, and a connected
 receiver owned by `rf433-button-manager.service`. This is host update evidence;
 it does not establish reboot recovery, physical action success or full acceptance.
 
-The following issues are **open**. The operator requested notes only; no code,
-installed application, published release or distributed package was changed in
-response to this feedback.
+The following feedback was recorded before test.2. At that point the operator
+requested notes only. Test.2 implementation is recorded below; physical acceptance
+on the operator's equipment remains open.
 
 1. **Desktop editor navigation and scrolling.** The screenshots show **Back to
    remote** even while the remote and its editor are visible side by side. Hide
@@ -259,7 +259,64 @@ Software validation on 1 November:
   Mixed decoder output/held bursts, collision refusal and action gates pass too.
 
 The next executable/package and ZORIN deployment remain pending. The distributed
-test.1 archive has not been overwritten. UI/network feedback above is still open.
+test.1 archive was not overwritten. At this matching-only checkpoint, the UI/network
+feedback was still open; the following test.2 work addresses its software changes.
+
+## Test.2: matching, touch navigation and network access
+
+The operator authorized completing these changes on 1 November 2026. Test.2
+includes the exact-payload matching correction above, without a new dispatch
+wait, approximate identities or changes to saved mappings. A received GS558
+representation may match an existing complete Akhan mapping only under the
+validated transformation. This cannot recover a transmission that the receiver
+never decodes, and does not establish RF range or a measured physical latency.
+
+- Desktop Classic/Unified layouts retain one editor and its drafts. The Back
+  control is hidden beside a visible remote, the main scroll container reaches
+  the viewport edge, and sidebar spacing is corrected.
+- Tablets and phones use a searchable dialog with large remote rows. Compact
+  editing is a separate view with Back to remote. Phone bottom navigation remains.
+  The public LRBridge controller's large jump-choice pattern was inspected as a
+  reference; no LRBridge code or services were modified.
+- Network access follows the supplied Storage Watch reference: local-network
+  switch, explicit address picker, current network/local URL cards with copy,
+  large HTTP/HTTPS choices, advanced address/ports, and staged confirmation.
+  The switch edits a draft; Apply and confirmation are deliberately explicit.
+- Each enabled protocol has a companion IPv4 loopback listener. Disabling network
+  access requires confirmation at the proposed local endpoint; the old listener
+  remains available until then. Existing selected address/protocols are preserved.
+- Certificates cover the selected address and local loopback/localhost. The UI
+  and NETWORK.md explain importing the public CA on Windows, Linux, Firefox,
+  Android, macOS and iOS, fingerprint verification, VPN use and no public forwarding.
+  These are platform instructions, not completed client-OS trust-install tests.
+- Token UI/rotation, schema 2, updater action restoration and test.1 branding
+  migration remain intact. No new runtime dependency is added.
+
+Software validation for this build:
+
+- `make check` passed: race-enabled Go tests, vet, **18 controller checks**, shell
+  deployment/history checks and **10 updater simulations**. The optional latest
+  three-press and earlier nine-burst private replay inputs were supplied; they
+  were not skipped. Original and alternate-only replay checks produce one isolated
+  request per recorded burst, with no production webhook involved.
+- The built demo executable passes authenticated selected/companion HTTP and HTTPS,
+  CA-verified TLS, refusal to confirm a selected listener through its companion,
+  token revocation on both endpoints, settings/token persistence after restart,
+  and leaf renewal preserving the CA. Go tests also cover a busy companion port
+  without losing current access and confirmation of local-only access.
+- Chromium 141 completed **12 browser groups** against the real demo
+  service, including learning, draft preservation, desktop Classic/Unified,
+  820 px tablet, 390 px phone, 320 px overflow checks, certificate download and
+  staged-network cancellation. A touch-capable context also checked 32 remotes,
+  picker search/scrolling, a filtered bottom sheet that shrinks to its content,
+  large selectable rows and unsaved editor preservation. CSS was visually inspected; screenshots
+  in docs are synthetic demo state, not the operator's configuration.
+- Final package reproducibility and ZIP/internal checksum checks are recorded
+  separately during packaging. This local private build has no new GitHub CI or
+  publication claim. Browser emulation does not replace actual phone/tablet testing.
+
+No physical receiver, Home Assistant action, USB reconnect, ZORIN service restart,
+Windows/phone CA installation, new RF range test or soak test was performed here.
 
 ## ZORIN acceptance — in progress
 
@@ -272,9 +329,11 @@ browser/screen was tested. Never include tokens or webhook URLs in shared report
    service is enabled and owns one decoder child. Confirm the renamed paths.
 2. **Reboot:** with operator approval, confirm service and receiver recover after
    a host reboot. An enabled service alone is not evidence of receiver recovery.
-3. **Problem button:** first inspect/relearn it using three separate presses and
-   automatic identity fields. Confirm the detected model/identity corresponds to
-   the intended remote. Re-enable the saved action after deliberate validation.
+3. **Problem button:** inspect its saved mapping first. A complete learned Akhan
+   identity receives the exact alternate-report fix without relearning. If it is
+   still a custom-profile mapping, use three separate Learn presses to verify the
+   intended native identity before saving; do not remap unrelated sensor traffic.
+   Re-enable a newly learned action only after deliberate validation.
    Test one press at a time from each room, with someone watching the monitor.
    Record attempted presses, recognized bursts and resulting actions separately.
    Check different buttons do not trigger each other's actions and a held press

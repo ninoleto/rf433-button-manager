@@ -148,7 +148,10 @@ CODEX_PRIMARY_RUNTIME_NODE_MODULES="$rfb_ui_tools/node_modules" \
 The version above is a pinned optional harness dependency, independent of the
 application runtime. Check the harness against the chosen browser version when
 upgrading it. `RFB_UI_BROWSER` can select an existing compatible Chromium binary;
-`RFB_UI_PORT` overrides 18788. Browser libraries must already be available; any
+`RFB_UI_PORT` overrides 18788; the network-cancel scenario also temporarily uses
+18789 on loopback. Run it where these test ports are free. The harness uses a
+touch-capable Chromium context and desktop/tablet/phone viewports; this is
+emulation, not a physical Android/iOS test. Browser libraries must already be available; any
 host package installation is a separate operation. The harness uses disposable
 `.qa` state, synthetic signals and screenshots; inspect artifacts before sharing.
 It is not part of the default CI workflow. Record whether you actually ran it.

@@ -356,7 +356,7 @@ with an `error` field. Never log a token-rotation response.
 
 | Method and path | Request / behavior |
 | --- | --- |
-| GET `/api/manage/network` | Current `config`, `urls`, optional `pending`, local `interfaces`, certificate expiry/fingerprint |
+| GET `/api/manage/network` | Current `config`, `urls`, `local_urls`, `network_enabled`, optional `pending`, local `interfaces`, certificate expiry/fingerprint |
 | POST `/api/manage/network/stage` | Full network object; opens proposed listeners and creates a three-minute pending change |
 | POST `/api/manage/network/confirm` | `{ "id": "pending-id" }`; must arrive at proposed endpoint, over TLS if HTTPS enabled |
 | POST `/api/manage/network/cancel` | Cancels the pending change; old configuration remains |
@@ -370,6 +370,16 @@ Network object example (replace with the actual host's private address):
 ```json
 {"address":"192.168.50.20","http":false,"http_port":8787,"https":true,"https_port":8788}
 ```
+
+Test.2 adds a companion `127.0.0.1` listener for every enabled protocol. `urls`
+keeps the configured address first, followed by the companion local URLs without
+duplicates. `local_urls` lists these local-only endpoints. `network_enabled` is
+false when the configured address is loopback. The network object is unchanged:
+to disable remote access, stage `address: "127.0.0.1"` and confirm at that endpoint.
+A companion loopback endpoint cannot confirm a proposed non-loopback endpoint;
+the selected network address must be tested. Certificates cover the selected and
+pending addresses plus `localhost`, `127.0.0.1` and `::1`. Local URLs use IPv4
+loopback so an IPv6-disabled host is supported.
 
 Ports are 1024–65535; at least one protocol must be enabled. A pending object has
 `id`, `config` and `expires_at`. Only successful confirmation persists settings.

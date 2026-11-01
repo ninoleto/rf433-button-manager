@@ -114,6 +114,10 @@ func loadCertificate(dir string, hosts []string, renew bool) (certificateFiles, 
 	}
 	leaf := &x509.Certificate{SerialNumber: serial(), Subject: pkix.Name{CommonName: "RF433 Button Manager"}, NotBefore: now.Add(-5 * time.Minute), NotAfter: now.AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
 	for _, host := range hosts {
+		if host == "localhost" {
+			leaf.DNSNames = append(leaf.DNSNames, host)
+			continue
+		}
 		ip := net.ParseIP(host)
 		if ip == nil {
 			return files, pair, errors.New("certificate requires an explicit IP address")

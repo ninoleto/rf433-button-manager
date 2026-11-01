@@ -28,6 +28,9 @@
   let networkLoaded = false;
   let networkState = null;
   let networkTimer = null;
+  let networkURLKey = '';
+  let networkSavedKey = '';
+  let networkPendingID = null;
   let layout = 'classic';
   try { layout = localStorage.getItem('rf433-layout') || 'classic'; } catch (_) {}
   function applyLayout(value) {
@@ -104,7 +107,7 @@
 
   function lock(message = '') {
     token = '';
-    clearTimeout(networkTimer); settingsLoaded = false; networkLoaded = false; networkState = null;
+    clearTimeout(networkTimer); settingsLoaded = false; networkLoaded = false; networkState = null; networkURLKey = ''; networkSavedKey = ''; networkPendingID = null;
     $('new-management-token').value = ''; $('new-token-panel').hidden = true;
     $('management-token').type = 'password'; $('token-visibility').textContent = 'Show';
     setView('remotes'); document.documentElement.dataset.editor = 'closed';
@@ -213,11 +216,10 @@
     navKey = key;
     const fragment = document.createDocumentFragment();
     if (!state.remotes.length) fragment.append(node('p', 'sidebar-empty', 'No remotes yet. Add your first remote to get started.'));
-    const options = document.createDocumentFragment();
-    for (const remote of state.remotes) {
-      const option = node('option', '', remote.name); option.value = remote.id; options.append(option);
-    }
-    $('remote-picker').replaceChildren(options); $('remote-picker').value = selectedRemote || '';
+    const selected = state.remotes.find(r => r.id === selectedRemote);
+    $('remote-picker-name').textContent = selected?.name || 'Choose a remote';
+    $('remote-picker-count').textContent = selected ? `${selected.buttons.length} buttons · Change remote` : 'Select or create a remote';
+    renderRemotePicker();
     for (const remote of state.remotes.filter(r => r.name.toLowerCase().includes(search))) {
       const button = node('button', `remote-nav${remote.id === selectedRemote ? ' selected' : ''}`);
       button.type = 'button';
@@ -798,34 +800,122 @@
     try { if (!document.execCommand('copy')) throw new Error('Select the text and copy it manually.'); }
     finally { field.remove(); previous?.focus(); }
   }
+  function renderRemotePicker() {
+    const query = $('remote-picker-search').value.trim().toLowerCase();
+    const list = document.createDocumentFragment();
+    for (const remote of state.remotes.filter(r => r.name.toLowerCase().includes(query))) {
+      const button = node('button', 'picker-option'); button.type = 'button';
+      button.setAttribute('aria-current', remote.id === selectedRemote ? 'true' : 'false');
+      const label = node('span'); label.append(node('strong', '', remote.name), node('small', '', `${remote.buttons.length} buttons`));
+      button.append(label, node('span', 'picker-mark', remote.id === selectedRemote ? '✓' : '›'));
+      button.addEventListener('click', async () => {
+        if (remote.id !== selectedRemote && !(await mayDiscard())) return;
+        if (remote.id !== selectedRemote) { selectedRemote = remote.id; selectedButton = null; editorDirty = false; }
+        document.documentElement.dataset.editor = 'closed'; close('remote-picker-dialog'); render();
+      });
+      list.append(button);
+    }
+    $('remote-picker-list').replaceChildren(list);
+    if (!$('remote-picker-list').children.length) $('remote-picker-list').append(node('p', 'hint', 'No remotes match this search.'));
+  }
+  function isLoopback(address) { return address === '::1' || /^127\./.test(address); }
+  function configURLs(c) {
+    const host = c.address.includes(':') ? `[${c.address}]` : c.address;
+    return [...(c.http ? [`http://${host}:${c.http_port}`] : []), ...(c.https ? [`https://${host}:${c.https_port}`] : [])];
+  }
+  function networkDraft() {
+    return {address: $('network-enabled').checked ? $('network-address').value.trim() : '127.0.0.1', http: $('network-http').checked || ($('network-https').checked && $('network-keep-http').checked), https: $('network-https').checked, http_port: Number($('network-http-port').value), https_port: Number($('network-https-port').value)};
+  }
+  function networkKey(c) { return JSON.stringify([c.address,c.http,c.http_port,c.https,c.https_port]); }
+  function fillNetwork(c) {
+    $('network-enabled').checked = !isLoopback(c.address);
+    $('network-address').value = c.address;
+    $('network-http').checked = !c.https; $('network-https').checked = c.https;
+    $('network-keep-http').checked = c.http && c.https;
+    $('network-http-port').value = c.http_port; $('network-https-port').value = c.https_port;
+  }
+  function renderNetworkDraft() {
+    if (!networkState) return;
+    const enabled = $('network-enabled').checked, address = $('network-address').value.trim();
+    const info = (networkState.interfaces || []).find(i => i.address === address);
+    $('network-address-choice').hidden = !enabled;
+    $('network-address-label').textContent = address && !isLoopback(address) ? address : 'Choose a LAN or VPN address';
+    $('network-interface-label').textContent = info && !isLoopback(address) ? info.interface : 'An address assigned to the Linux server';
+    $('network-address').disabled = !enabled;
+    $('network-keep-http-row').hidden = !$('network-https').checked;
+    $('network-https-help').hidden = !$('network-https').checked;
+    const pending = !!networkState.pending;
+    const changed = networkKey(networkDraft()) !== networkKey(networkState.config);
+    $('network-fields').disabled = pending;
+    $('network-stage').disabled = pending || !changed;
+    $('network-draft-status').textContent = pending ? 'Waiting for confirmation. Current access stays available until then.' : changed ? 'Not applied yet. Test the new connection before the 3-minute deadline; otherwise your current settings stay in place.' : 'Current settings saved. Changes here affect this app only.';
+  }
+  function renderAddressPicker() {
+    const list = document.createDocumentFragment();
+    const items = (networkState?.interfaces || []).filter(i => !isLoopback(i.address));
+    for (const item of items) {
+      const button = node('button', 'picker-option'); button.type = 'button';
+      const vpn = /^(tailscale|wg|tun|tap)/i.test(item.interface), virtual = /^(docker|br-|veth|virbr)/i.test(item.interface);
+      const label = node('span'); label.append(node('strong', '', item.address), node('small', '', `${item.interface} · ${vpn ? 'VPN connection' : virtual ? 'Virtual network — advanced' : 'Network interface'}`));
+      const selected = item.address === $('network-address').value.trim();
+      button.setAttribute('aria-current', selected ? 'true' : 'false');
+      button.append(label, node('span', 'picker-mark', selected ? '✓' : '›'));
+      button.addEventListener('click', () => { $('network-address').value = item.address; close('network-address-dialog'); renderNetworkDraft(); });
+      list.append(button);
+    }
+    $('network-address-list').replaceChildren(list);
+    if (!items.length) $('network-address-list').append(node('p', 'hint', 'No LAN or VPN address is currently available. Connect the server to your network, then reopen this picker. Local access still works.'));
+  }
+  function showURLCards() {
+    const c = networkState.config, remoteURLs = isLoopback(c.address) ? [] : configURLs(c);
+    const localURLs = networkState.local_urls || configURLs({...c,address:'127.0.0.1'});
+    const key = JSON.stringify([remoteURLs,localURLs]);
+    if (key === networkURLKey) return;
+    networkURLKey = key;
+    for (const [id,urls] of [['network-current-urls',remoteURLs],['network-local-urls',localURLs]]) {
+      $(id).replaceChildren();
+      for (const url of urls) {
+        const row = node('div', 'url-row'), code = node('code', '', url), button = node('button', 'secondary compact', 'Copy URL'); button.type = 'button';
+        button.setAttribute('aria-label', `Copy ${url}`);
+        button.addEventListener('click', async () => { try { await copyText(url); toast('URL copied.'); } catch (e) { setError('network-error', e.message); } });
+        row.append(code,button); $(id).append(row);
+      }
+      if (!urls.length) $(id).append(node('p', 'hint', 'Network access is off. Only the Linux server can connect.'));
+    }
+  }
   function showNetworkStatus() {
     if (!networkState) return;
     const pending = networkState.pending;
     $('network-pending').hidden = !pending;
-    $('network-stage').disabled = !!pending;
-    $('network-links').replaceChildren();
+    const oldLink = $('network-links').children[0]?.href;
     if (pending) {
       const seconds = Math.max(0, Math.ceil((new Date(pending.expires_at).getTime() - Date.now()) / 1000));
-      $('network-pending-message').textContent = `Test the new connection and confirm within ${seconds} seconds. Otherwise the previous settings are restored.`;
-      const c = pending.config, host = c.address.includes(':') ? `[${c.address}]` : c.address;
-      const urls = c.https ? [`https://${host}:${c.https_port}`] : [`http://${host}:${c.http_port}`];
-      for (const url of urls) { const a = node('a', '', url); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; $('network-links').append(a); }
-    }
+      const c = pending.config, urls = configURLs(c), url = c.https ? urls.find(u => u.startsWith('https:')) : urls[0];
+      const here = typeof location !== 'undefined' && location.origin === url;
+      $('network-pending-message').textContent = `${seconds} seconds left to confirm. If you do not confirm, the previous settings are kept automatically.`;
+      if (oldLink !== url) { const a = node('a', '', url); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; $('network-links').replaceChildren(a); }
+      $('network-confirm').disabled = !here;
+      const localOnly = isLoopback(c.address);
+      $('network-confirm-help').textContent = here ? 'This tab is using the proposed connection. Confirm to save it, or cancel to keep the previous settings.' : localOnly ? 'Open this localhost address in a browser ON THE LINUX SERVER (or through an SSH tunnel). Log in, open Settings and confirm there. Opening it on your phone or Windows PC will not reach the server.' : 'Open the proposed address in a new tab, log in with your existing token and return to Settings to confirm. Keep this tab open until you finish. The token is never included in the link.';
+    } else { $('network-links').replaceChildren(); }
     const cert = networkState.certificate || {};
-    $('certificate-status').textContent = cert.expires_at ? `HTTPS certificate expires ${new Date(cert.expires_at).toLocaleDateString()}. Trust certificate SHA-256: ${cert.ca_sha256}` : 'A local trust certificate will be created when you enable HTTPS or download it.';
+    $('certificate-status').textContent = cert.expires_at ? `Server certificate expires ${new Date(cert.expires_at).toLocaleDateString()}. Trust certificate SHA-256:` : 'Download to create this server’s local trust certificate.';
+    $('certificate-fingerprint').textContent = cert.ca_sha256 ? cert.ca_sha256.toUpperCase().match(/.{2}/g).join(':') : '';
+    $('certificate-renew').disabled = !!pending;
+    showURLCards(); renderNetworkDraft();
   }
   async function loadManagement(fill = false) {
     try {
-      networkState = await api('/manage/network');
-      if (!networkLoaded || fill) {
-        const c = networkState.pending?.config || networkState.config;
-        $('network-address').value = c.address; $('network-http').checked = c.http; $('network-https').checked = c.https;
-        $('network-http-port').value = c.http_port; $('network-https-port').value = c.https_port;
-        $('network-addresses').replaceChildren();
-        for (const item of networkState.interfaces || []) { const option = node('option'); option.value = item.address; option.label = item.interface; $('network-addresses').append(option); }
+      const next = await api('/manage/network');
+      const changedElsewhere = networkLoaded && networkSavedKey !== networkKey(next.config);
+      const endedPending = networkPendingID && !next.pending;
+      networkState = next;
+      if (!networkLoaded || fill || changedElsewhere || endedPending) {
+        fillNetwork(networkState.pending?.config || networkState.config);
         networkLoaded = true;
       }
-      showNetworkStatus(); setError('network-error', '');
+      networkSavedKey = networkKey(networkState.config); networkPendingID = networkState.pending?.id || null;
+      showNetworkStatus();
     } catch (error) { setError('network-error', error.message); }
     clearTimeout(networkTimer);
     if (token && activeView === 'settings') networkTimer = setTimeout(() => loadManagement(), 2000);
@@ -835,12 +925,15 @@
     bindAction('view-remotes', () => setView('remotes'));
     bindAction('view-activity', () => setView('activity'));
     bindAction('editor-back', () => { document.documentElement.dataset.editor = 'closed'; });
-    bindAction('compact-add-remote', () => $('remote-create-open').click());
+    bindAction('compact-add-remote', () => { close('remote-picker-dialog'); $('remote-create-open').click(); });
     $('remote-search').addEventListener('input', renderNavigation);
-    $('remote-picker').addEventListener('change', async () => {
-      if (!(await mayDiscard())) { $('remote-picker').value = selectedRemote || ''; return; }
-      selectedRemote = $('remote-picker').value; selectedButton = null; editorDirty = false;
-      document.documentElement.dataset.editor = 'closed'; render();
+    $('remote-picker-search').addEventListener('input', renderRemotePicker);
+    bindAction('remote-picker', () => { $('remote-picker-search').value = ''; renderRemotePicker(); show('remote-picker-dialog'); });
+    bindAction('network-address-picker', () => { renderAddressPicker(); show('network-address-dialog'); });
+    $('network-form').addEventListener('input', renderNetworkDraft);
+    $('network-enabled').addEventListener('change', () => {
+      renderNetworkDraft();
+      if ($('network-enabled').checked && isLoopback($('network-address').value.trim())) { renderAddressPicker(); show('network-address-dialog'); }
     });
     bindAction('token-visibility', () => {
       const show = $('management-token').type === 'password'; $('management-token').type = show ? 'text' : 'password';
@@ -851,7 +944,10 @@
     $('network-form').addEventListener('submit', async e => {
       e.preventDefault(); setError('network-error', '');
       try {
-        await api('/manage/network/stage', 'POST', { address: $('network-address').value.trim(), http: $('network-http').checked, https: $('network-https').checked, http_port: Number($('network-http-port').value), https_port: Number($('network-https-port').value) });
+        const draft = networkDraft();
+        if ($('network-enabled').checked && (!draft.address || isLoopback(draft.address))) throw new Error('Choose the server’s LAN or VPN address before allowing network access.');
+        if (isLoopback(draft.address) && !isLoopback(networkState.config.address) && !(await ask('Turn off network access?', 'To finish this change, you must open the localhost URL on the Linux server, or through an SSH tunnel, and confirm there. Other devices will then lose access. Without confirmation, your current network access is kept.', 'Test local-only access'))) return;
+        await api('/manage/network/stage', 'POST', draft);
         await loadManagement();
       } catch (error) { setError('network-error', error.message); }
     });

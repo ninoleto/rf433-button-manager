@@ -240,3 +240,103 @@ func TestManagementTokenPersistsPrivately(t *testing.T) {
 		t.Fatal("corrupt token silently replaced")
 	}
 }
+
+func TestSelectedListenerAlsoKeepsLocalAccess(t *testing.T) {
+	dir := t.TempDir()
+	token, err := OpenToken(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A second loopback IP stands in for an explicitly selected LAN interface.
+	address := net.JoinHostPort("127.0.0.2", strconv.Itoa(freePort(t)))
+	s, err := NewServer(dir, address, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Start(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	if len(s.URLs()) != 2 || s.URLs()[0] != "http://"+address {
+		t.Fatal("primary address changed or local listener missing", s.URLs())
+	}
+	for _, url := range s.URLs() {
+		resp, e := http.Get(url)
+		if e != nil {
+			t.Fatal("listener unreachable", e)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 204 {
+			t.Fatal("handler missing")
+		}
+	}
+	c := s.config
+	c.HTTP, c.HTTPS, c.HTTPSPort = false, true, freePort(t)
+	pending, err := s.Stage(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(s.cert.CA)
+	client := &http.Client{Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: pool}}, Timeout: time.Second}
+	defer client.CloseIdleConnections()
+	for _, url := range c.URLs() {
+		resp, e := client.Get(url)
+		if e != nil {
+			t.Fatal("trusted local/selected HTTPS unavailable", e)
+		}
+		resp.Body.Close()
+	}
+	block, _ := pem.Decode(s.cert.Cert)
+	leaf, _ := x509.ParseCertificate(block.Bytes)
+	for _, host := range []string{"localhost", "127.0.0.1", "::1", c.Address} {
+		if err = leaf.VerifyHostname(host); err != nil {
+			t.Fatal("missing local/selected certificate SAN", err)
+		}
+	}
+	if err = s.confirm(pending.ID, net.JoinHostPort("127.0.0.1", strconv.Itoa(c.HTTPSPort)), true); err == nil {
+		t.Fatal("loopback confirmation bypassed the selected network listener test")
+	}
+	if err = s.confirm(pending.ID, net.JoinHostPort(c.Address, strconv.Itoa(c.HTTPSPort)), true); err != nil {
+		t.Fatal(err)
+	}
+	c.Address = "127.0.0.1"
+	pending, err = s.Stage(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.confirm(pending.ID, net.JoinHostPort(c.Address, strconv.Itoa(c.HTTPSPort)), true); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.URLs()) != 1 || s.URLs()[0] != c.LocalURLs()[0] {
+		t.Fatal("local-only confirmation retained the network listener")
+	}
+	resp, err := client.Get(c.LocalURLs()[0])
+	if err != nil {
+		t.Fatal("local access lost after disabling selected listener", err)
+	}
+	resp.Body.Close()
+}
+
+func TestBusyCompanionLoopbackCannotReplaceCurrentListener(t *testing.T) {
+	s, _ := testServer(t)
+	old := s.config
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	c := old
+	c.Address, c.HTTPPort = "127.0.0.2", ln.Addr().(*net.TCPAddr).Port
+	if _, err = s.Stage(c); err == nil {
+		t.Fatal("accepted a network listener whose companion loopback port is occupied")
+	}
+	if s.pending != nil || s.config != old {
+		t.Fatal("failed staging changed saved configuration")
+	}
+	resp, err := http.Get(old.URLs()[0])
+	if err != nil {
+		t.Fatal("failed staging lost current access", err)
+	}
+	resp.Body.Close()
+}
