@@ -4,13 +4,25 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
-Test.4 removes the duplicate editable network IP field, adds opt-in Adaptive
-threshold selection while preserving Standard by default, and exposes separate
-signal/noise observations and per-button reception counters. Counters preserve
-normal debounce and action gating; resetting them cannot send a request. No
-decoder upgrade, gain change, looser matching or dispatch delay is introduced.
-The runtime version is `0.4.0-test.4`. The next step is a counted Standard/Adaptive
-comparison in the kitchen, followed by all nine assignments and idle observation.
+Test.5 adds a bounded normal-use recording in each saved button's Reception
+diagnostics. Starting/stopping retention does not restart the receiver or pause
+actions; complete pulse packets, unchanged decoded JSON, match decisions and
+sanitized webhook outcomes are retained together for offline inspection. Pulse
+output now runs continuously, with only the current bounded packet retained
+outside an explicit recording. Successful Finish inspection has its own outcome.
+
+The network change is frontend only: Server address moves into Advanced: address
+and ports, alongside editable port fields with large minus, plus and Reset
+buttons. The two existing URL cards and one-network-address-plus-localhost
+backend, Apply/Test/Confirm and rollback remain unchanged. The runtime version is
+`0.4.0-test.5`. The next step is a normal-use recording of ten problem-button
+presses in the kitchen; previous captures did not include the failed normal-use
+presses. Do not relearn mappings or infer a hardware cause from those omissions.
+
+Test.4 introduced opt-in Adaptive thresholds, separate signal/noise observations
+and per-button reception counters. Standard remains the default. Its operator
+comparison found substantial differences between buttons, so an aggregate 95%
+reliability claim is not supported. See TESTING-0.4.md for the counts.
 
 Test.3 fixed a reproduced dispatch gap: a saved Smoke mapping ignored the same
 complete payload when only a registered 25-bit PWM profile reported it. The bounded

@@ -273,6 +273,14 @@ Upstream references: [rtl_433 operation](https://triq.org/rtl_433/OPERATION.html
 
 ## Download a diagnostic RF capture (0.3.1)
 
+For missed presses of an **already saved** button, use **Reception diagnostics →
+Record normal use** instead of Inspect signal. Inspect deliberately pauses
+actions and changes the receiver session. Normal recording keeps the receiver
+and existing action behavior running, which is the condition being investigated.
+See [the test.5 procedure](TESTING-0.4.md#test5-normal-use-recording-and-network-controls).
+
+### Learning and inspection captures
+
 After a failed attempt, use **Download RF capture** before Retry. The JSON contains
 complete pulse recordings from both OOK and FSK packets, elapsed timestamps and
 actual decoded events. It deliberately retains FSK that automatic discovery

@@ -52,6 +52,7 @@ func (a *App) EnableCaptureLearning(binary, tempDir string) {
 }
 
 func (a *App) receiverChangedLocked() {
+	a.stopRecordingLocked("receiver_settings_changed")
 	a.receiverGeneration++
 	select {
 	case a.settingsChanged <- struct{}{}:
@@ -65,6 +66,7 @@ func (a *App) ReceiverPlan(binary string) (receiver.Config, uint64) {
 	s := a.config.Settings
 	return receiver.Config{Binary: binary, Serial: s.ReceiverSerial, FlexDecoder: s.FlexDecoder, AdaptiveSensitivity: s.AdaptiveSensitivity,
 		Protocols: clone(s.Protocols), Profiles: clone(a.config.DecoderProfiles),
+		MonitorPulses: a.captureEnabled,
 		CapturePulses: a.learning != nil && a.learning.Automatic}, a.receiverGeneration
 }
 
@@ -77,6 +79,7 @@ func (a *App) ReceiverPlanApplied(generation uint64) {
 		return
 	}
 	a.receiverApplied = generation
+	a.pulseStream = receiver.PulseStream{}
 	a.resetReceptionLocked()
 	a.lastDecodedAt = ""
 	a.receiver = receiver.Status{State: "recovering", Message: "Starting reception; waiting for sample acquisition"}
@@ -131,13 +134,17 @@ func (a *App) ReceivePulse(generation uint64, packet receiver.PulsePacket) {
 		return
 	}
 	a.recordCapturePacketLocked(generation, packet)
+	if generation == a.receiverApplied {
+		a.pulseStream = packet.Stream
+		a.recordNormalPulseLocked(generation, packet)
+	}
 	if l == nil || !l.Automatic || generation != l.CaptureGeneration {
 		// The supervisor finishes the old stream after restoration was requested.
 		// Preserve evidence on that session's notice, never accept a late candidate.
 		if notice := a.terminalCapture; notice != nil && generation == notice.CaptureGeneration {
 			a.observeCaptureLocked(notice, packet)
 			if packet.Final {
-				a.eventLocked("learning_diagnostics", "Capture stream closed; failure evidence retained", notice.ButtonID, captureEvidence(notice))
+				a.eventLocked("learning_diagnostics", "Capture stream closed; diagnostic evidence retained", notice.ButtonID, captureEvidence(notice))
 			}
 		}
 		return
@@ -327,7 +334,7 @@ func (a *App) finishLearningLocked(stage, message string) {
 	l.Stage = stage
 	l.Message = message
 	l.FinishedAt = a.now().UTC().Format(time.RFC3339Nano)
-	if stage != "saved" && stage != "cancelled" {
+	if stage != "saved" && stage != "cancelled" && stage != "inspected" {
 		if l.Diagnostics.FailureCode == "" {
 			l.Diagnostics.FailureCode = stage
 		}

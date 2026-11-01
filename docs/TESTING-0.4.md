@@ -1,10 +1,80 @@
 # 0.4 validation record and operator test plan
 
-Version: **0.4.0-test.4**. Base: published RC1 commit
+Version: **0.4.0-test.5**. Base: published RC1 commit
 `e1822594297c0d5b208c22b671a3be0f7a183445`. No production host change or GitHub
 publication is performed by building this package.
 
-## Test.4: network cleanup and reception comparison
+## Test.5: normal-use recording and network controls
+
+This build adds evidence collection for presses that fail in everyday use. It
+does not claim to fix RF range or establish that the remote, USB receiver or
+decoder is at fault. No mappings, profiles, RF thresholds or debounce rules are
+changed. Standard and Adaptive remain explicit choices.
+
+The receiver continuously emits pulse timings alongside decoded reports. Starting
+or stopping a recording retains/releases bounded in-memory evidence; it does not
+restart the receiver, pause webhooks or run a replay. The JSON includes original
+decoded reports, complete OOK and FSK packets, exact matching decisions and
+sanitized action outcomes. It excludes webhook URLs, headers, bodies and tokens.
+It still contains private RF/device identifiers; do not publish it in GitHub.
+Quiet sessions are downloadable, and the stop reason identifies time/data limits
+or an interrupted receiver/settings session. This is pulse data, not raw IQ.
+
+**Finish inspection** now records success after three matching presses. **Stop
+inspection** says that it was stopped; stream cleanup says diagnostic evidence
+was retained. Neither path saves an inspected button or bypasses action cleanup.
+
+The network change is **frontend only**: the existing Server address picker now
+sits in **Advanced: address and ports**. Both port fields remain directly editable
+and gain large **−**, **+** and **Reset** buttons. Reset writes the default into the
+draft (HTTP 8787, HTTPS 8788); it never applies it. The Network URL and Localhost
+URL cards, one selected network address plus localhost, Apply → open proposed
+URL → Confirm, timeout and rollback keep their existing behavior.
+
+### First normal-use test
+
+1. Upgrade with the supplied updater, refresh and verify **0.4.0-test.5** and
+   **Connected**. Keep the saved mappings and current Standard sensitivity.
+2. Select **B OFF → Reception diagnostics → Start recording**. Do not open Inspect
+   signal or Relearn. Existing enabled actions continue normally.
+3. From the usual kitchen position, press **exactly 10 times, two seconds apart**.
+   Count both attempted presses and actual light responses. Keep placement/grip
+   consistent. No extra presses are needed to make the recording look complete.
+4. Wait for the final action result, then use **Stop and download**. If the
+   60-second limit already ended it, use **Download recording**. Send that JSON
+   together with the two counts. Do not change configuration during the capture.
+
+After reviewing that evidence, repeat for another button only if needed. Do not
+relearn all buttons or repeatedly compare sensitivity modes before examining a
+failed normal-use recording. A packet/decoder count is not the attempt count.
+
+### Operator observations before this build
+
+The supplied counted Standard trials varied sharply by button:
+
+| Button | Physical presses | Recognized | Repeat reports ignored |
+| --- | ---: | ---: | ---: |
+| A ON | 10 | 10 | 17 |
+| A OFF | 20 | 19 | 51 |
+| B ON | 20 | 19 | 51 |
+| B OFF, initial trial | 10 | 0 | 0 |
+| B OFF, after selective relearn | 20 | 2 | 2 |
+| C ON | 20 | 19 | 0 |
+| C OFF | 30 | 11 | 0 |
+
+A later four-press kitchen trial had three failures and one success. The visible
+success had a correct decode, match and HTTP 200; expanded nearby sensor reports
+were background traffic. Those screenshots do not contain raw failed presses.
+The later three-press inspection succeeded, but captured the inspection condition
+and therefore cannot settle the normal-use failure. Its generic-discovery
+rejections/FSK counts do not count failed physical button presses. These results
+do not support blaming the remote or claiming overall 95% reliability.
+
+Software checks and packaging evidence are recorded in TEST-REPORT.md. Physical
+test.5 reception, timing, long-running load and action behavior remain to be tested
+on Zorin. Published releases and older private packages remain untouched.
+
+## Historical test.4: network cleanup and reception comparison
 
 The upper **Server address** picker is now the only address control. **Advanced:
 ports** contains only the HTTP/HTTPS port fields. Localhost HTTP remains available

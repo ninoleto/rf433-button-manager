@@ -49,7 +49,8 @@ async function harness() {
       if(url==='/api/settings' && options.method==='PUT') state={...state,settings:JSON.parse(options.body)};
       else if(url==='/api/learn/start') state={...state,learning:session(),learning_notice:null,actions_paused:true};
       else if(url==='/api/inspect/start') state={...state,learning:{...session(),button_id:'',inspect_only:true},learning_notice:null,actions_paused:true};
-      else if(url==='/api/learn/cancel') state={...state,learning:null,learning_notice:null,actions_paused:false};
+      else if(url==='/api/learn/cancel' || url==='/api/inspect/finish') state={...state,learning:null,learning_notice:null,actions_paused:false};
+      else if(url==='/api/buttons/fixture-button/reception/record') state={...state,reception_recording:{active:true,button_id:button.id,button_name:button.name,seconds_remaining:60,recognized_presses:0,packet_count:0,decoded_count:0}};
       else if(url==='/api/learn/arm') state={...state,learning:{...state.learning,stage:'waiting'}};
       else if(url==='/api/learn/confirm') state={...state,learning:null,learning_notice:null,actions_paused:true};
       else if(url==='/api/buttons/fixture-button/reception/reset') state={...state,reception:{since:new Date().toISOString(),buttons:{}}};
@@ -331,7 +332,46 @@ test('signal inspector works without a remote and cannot accidentally save a but
   assert.match(h.el('learning-description').textContent,/Nothing will be saved/);
   await h.el('learning-confirm').click();
   assert.equal(h.el('learning-dialog').open,false);
-  assert.deepEqual(h.calls.filter(c=>c.method!=='GET').map(c=>c.url),['/api/inspect/start','/api/learn/cancel']);
+  assert.deepEqual(h.calls.filter(c=>c.method!=='GET').map(c=>c.url),['/api/inspect/start','/api/inspect/finish']);
+});
+
+test('port touch controls edit drafts only, enforce bounds and reset defaults',async()=>{
+  const h=await harness();
+  await h.el('settings-open').click();
+  await h.el('network-http-plus').click();
+  assert.equal(h.el('network-http-port').value,'8788');
+  await h.el('network-http-minus').click();
+  assert.equal(h.el('network-http-port').value,'8787');
+  h.el('network-https-port').value='65535';await h.el('network-https-plus').click();
+  assert.equal(h.el('network-https-port').value,'65535');
+  h.el('network-http-port').value='1024';await h.el('network-http-minus').click();
+  assert.equal(h.el('network-http-port').value,'1024');
+  h.el('network-http-port').value='';await h.el('network-http-plus').click();
+  assert.equal(h.el('network-http-port').value,'');
+  assert.match(h.el('network-error').textContent,/1024 to 65535/);
+  await h.el('network-http-reset').click();await h.el('network-https-reset').click();
+  assert.equal(h.el('network-http-port').value,'8787');
+  assert.equal(h.el('network-https-port').value,'8788');
+  await h.el('network-http-plus').click();await h.refreshNetwork();
+  assert.equal(h.el('network-http-port').value,'8788');
+  assert.equal(h.calls.some(c=>c.method!=='GET'),false);
+  await h.el('network-form').emit('submit');
+  await h.el('network-http-plus').click();
+  assert.equal(h.el('network-http-port').value,'8788');
+  assert.equal(h.el('network-fields').disabled,true);
+});
+
+test('normal-use recording starts without learning, action suppression or configuration writes',async()=>{
+  const h=await harness();
+  h.button.signature='synthetic-saved-signal';
+  h.set({reception_recording_supported:true});await h.refresh();
+  await h.el('button-grid').children[0].click();
+  assert.equal(h.el('recording-panel').hidden,false);
+  await h.el('recording-start').click();
+  assert.equal(h.el('recording-stop').hidden,false);
+  assert.match(h.el('recording-status').textContent,/60s remaining/);
+  assert.equal(h.el('learning-dialog').open,false);
+  assert.deepEqual(h.calls.filter(c=>c.method!=='GET').map(c=>c.url),['/api/buttons/fixture-button/reception/record']);
 });
 
 test('failed inspection retries inspection rather than starting button learning',async()=>{

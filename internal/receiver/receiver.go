@@ -20,6 +20,7 @@ type Config struct {
 	Protocols           []int
 	Profiles            []DecoderProfile
 	CapturePulses       bool
+	MonitorPulses       bool // Stream pulses during normal use; retaining a recording is application-controlled.
 }
 
 type Status struct {
@@ -120,7 +121,7 @@ func arguments(cfg Config, dev device) []string {
 	for _, profile := range cfg.Profiles {
 		args = append(args, "-X", profile.FlexDecoder)
 	}
-	if cfg.CapturePulses {
+	if cfg.CapturePulses || cfg.MonitorPulses {
 		args = append(args, "-w", "OOK:-")
 	}
 	return args
@@ -165,6 +166,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 		onStatus = func(Status) {}
 	}
 	var previous Status
+	streamPulses := cfg.CapturePulses || cfg.MonitorPulses
 	var noise *NoiseReading
 	attempts := 0
 	emit := func(state, message string, d device) {
@@ -193,7 +195,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 		if child != nil {
 			child.stop()
 			child = nil
-			if cfg.CapturePulses {
+			if streamPulses {
 				// stop() has joined the readers. Account for their bounded queue before
 				// discarding the process. Cleanup records cannot become new candidates.
 			drain:
@@ -266,7 +268,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 				continue
 			}
 			if rec.err != nil {
-				if cfg.CapturePulses {
+				if streamPulses {
 					callback(PulsePacket{ErrorCode: "stream_read_error", Error: rec.err.Error(), Stream: pulses.snapshot()})
 				}
 				failure(rec.err.Error())
@@ -281,12 +283,12 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 				}
 				continue
 			}
-			if cfg.CapturePulses {
+			if streamPulses {
 				packet, consumed := pulses.feed(rec.data)
 				if packet != nil {
 					if packet.Error == "" && len(packet.Data) > 0 {
 						heartbeat = time.Now()
-						emit("connected", "receiver is producing pulse records", current)
+						emit("connected", "receiver is acquiring samples", current)
 					}
 					callback(*packet)
 				}

@@ -119,6 +119,19 @@ func (a *App) ManagedHandler(valid func(string) bool, static fs.FS, management h
 	handle("POST /api/buttons/{id}/reception/reset", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		return nil, a.ResetReception(r.PathValue("id"))
 	})
+	handle("POST /api/buttons/{id}/reception/record", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		return a.StartRecording(r.PathValue("id"))
+	})
+	handle("POST /api/reception/recording/stop", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		return a.StopRecording()
+	})
+	handle("GET /api/reception/recording", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		result, err := a.ExportRecording()
+		if err == nil {
+			w.Header().Set("Content-Disposition", `attachment; filename="rf433-button-manager-reception.json"`)
+		}
+		return result, err
+	})
 	handle("POST /api/learn/start", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		var b struct {
 			ButtonID string   `json:"button_id"`
@@ -135,6 +148,9 @@ func (a *App) ManagedHandler(valid func(string) bool, static fs.FS, management h
 			return nil, err
 		}
 		return a.StartInspection()
+	})
+	handle("POST /api/inspect/finish", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		return nil, a.FinishInspection()
 	})
 	handle("GET /api/inspect/result", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		result, err := a.InspectionResult()

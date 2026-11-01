@@ -36,6 +36,9 @@ func TestInspectionWithoutRemoteCannotPersistMapping(t *testing.T) {
 	}
 	before := a.Backup()
 	gen := startInspectionCapture(t, a)
+	if err := a.FinishInspection(); err == nil {
+		t.Fatal("unfinished inspection accepted as complete")
+	}
 	if _, err := a.StartInspection(); err == nil {
 		t.Fatal("overlapping capture allowed")
 	}
@@ -63,8 +66,17 @@ func TestInspectionWithoutRemoteCannotPersistMapping(t *testing.T) {
 	if _, err := a.ExportRFCapture(); err != nil {
 		t.Fatal("missing raw diagnostic capture", err)
 	}
-	if err := a.CancelLearning(); err != nil {
+	if err := a.FinishInspection(); err != nil {
 		t.Fatal(err)
+	}
+	a.ReceivePulse(gen, receiver.PulsePacket{Final: true, Stream: receiver.PulseStream{Closed: true}})
+	for _, event := range a.events {
+		if strings.Contains(event.Message, "Learning cancelled") || strings.Contains(event.Message, "failure evidence") {
+			t.Fatal("successful inspection logged as a failure")
+		}
+	}
+	if a.terminalCapture.Stage != "inspected" || a.terminalCapture.Diagnostics.FailureCode != "" {
+		t.Fatal("completed inspection retained a failure classification")
 	}
 	if !a.captureSuppressed {
 		t.Fatal("actions resumed before receiver restoration")

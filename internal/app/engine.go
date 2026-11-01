@@ -10,10 +10,12 @@ import (
 	"time"
 )
 
-const Version = "0.4.0-test.4"
+const Version = "0.4.0-test.5"
 
 type App struct {
 	reception                           ReceptionDiagnostics
+	recording                           *ReceptionRecording
+	pulseStream                         receiver.PulseStream
 	discoverReceivers                   func() ([]receiver.DeviceInfo, error)
 	lastDecodedAt                       string
 	mu                                  sync.Mutex
@@ -57,10 +59,18 @@ func New(store *Store, c Config, demo bool) (*App, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &App{discoverReceivers: receiver.Devices, store: store, config: c, inFlight: map[string]bool{}, actionSlots: make(chan struct{}, 8), events: events, lastSeen: map[string]time.Time{}, lastTest: map[string]time.Time{}, muteUntil: time.Now().Add(2 * time.Second), demo: demo, now: time.Now, ctx: ctx, cancel: cancel, settingsChanged: make(chan struct{}, 1), receiver: receiver.Status{State: "disconnected", Message: "Receiver has not started"}}, nil
 }
-func (a *App) Close()                           { a.mu.Lock(); a.closed = true; a.cancel(); a.mu.Unlock(); a.wg.Wait() }
+func (a *App) Close() {
+	a.mu.Lock()
+	a.stopRecordingLocked("service_stopping")
+	a.closed = true
+	a.cancel()
+	a.mu.Unlock()
+	a.wg.Wait()
+}
 func (a *App) SettingsChanges() <-chan struct{} { return a.settingsChanged }
 func (a *App) Settings() Settings               { a.mu.Lock(); defer a.mu.Unlock(); return clone(a.config.Settings) }
 func (a *App) eventLocked(kind, message, button string, data json.RawMessage, levels ...*receiver.SignalLevels) bool {
+	a.recordActionEventLocked(kind, message, button)
 	if button != "" && (kind == "webhook_start" || kind == "webhook_ok" || kind == "webhook_error" || kind == "webhook_unknown" || kind == "webhook_busy") {
 		if d := a.reception.Buttons[button]; d != nil {
 			d.Action = message
@@ -81,6 +91,7 @@ func (a *App) eventLocked(kind, message, button string, data json.RawMessage, le
 	saved, e := a.store.Record(ev)
 	if e != nil {
 		a.storageErr = true
+		a.recordDiagnosticLocked(RecordingEvent{Kind: "storage_error", ButtonID: button})
 		ev.Kind = "storage_error"
 		ev.Message = "Cannot persist events; actions paused until service restart"
 		ev.Data = nil
@@ -112,8 +123,14 @@ func (a *App) setReceiverLocked(s receiver.Status) {
 		a.eventLocked("receiver", s.State+": "+s.Message, "", nil)
 	}
 	a.receiver = s
+	if s.State != "connected" {
+		a.stopRecordingLocked("receiver_unavailable")
+	}
 }
 func (a *App) expireLocked() {
+	if a.recording != nil && a.recording.Active && !a.now().Before(a.recording.expires) {
+		a.stopRecordingLocked("time_limit")
+	}
 	if a.learning != nil && !a.now().Before(a.learning.expires) {
 		a.finishLearningLocked("timeout", "Learning timed out. No mapping changed. Retry when you are ready to press the button.")
 	}
@@ -144,7 +161,9 @@ func (a *App) State() any {
 		RFCaptureAvailable    bool                      `json:"rf_capture_available"`
 		ReceiverLastDecodedAt string                    `json:"receiver_last_decoded_at"`
 		Reception             ReceptionDiagnostics      `json:"reception"`
-	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles, a.receiverMode, a.receiverApplied, a.rfCapture != nil && a.rfCapture.Bytes > 0, a.lastDecodedAt, a.reception})
+		Recording             *RecordingStatus          `json:"reception_recording"`
+		RecordingSupported    bool                      `json:"reception_recording_supported"`
+	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles, a.receiverMode, a.receiverApplied, a.rfCapture != nil && a.rfCapture.Bytes > 0, a.lastDecodedAt, a.reception, a.recordingStatusLocked(), a.captureEnabled || a.demo})
 }
 func findButton(c *Config, id string) *Button {
 	for ri := range c.Remotes {
@@ -179,6 +198,7 @@ func (a *App) mutateConfig(fn func(*Config) error, restartReceiver bool) error {
 		return errors.New("configuration could not be saved")
 	}
 	a.pruneReceptionLocked(&next)
+	a.stopRecordingLocked("configuration_changed")
 	a.config = next
 	a.epoch++
 	if restartReceiver {
@@ -410,6 +430,7 @@ func (a *App) startLearning(id string, fields []string, inspect bool) (*Learning
 	now := a.now()
 	a.epoch++
 	a.learningNotice = nil
+	a.stopRecordingLocked("inspection_or_learning_started")
 	a.learning = &Learning{SessionID: newID(), ButtonID: id, Stage: "waiting", Message: "Press the physical button once, then release it.", Required: 3, Fields: append([]string{}, fields...), expires: now.Add(90 * time.Second), armedAt: now, ExpiresAt: now.Add(90 * time.Second).UTC().Format(time.RFC3339)}
 	a.learning.InspectOnly = inspect
 	if a.captureEnabled && !a.demo {
@@ -461,7 +482,11 @@ func (a *App) ArmLearning() (*Learning, error) {
 func (a *App) CancelLearning() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.finishLearningLocked("cancelled", "Learning cancelled; previous mapping kept")
+	message := "Learning cancelled; previous mapping kept"
+	if a.learning != nil && a.learning.InspectOnly {
+		message = "Inspection stopped; no mapping or action changed"
+	}
+	a.finishLearningLocked("cancelled", message)
 	a.learningNotice = nil
 	return nil
 }
@@ -544,6 +569,7 @@ func (a *App) Receive(raw []byte) {
 	}
 	_ = json.Unmarshal(raw, &envelope)
 	a.recordCaptureEventLocked(raw)
+	report := a.recordDecodedLocked(raw)
 	if a.receiver.State == "connected" {
 		a.lastDecodedAt = a.now().UTC().Format(time.RFC3339Nano)
 	}
@@ -551,6 +577,7 @@ func (a *App) Receive(raw []byte) {
 	var normalizeErr error
 	raw, normalizeErr = receiver.NormalizeConfiguredFlex(raw, a.config.Settings.FlexDecoder, a.learning != nil && a.learning.Automatic)
 	if normalizeErr != nil {
+		a.recordDecisionLocked(report, "configured_decoder_normalization_rejected", "", false)
 		return
 	}
 	for _, profile := range a.config.DecoderProfiles {
@@ -562,6 +589,7 @@ func (a *App) Receive(raw []byte) {
 			}
 			normalized, e := receiver.NormalizeProfile(raw, profile)
 			if e != nil {
+				a.recordDecisionLocked(report, "profile_normalization_rejected", "", false)
 				return
 			}
 			raw = normalized
@@ -602,12 +630,17 @@ func (a *App) Receive(raw []byte) {
 		return
 	}
 	if a.captureSuppressed {
+		a.recordDecisionLocked(report, "actions_paused", "", false)
 		return
 	}
 	matches, ambiguous := a.matchReceivedButtonsLocked(raw)
 	if ambiguous {
+		a.recordDecisionLocked(report, "ambiguous_mapping", "", false)
 		a.eventLocked("rf_ambiguous", "Signal matches more than one saved button; no action sent. Clear the duplicate mapping before using this signal.", "", nil)
 		return
+	}
+	if len(matches) == 0 {
+		a.recordDecisionLocked(report, "no_saved_mapping", "", false)
 	}
 	for _, match := range matches {
 		b := match.button
@@ -620,9 +653,11 @@ func (a *App) Receive(raw []byte) {
 		b.LastReceived = now.UTC().Format(time.RFC3339Nano)
 		if !prior.IsZero() && now.Sub(prior) < time.Duration(b.DebounceMS)*time.Millisecond {
 			diagnostic.Repeats++
+			a.recordDecisionLocked(report, "debounce_repeat", b.ID, match.equivalent)
 			continue
 		}
 		diagnostic.Presses++
+		a.recordDecisionLocked(report, "recognized", b.ID, match.equivalent)
 		if e := a.store.Save(a.config); e != nil {
 			a.storageErr = true
 		}
@@ -632,11 +667,24 @@ func (a *App) Receive(raw []byte) {
 		}
 		a.eventLocked("matched", message, b.ID, nil)
 		if !b.Enabled || b.Webhook.URL == "" || now.Before(a.muteUntil) || a.storageErr {
+			reason := "action_disabled"
+			switch {
+			case a.storageErr:
+				reason = "storage_error"
+			case now.Before(a.muteUntil):
+				reason = "action_muted"
+			case b.Webhook.URL == "":
+				reason = "no_action_configured"
+			}
+			a.recordDecisionLocked(report, reason, b.ID, match.equivalent)
 			continue
 		}
 		id, epoch := b.ID, a.epoch
 		if e := a.scheduleLocked(id, epoch, false); e != nil {
+			a.recordDecisionLocked(report, "action_busy", b.ID, match.equivalent)
 			a.eventLocked("webhook_busy", e.Error(), id, nil)
+		} else {
+			a.recordDecisionLocked(report, "action_scheduled", b.ID, match.equivalent)
 		}
 	}
 }

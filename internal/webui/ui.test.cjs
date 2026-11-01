@@ -132,6 +132,42 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     await page.locator('#view-remotes').click();
     await page.unroute('**/api/receivers', inventory);
   });
+  await check('normal-use recording downloads evidence without pausing actions (synthetic demo)', async () => {
+    const readState=async()=> (await fetch(`${base}/api/state`,{headers:{Authorization:`Bearer ${token}`}})).json();
+    const before=await readState();
+    await page.locator('#button-reception').evaluate(el=>{el.open=true;});
+    await page.locator('#recording-start').click();
+    await visible(page.locator('#recording-stop'));
+    const during=await readState();
+    assert.equal(during.reception_recording.active,true);
+    assert.equal(during.actions_paused,false);
+    assert.equal(during.receiver_generation,before.receiver_generation);
+    assert.equal(during.learning,null);
+    await page.waitForFunction(()=>/ [1-9]\d* decoded reports/.test(document.getElementById('recording-status').textContent));
+    for(const size of [{width:1440,height:1100},{width:820,height:1180},{width:390,height:844},{width:320,height:740}]) {
+      await page.setViewportSize(size);
+      await page.locator('#recording-stop').scrollIntoViewIfNeeded();
+      assert.ok((await page.locator('#recording-stop').boundingBox()).height>=48);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      if(size.width===390) await page.screenshot({path:path.join(qa,'recording-phone.png'),fullPage:true});
+    }
+    const downloadEvent=page.waitForEvent('download');
+    await page.locator('#recording-stop').click();
+    const download=await downloadEvent;
+    assert.equal(download.suggestedFilename(),'rf433-button-manager-reception.json');
+    const raw=fs.readFileSync(await download.path(),'utf8'), report=JSON.parse(raw);
+    assert.equal(report.format,'rf433-button-manager-reception-v1');
+    assert.equal(report.active,false);assert.equal(report.stop_reason,'stopped');
+    assert.equal(report.demo,true);assert.equal(report.packet_count,0);
+    assert.ok(report.decoded_count>=1);assert.ok(report.recognized_presses>=1);
+    assert.ok(report.events.some(e=>e.kind==='decision' && e.reason==='recognized'));
+    assert.ok(!raw.includes(token));assert.ok(!raw.includes('/api/webhook/demo-only'));
+    assert.ok(!raw.includes('"source":"rf-demo"'));
+    const after=await readState();
+    assert.equal(after.actions_paused,false);
+    assert.equal(after.receiver_generation,before.receiver_generation);
+    await page.setViewportSize({width:1440,height:1100});
+  });
   await check('HTML-like remote labels render as text', async () => {
     await page.locator('#button-name').fill('<img src=x onerror=alert(1)>');
     await page.locator('#button-save').click();
@@ -285,7 +321,8 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     assert.equal(await page.locator('#network-https').isDisabled(),true);
     assert.equal(await page.locator('#network-keep-http').count(),0);
     assert.equal(await page.locator('#network-address').count(),0);
-    assert.equal(await page.locator('#network-advanced summary').textContent(),'Advanced: ports');
+    assert.equal(await page.locator('#network-advanced summary').textContent(),'Advanced: address and ports');
+    assert.equal(await page.locator('#network-advanced #network-address-choice').count(),1);
     assert.equal(await page.locator('#network-stage').isDisabled(),true);
     assert.match(await page.locator('#network-local-urls').textContent(),new RegExp(`127.0.0.1:${port}`));
     await page.locator('#network-enabled').check();
@@ -313,6 +350,15 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
       await summary.click();
     }
     await page.locator('#network-advanced').evaluate(el=>{el.open=true;});
+    await page.locator('#network-http-plus').click();
+    assert.equal(await page.locator('#network-http-port').inputValue(),String(Number(port)+1));
+    await page.locator('#network-http-minus').click();
+    assert.equal(await page.locator('#network-http-port').inputValue(),port);
+    await page.locator('#network-http-reset').click();
+    assert.equal(await page.locator('#network-http-port').inputValue(),'8787');
+    await page.locator('#network-https-plus').click();
+    await page.locator('#network-https-reset').click();
+    assert.equal(await page.locator('#network-https-port').inputValue(),'8788');
     await page.locator('#network-http-port').fill('18789');
     await delay(2200);
     assert.equal(await page.locator('#network-http-port').inputValue(),'18789','poll must retain draft');
@@ -324,12 +370,15 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     await hidden(page.locator('#network-pending'));
     assert.equal(await page.locator('#network-http-port').inputValue(),port);
     assert.equal(await page.locator('#network-stage').isDisabled(),true);
-    await page.locator('#network-advanced').evaluate(el=>{el.open=false;});
     await page.locator('#certificate-guide').evaluate(el=>{el.open=false;});
     await page.setViewportSize({width:1440,height:1100});
     for(const size of [{width:1440,height:1100},{width:820,height:1180},{width:390,height:844},{width:320,height:740}]) {
       await page.setViewportSize(size);
       assert.equal(await page.locator('#main-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,`content overflow at ${size.width}`);
+      for(const control of await page.locator('.port-stepper button, .port-stepper input').all()) {
+        assert.ok((await control.boundingBox()).height>=48,'port controls need touch-sized targets');
+        assert.equal(await control.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,'port controls must fit');
+      }
       for(const card of await page.locator('.security-choices .choice-card').all()) {
         assert.equal(await card.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,'radio labels must fit inside the card');
         assert.ok((await card.locator('input').boundingBox()).width<=24,'native radio must not inherit full text-input width');

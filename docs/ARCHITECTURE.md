@@ -150,7 +150,7 @@ The child command is built as separate arguments, not passed through a shell:
 rtl_433 -c /dev/null -d :SERIAL -D quit -f 433.92M \
   -F json -F log:/dev/stderr -M stats:1:10 \
   [-R 0] [-R PROTOCOL_ID ...] [-X EXISTING_FLEX_SPECIFICATION] \
-  [-X VALIDATED_PROFILE ...] [-w OOK:- during learning]
+  [-X VALIDATED_PROFILE ...] -w OOK:-
 ```
 
 `-R 0` is added when explicit protocols or a flex decoder are configured. With
@@ -166,7 +166,16 @@ minute. A missing sample heartbeat for 45 seconds causes a restart. Ordinary RF
 silence does not. `recovering` means a child is starting; `connected` requires
 recognized statistics, RF JSON or captured pulses, not simply successful process creation.
 
-Stdout carries JSON and, during learning, `-w OOK:-` pulse records; stderr is drained independently and a bounded sanitized last
+From test.5, stdout carries JSON and `-w OOK:-` pulse records during normal use as
+well as learning. Starting/stopping a normal-use recording only changes bounded
+in-memory retention; it does not replace the receiver process, change decoding
+options or suppress actions. Outside recording, the parser retains only the
+current bounded packet and stream counters. Recording data is excluded from
+ordinary state polling, SQLite and backups; its authenticated export includes
+RF-only configuration, original JSON, match decisions and sanitized action
+outcomes. See [API](API.md#normal-use-recording-040-test5).
+
+Stderr is drained independently and a bounded sanitized last
 diagnostic is available on child failure. It never enters learning. Scanner lines
 are limited to 256 KiB; RF application input to 64 KiB. Shutdown sends SIGTERM to
 the dedicated process group, waits two seconds, then escalates to SIGKILL if

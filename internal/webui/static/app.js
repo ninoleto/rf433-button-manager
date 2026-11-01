@@ -336,6 +336,15 @@
     const action = d?.action ? `Latest action: ${d.action} (${fmtTime(d.action_at)})` : 'No action result in this counting session.';
     const stateNote = state.actions_paused ? 'Actions are paused.' : state.storage_error ? 'Actions are paused because storage failed.' : !button.enabled ? 'This button is disabled; matched presses are still counted.' : !button.webhook?.url ? 'No webhook is configured.' : 'This button is enabled; recognized presses may run its action.';
     $('reception-action').textContent = `${stateNote} ${action}`;
+    const recording = state.reception_recording;
+    $('recording-panel').hidden = !state.reception_recording_supported && !recording;
+    $('recording-stop').hidden = !recording?.active;
+    $('recording-download').hidden = !recording || recording.active;
+    $('recording-start').hidden = !!recording?.active;
+    const reasons = {stopped:'Recording stopped', time_limit:'60-second recording complete', data_limit:'Recording stopped at the data limit', record_too_large:'Recording stopped: one record exceeded the size limit', receiver_stream_closed:'Recording stopped: receiver stream closed', receiver_unavailable:'Recording stopped: receiver became unavailable', receiver_settings_changed:'Recording stopped: receiver settings changed', configuration_changed:'Recording stopped: configuration changed', inspection_or_learning_started:'Recording stopped: inspection or learning started', service_stopping:'Recording stopped: app shutting down'};
+    $('recording-status').textContent = recording
+      ? `${state.demo ? 'Synthetic demo · ' : ''}${recording.active ? `Recording ${recording.button_name} · ${recording.seconds_remaining}s remaining` : `${reasons[recording.stop_reason] || 'Recording complete'} · ${recording.button_name}`} · ${recording.recognized_presses} recognized · ${recording.packet_count} RF packets · ${recording.decoded_count} decoded reports`
+      : state.demo ? 'Demo records synthetic events only; no radio capture or webhook is performed.' : 'Starting and stopping a recording keeps the receiver running. Existing action settings stay in effect.';
   }
   function webhookDestination(raw) {
     if (!raw) return null;
@@ -364,6 +373,9 @@
     $('receiver-serial').disabled = learning || busy || !receiverListReady;
     $('sensitivity-standard').disabled = learning || busy; $('sensitivity-adaptive').disabled = learning || busy;
     $('reception-reset').disabled = learning || busy || !currentButton()?.signature;
+    $('recording-start').disabled = learning || busy || editorDirty || !state.reception_recording_supported || !!state.reception_recording?.active || !currentButton()?.signature || (!state.demo && state.receiver.state !== 'connected');
+    $('recording-stop').disabled = busy || !state.reception_recording?.active;
+    $('recording-download').disabled = busy || !state.reception_recording;
     $('webhook-test').disabled = !!state.demo || learning || busy || editorDirty || !currentButton()?.webhook?.url;
     $('learn-start').disabled = learning || busy || editorDirty;
     $('button-save').disabled = busy || learning;
@@ -751,7 +763,7 @@
   }, 'learning-error');
   bindAction('learning-confirm', async () => {
     if (state.learning?.inspect_only) {
-      await mutate('/learn/cancel'); render(); toast('Inspection finished. No mapping or webhook was changed.'); return;
+      await mutate('/inspect/finish'); render(); toast('Inspection finished. No mapping or webhook was changed.'); return;
     }
     await mutate('/learn/confirm'); fillEditor(); render(); toast('RF signal saved. Review the webhook, then enable this button.');
   }, 'learning-error');
@@ -806,6 +818,20 @@
       close('settings-dialog'); toast('Settings saved. Receiver changes restart the decoding process.');
     } catch (error) { handleError(error, 'settings-error'); }
   });
+  async function downloadRecording() {
+    const report = await api('/reception/recording');
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2) + '\n'], {type: 'application/json'}));
+    const link = node('a'); link.href = url; link.download = 'rf433-button-manager-reception.json';
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Recording downloaded. Include how many physical presses you made and how many actions worked.');
+  }
+  bindAction('recording-start', async () => {
+    if (editorDirty) throw new Error('Save button changes before recording.');
+    if (selectedButton) await mutate(`/buttons/${selectedButton}/reception/record`, 'POST', {});
+  }, 'recording-error');
+  bindAction('recording-stop', async () => { await mutate('/reception/recording/stop', 'POST', {}); await downloadRecording(); }, 'recording-error');
+  bindAction('recording-download', downloadRecording, 'recording-error');
   bindAction('backup-download', async () => {
     const backup = await api('/backup');
     const blob = new Blob([JSON.stringify(backup, null, 2) + '\n'], { type: 'application/json' });
@@ -887,7 +913,17 @@
     const changed = networkKey(networkDraft()) !== networkKey(networkState.config);
     $('network-fields').disabled = pending;
     $('network-stage').disabled = pending || !changed;
-    $('network-draft-status').textContent = pending ? 'Waiting for confirmation. Current access stays available until then.' : changed ? 'Not applied yet. Test the new connection before the 3-minute deadline; otherwise your current settings stay in place.' : 'Current settings saved. Changes here affect this app only.';
+    $('network-draft-status').textContent = pending ? 'Waiting for confirmation. Current access stays available until then.' : changed ? 'Unsaved changes. Apply, open the proposed address, then confirm there within 3 minutes. Without confirmation, your current settings stay in place.' : 'Current settings saved. Changes here affect this app only.';
+  }
+  function adjustNetworkPort(protocol, change) {
+    if (networkState?.pending) return;
+    const input = $(`network-${protocol}-port`);
+    const current = Number(input.value);
+    if (change !== 'reset' && (!String(input.value).trim() || !Number.isInteger(current) || current < 1024 || current > 65535)) {
+      setError('network-error', 'Enter a whole port number from 1024 to 65535, or use Reset.'); return;
+    }
+    input.value = String(change === 'reset' ? (protocol === 'http' ? 8787 : 8788) : Math.min(65535, Math.max(1024, current + change)));
+    setError('network-error', ''); renderNetworkDraft();
   }
   function renderAddressPicker() {
     const list = document.createDocumentFragment();
@@ -970,6 +1006,11 @@
     bindAction('remote-picker', () => { $('remote-picker-search').value = ''; renderRemotePicker(); show('remote-picker-dialog'); });
     bindAction('network-address-picker', () => { renderAddressPicker(); show('network-address-dialog'); });
     $('network-form').addEventListener('input', renderNetworkDraft);
+    for (const protocol of ['http', 'https']) {
+      bindAction(`network-${protocol}-minus`, () => adjustNetworkPort(protocol, -1), 'network-error');
+      bindAction(`network-${protocol}-plus`, () => adjustNetworkPort(protocol, 1), 'network-error');
+      bindAction(`network-${protocol}-reset`, () => adjustNetworkPort(protocol, 'reset'), 'network-error');
+    }
     $('network-enabled').addEventListener('change', () => {
       renderNetworkDraft();
       if ($('network-enabled').checked && isLoopback(networkAddress)) { renderAddressPicker(); show('network-address-dialog'); }

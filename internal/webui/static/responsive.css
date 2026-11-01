@@ -1,4 +1,14 @@
 /* One DOM and one editor across layouts: resizing never discards a draft. */
+.port-stepper{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:8px;align-items:stretch}
+.port-stepper button,.port-stepper input{min-height:48px;margin:0;min-width:0}
+.port-stepper button:not(.port-reset){font-size:22px;padding:8px}
+.port-stepper input{text-align:center;appearance:textfield;-moz-appearance:textfield}
+.port-stepper input::-webkit-inner-spin-button,.port-stepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.port-stepper .port-reset{grid-column:1/-1}
+.normal-recording{border-top:1px solid var(--border);margin-top:18px;padding-top:18px}
+.normal-recording h3{font-size:16px}
+.recording-actions{display:flex;flex-wrap:wrap;gap:10px}
+.recording-actions button{min-height:48px}
 body{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 .topbar,.banner{flex-shrink:0}
 .topbar{height:78px;padding:0 24px}

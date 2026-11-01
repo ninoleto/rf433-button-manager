@@ -11,10 +11,78 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestNormalMonitoringIQDecodeParity(t *testing.T) {
+	binary := installedRTL(t)
+	for _, fsk := range []bool{false, true} {
+		name := "OOK"
+		if fsk {
+			name = "FSK"
+		}
+		t.Run(name, func(t *testing.T) {
+			input := filepath.Join(t.TempDir(), "synthetic_433.92M_250k.cu8")
+			if err := os.WriteFile(input, syntheticIQ(fsk), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var baseline []string
+			for _, monitor := range []bool{false, true} {
+				cfg := Config{MonitorPulses: monitor, Profiles: []DecoderProfile{{FlexDecoder: "n=MonitorFixture,m=OOK_PWM,s=400,l=1200,r=20000,g=7000,t=160,bits=24,repeats>=2"}}}
+				live := arguments(cfg, device{serial: "must-not-open"})
+				var args []string
+				for i := 0; i < len(live); i++ {
+					if live[i] == "-d" || live[i] == "-D" {
+						i++
+						continue
+					}
+					args = append(args, live[i])
+				}
+				args = append(args, "-r", input)
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, binary, args...)
+				var stdout, stderr bytes.Buffer
+				cmd.Stdout, cmd.Stderr = &stdout, &stderr
+				if err := cmd.Run(); err != nil {
+					t.Fatalf("file-only receiver failed: %v %s", err, stderr.String())
+				}
+				var events []string
+				var parser pulseAssembler
+				packets, expectedModulation := 0, false
+				for _, line := range strings.Split(stdout.String(), "\n") {
+					if monitor {
+						packet, _ := parser.feed([]byte(line))
+						if packet != nil && packet.Error == "" {
+							if packet.OOK != fsk {
+								expectedModulation = true
+							}
+							packets++
+						}
+					}
+					if classify([]byte(line)) == event {
+						var obj map[string]any
+						json.Unmarshal([]byte(line), &obj)
+						delete(obj, "time")
+						normalized, _ := json.Marshal(obj)
+						events = append(events, string(normalized))
+					}
+				}
+				if !monitor {
+					baseline = events
+					if !fsk && len(events) == 0 {
+						t.Fatal("no baseline synthetic OOK decode")
+					}
+				} else if packets == 0 || !expectedModulation || !reflect.DeepEqual(events, baseline) {
+					t.Fatalf("pulse monitoring changed decoded events: %v != %v, packets=%d", events, baseline, packets)
+				}
+			}
+		})
+	}
+}
 
 func TestAdaptiveIQRecoveryAndRealMeasurementOutput(t *testing.T) {
 	binary := installedRTL(t)

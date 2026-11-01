@@ -4,6 +4,55 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
+## 0.4.0-test.5 software verification (2026-11-01)
+
+This private build adds normal-use recording, correct inspection completion
+messages and the agreed frontend-only network layout. It does not claim a
+reception fix or assign the failed presses to hardware without recorded evidence.
+
+- `go mod verify`, uncached full Go race tests, vet, JavaScript syntax, **23
+  controller checks**, deployment/history simulations and **10 updater tests**
+  passed with Go 1.27.3. Dependency versions and configuration schema stay unchanged.
+- New app checks cover unchanged receiver plans, action epochs, quiet-period
+  debounce, real loopback action delivery while recording, original decoded JSON,
+  unmatched versus recognized reports, repeat suppression, OOK/FSK retention,
+  pre-start/stale-generation packet exclusion, quiet timeout, memory/count bounds,
+  interruptions, retained evidence, token/origin enforcement and secret exclusion.
+  Demo records synthetic events without waiting for nonexistent hardware.
+- The normal receiver adds only pulse output. A fake supervisor verifies a single
+  receiver child, interleaved JSON/pulses and stable status messages. A parser
+  endurance check processes more than twice the recording byte budget without
+  retaining past packets or disabling subsequent reception.
+- File-only synthetic IQ playback with rtl_433 23.11 confirms identical decoded
+  events with/without normal pulse monitoring and captures both OOK and FSK output.
+  The four checksum-pinned public IQ recordings also retained exactly the same
+  decoded events (4, 5, 9 and 14 respectively). This is processing parity on those
+  samples, not proof of zero overhead or improved RF range on the operator's host.
+- Existing private recorded-Smoke/profile equivalence cases and the nine-burst
+  weak-signal replay passed with loopback requests, including simulated removal
+  of one decoder's output. No USB or production webhook was used; private captures,
+  identifiers and screenshots are excluded from source and package.
+- **14 headless Chrome for Testing 141 browser groups** passed against the real
+  isolated demo service. Coverage includes a real recording JSON download, continued
+  reception without suppression/restart, no invented RF packets in demo, preserved
+  settings, the moved address picker, editable port steps/reset, pending-change
+  protection and 48px touch controls at 1440, 820, 390 and 320px widths. This is
+  browser emulation, not a physical Android/iOS test.
+- Real demo HTTP/TLS tests passed for network HTTP, network HTTPS with network HTTP
+  closed, and network-off modes while authenticated localhost HTTP stays available.
+  Staging/confirmation, CA trust, token rotation/revocation, restart persistence and
+  certificate renewal remain passing. No network backend source was changed.
+- A tracked-source secret scan passed. Final outgoing-history/package scans,
+  bundle cloning, internal checksums and byte-identical clean rebuild verification
+  are performed during packaging; exact commit and hashes belong to `release.json`
+  and the accompanying archive checksum, not a moving version label.
+
+Physical normal-use recording, misses, long-running receiver load, button latency,
+hold behavior and real action responses still require Zorin validation. Starting
+recording does not restart the receiver, but this build enables continuous pulse
+output at receiver startup; software checks cannot replace testing that on the
+actual equipment. Use the short B OFF procedure in TESTING-0.4.md first.
+
 ## 0.4.0-test.4 software verification (2026-11-01)
 
 This private build adds optional Adaptive threshold selection, separately tracked

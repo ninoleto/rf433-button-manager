@@ -2,11 +2,102 @@ package receiver
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
+
+func TestNormalMonitoringKeepsOneReceiverAndUnchangedDecodingArguments(t *testing.T) {
+	base := Config{Protocols: []int{30}, AdaptiveSensitivity: true}
+	baseArgs := arguments(base, device{serial: "synthetic"})
+	base.MonitorPulses = true
+	got := arguments(base, device{serial: "synthetic"})
+	var stripped []string
+	for i := 0; i < len(got); i++ {
+		if got[i] == "-w" && i+1 < len(got) && got[i+1] == "OOK:-" {
+			i++
+			continue
+		}
+		stripped = append(stripped, got[i])
+	}
+	if !reflect.DeepEqual(stripped, baseArgs) || len(got) != len(baseArgs)+2 {
+		t.Fatal("normal monitoring changed decoder or sensitivity arguments", got)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p := newFake()
+	started := make(chan struct{}, 2)
+	packets := make(chan PulsePacket, 64)
+	events := make(chan string, 8)
+	statuses := make(chan Status, 64)
+	rt := runtime{discover: func() ([]device, error) { return []device{{serial: "synthetic", incarnation: "fake:1"}}, nil }, start: func(context.Context, string, []string, time.Duration) (process, error) {
+		started <- struct{}{}
+		return p, nil
+	}, poll: time.Millisecond, heartbeatTimeout: time.Second, stopTimeout: time.Millisecond, initialBackoff: time.Millisecond, maxBackoff: time.Second, stableAfter: time.Second}
+	done := make(chan error, 1)
+	go func() {
+		done <- run(ctx, base, func(raw []byte) { events <- string(raw) }, func(s Status) { statuses <- s }, rt, func(packet PulsePacket) { packets <- packet })
+	}()
+	receive(t, started)
+	for _, line := range strings.Split(strings.TrimSuffix(pulsePreamble, "\n"), "\n") {
+		p.out <- record{data: []byte(line)}
+	}
+	for _, line := range []string{";ook 2 pulses", "400 1200", signalJSON, "1200 10000", ";end", heartbeatJSON, signalJSON} {
+		p.out <- record{data: []byte(line)}
+	}
+	if receive(t, events) != signalJSON || receive(t, events) != signalJSON {
+		t.Fatal("normal monitoring altered decoded events")
+	}
+	for {
+		packet := receive(t, packets)
+		if !packet.Progress && !packet.Final {
+			if packet.Error != "" || !packet.OOK || packet.Pulses != 2 || packet.Stream.JSONRecords != 1 {
+				t.Fatal("interleaved pulse/JSON records corrupted", packet)
+			}
+			break
+		}
+	}
+	cancel()
+	if err := receive(t, done); err != nil {
+		t.Fatal(err)
+	}
+	if len(started) != 0 {
+		t.Fatal("monitoring restarted the receiver")
+	}
+	close(statuses)
+	for s := range statuses {
+		if s.State == "connected" && s.Message != "receiver is acquiring samples" {
+			t.Fatal("pulse traffic would alternate receiver status and flood event storage", s)
+		}
+	}
+}
+
+func TestNormalPulseParserRemainsBoundedBeyondRecordingByteLimit(t *testing.T) {
+	var parser pulseAssembler
+	for _, line := range strings.Split(strings.TrimSuffix(pulsePreamble, "\n"), "\n") {
+		parser.feed([]byte(line))
+	}
+	packets := 0
+	for parser.stream.Bytes < 2*MaxCaptureStreamBytes {
+		for _, line := range []string{";ook 2 pulses", "400 1200", "1200 10000", ";end"} {
+			packet, _ := parser.feed([]byte(line))
+			if packet != nil {
+				if packet.Error != "" || packet.Pulses != 2 {
+					t.Fatal("cumulative monitoring traffic disabled future packets")
+				}
+				packets++
+			}
+		}
+		if parser.buf.Len() != 0 || parser.buf.Cap() > MaxCaptureBytes {
+			t.Fatal("normal monitoring retained historical pulse data")
+		}
+	}
+	if parser.stream.Completed != packets || parser.stream.Headers != packets {
+		t.Fatal("cumulative stream accounting lost records")
+	}
+}
 
 // Models records already queued by the reader when stop joins it. A complete
 // packet and a partial next packet must remain diagnostics, never candidates.

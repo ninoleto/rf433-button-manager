@@ -59,6 +59,14 @@
               <div class="signal-actions"><button id="reception-reset" class="secondary compact" type="button">Reset counts</button><span id="reception-since" class="hint"></span></div>
               <p class="hint">Only this saved button is counted. A press the receiver cannot decode is not counted. Levels describe the last matched signal, not a live strength meter; they vary with receiver gain.</p>
               <p class="hint">These diagnostics do not pause actions. For a reception-only test, turn Enabled off and Save button first. Use normal reception, not Inspect signal.</p>
+              <div id="recording-panel" class="normal-recording" hidden>
+                <h3>Record normal use</h3>
+                <p class="hint">Record up to 60 seconds while your existing button actions continue. Start recording, press this physical button 10 times with two seconds between presses, then stop and download.</p>
+                <p id="recording-status" class="hint" role="status"></p>
+                <div class="recording-actions"><button id="recording-start" class="secondary accent" type="button">Start recording</button><button id="recording-stop" class="primary" type="button" hidden>Stop and download</button><button id="recording-download" class="secondary" type="button" hidden>Download recording</button></div>
+                <p id="recording-error" class="inline-error" role="alert" hidden></p>
+                <p class="hint">The file includes nearby radio signals and action results, without application credentials or webhook addresses. One recording is kept until replaced or the app restarts.</p>
+              </div>
             </details>
             <details class="advanced"><summary>Signal matching and debounce</summary><label class="toggle"><input id="learning-automatic-fields" type="checkbox" checked><span>Choose identity fields automatically when learning</span></label><p class="hint">Recommended when relearning a button to improve reception. The old mapping is kept until you confirm the replacement; webhook settings are preserved.</p><label for="button-fields">Identity fields</label><input id="button-fields" autocomplete="off" placeholder="id, channel, command, state, button, code, codes"><p class="hint">Comma-separated stable fields for the next Learn / Relearn. Model is included automatically. Existing matching changes only after verification.</p><label for="button-debounce">Release / debounce interval (ms)</label><input id="button-debounce" type="number" min="100" max="60000" step="50" value="700" required><p class="hint">Repeated bursts are suppressed until the signal has been quiet for this interval.</p></details>
             <div class="divider"></div><div class="subheading"><h3>Webhook action</h3><span class="pill subtle">HTTP</span></div>
@@ -90,9 +98,6 @@
         <form id="network-form">
           <fieldset id="network-fields">
             <label class="switch-row" for="network-enabled"><span><strong>Allow access from my local network</strong><small>Use a browser on your PC, tablet or phone. Changes take effect after you test and confirm them.</small></span><input id="network-enabled" class="switch-input" type="checkbox" role="switch"></label>
-            <div id="network-address-choice" class="network-address-choice">
-              <span class="picker-label">Server address</span><button id="network-address-picker" class="secondary picker-trigger" type="button" aria-haspopup="dialog"><span><strong id="network-address-label">Choose an address</strong><small id="network-interface-label">An address belonging to the Linux server</small></span><span aria-hidden="true">⌄</span></button>
-            </div>
         <div class="network-urls"><section class="url-card"><h4>Network URL</h4><p class="hint">For another device on the same network or connected VPN.</p><div id="network-current-urls"></div></section><section class="url-card"><h4>Localhost URL</h4><p class="hint">Only in a browser running on the Linux server. On your phone or Windows PC, localhost means that device, not the server.</p><div id="network-local-urls"></div></section></div>
             <details class="network-section" id="connection-security" open><summary>Network connection security</summary>
               <p class="hint">This choice applies to other devices. HTTPS allows only HTTPS on the selected network address; localhost HTTP stays available on the server.</p>
@@ -104,9 +109,16 @@
               <p class="network-warning">HTTP sends your management token without encryption. Never use it on a public or shared network. For access away from home, use a trusted VPN such as Tailscale or WireGuard. Never forward this app’s port to the public internet, even with HTTPS.</p>
               <p id="network-https-help" class="hint" hidden>First download and install the trust certificate below on each device you use. Then apply, open the proposed HTTPS address and confirm the connection there.</p>
             </details>
-            <details class="network-section" id="network-advanced"><summary>Advanced: ports</summary>
-              <p class="hint">Usually you can leave these ports unchanged. Choose the server address with the picker above. These settings do not change Home Assistant, your firewall, router or VPN.</p>
-              <div class="field-row"><div><label for="network-http-port">HTTP / localhost port</label><input id="network-http-port" type="number" inputmode="numeric" min="1024" max="65535" required></div><div><label for="network-https-port">Network HTTPS port</label><input id="network-https-port" type="number" inputmode="numeric" min="1024" max="65535" required></div></div>
+            <details class="network-section" id="network-advanced"><summary>Advanced: address and ports</summary>
+              <p class="hint">Usually you can leave these settings unchanged. They affect this app only, not Home Assistant, your firewall, router or VPN.</p>
+              <div id="network-address-choice" class="network-address-choice">
+                <span class="picker-label">Server address</span><button id="network-address-picker" class="secondary picker-trigger" type="button" aria-haspopup="dialog"><span><strong id="network-address-label">Choose an address</strong><small id="network-interface-label">An address belonging to the Linux server</small></span><span aria-hidden="true">⌄</span></button>
+                <p class="hint">Changing this address replaces the current network connection after you apply, open the new address and confirm there. Localhost stays available.</p>
+              </div>
+              <div class="field-row">
+                <div><label for="network-http-port">HTTP / localhost port</label><div class="port-stepper"><button id="network-http-minus" class="secondary" type="button" aria-label="Decrease HTTP port">−</button><input id="network-http-port" type="number" inputmode="numeric" min="1024" max="65535" step="1" required><button id="network-http-plus" class="secondary" type="button" aria-label="Increase HTTP port">+</button><button id="network-http-reset" class="secondary port-reset" type="button">Reset to 8787</button></div></div>
+                <div><label for="network-https-port">Network HTTPS port</label><div class="port-stepper"><button id="network-https-minus" class="secondary" type="button" aria-label="Decrease HTTPS port">−</button><input id="network-https-port" type="number" inputmode="numeric" min="1024" max="65535" step="1" required><button id="network-https-plus" class="secondary" type="button" aria-label="Increase HTTPS port">+</button><button id="network-https-reset" class="secondary port-reset" type="button">Reset to 8788</button></div></div>
+              </div>
               <p class="hint">The HTTP port is always used for localhost. It is also used on the selected network address only when you choose HTTP.</p>
             </details>
             <button id="network-stage" class="primary" type="submit" disabled>Apply network settings</button><p id="network-draft-status" class="hint" role="status">Loading current settings…</p>
@@ -181,7 +193,7 @@
   <dialog id="network-address-dialog" class="picker-dialog" aria-labelledby="network-address-title">
     <div class="dialog-heading"><div><div class="eyebrow">LINUX SERVER</div><h2 id="network-address-title">Choose an address</h2></div><button class="icon-button" data-close="network-address-dialog" type="button" aria-label="Close address picker">×</button></div>
     <p class="hint">Choose the server connection your other devices can reach. VPN access requires an already configured VPN on both devices.</p>
-    <div id="network-address-list" class="picker-list"></div><p class="hint">An address missing from this list can be entered under Advanced. The app never chooses another address for you.</p>
+    <div id="network-address-list" class="picker-list"></div><p class="hint">Only addresses assigned to this Linux server are listed. Connect its network or VPN first if an address is missing. Apply and confirm to replace the current network address.</p>
   </dialog>
 
   <dialog id="confirm-dialog" aria-labelledby="confirm-title"><h2 id="confirm-title">Confirm action</h2><p id="confirm-message"></p><div class="dialog-actions"><button id="confirm-no" class="secondary" type="button">Cancel</button><button id="confirm-yes" class="primary" type="button">Continue</button></div></dialog>

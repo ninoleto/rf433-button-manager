@@ -69,6 +69,10 @@ Confirmation requires three separately armed captures; see LEARNING.md.
 - POST /api/learn/start {button_id,identity_fields:[string]} -> Learning
 - POST /api/inspect/start {} -> Learning with `inspect_only:true`, no button ID
   required. Shares the bounded capture/three-arm workflow and webhook suppression.
+- POST /api/inspect/finish {} -> {ok:true}. Requires three matching armed presses
+  and stage `ready`; records a successful inspection, changes no mapping, and
+  retains suppression until receiver/analysis cleanup completes. Stop inspection
+  still uses `/api/learn/cancel`, with an inspection-specific stopped message.
 - GET /api/inspect/result -> RF-only inspection report for the active/retained
   inspection dialog: candidate, matched observations, candidate profile and limits.
   Requires authentication. Download before closing the dialog. No configuration,
@@ -112,6 +116,46 @@ No counter establishes the number of physical attempts or webhook successes.
 These diagnostics are bounded by configured buttons, kept only in memory and
 excluded from configuration backups. Receiver restarts/source changes reset them;
 removed/relearned mappings lose their old counts. Reset cannot alter debounce.
+
+## Normal-use recording (0.4.0-test.5)
+
+- `POST /api/buttons/{id}/reception/record {}` starts a 60-second recording for a
+  saved identity, returning `RecordingStatus`. Normal connected reception must
+  be ready; learning, cleanup, unavailable receivers and overlapping recordings
+  are rejected. Demo permits explicitly marked synthetic recordings only.
+- `POST /api/reception/recording/stop {}` stops retention, preserving the recording.
+  Returns status; calling it again on a retained recording is harmless.
+- `GET /api/reception/recording` downloads an authenticated JSON attachment, format
+  `rf433-button-manager-reception-v1`. A current recording can be exported as a
+  snapshot; the UI stops before downloading. Quiet recordings are valid evidence.
+
+`state.reception_recording_supported` indicates availability;
+`state.reception_recording` is null or a payload-free summary with ID, selected
+button ID/name, start/expiry/end, active/stop reason, remaining seconds, retained
+byte/packet/decoded counts, recognized presses and ignored repeat reports.
+
+The export adds complete OOK/FSK `packets` with unchanged `pulse_data`, original
+decoded reports and per-report match decisions in `events`, sanitized webhook
+event kinds/HTTP statuses, RF-only target/decoder settings, receiver/stream
+snapshots and limitations. `report_id` joins a decision to its original JSON;
+webhook events are button/timestamp observations, not falsely assigned to a
+specific report. Existing or manually tested requests can appear; results after
+the stop time are absent. Offsets are application receipt times, not RF timestamps.
+
+Retention is RAM-only, at most 60 seconds, 512 packets, 2,048 events and a 2 MiB
+encoded-data budget. Oversized individual decoded reports stop retention. Starting
+another recording replaces the retained one; restarting the app clears it.
+Receiver failure/reload, inspection/learning or a saved configuration edit stops
+retention with an explicit reason. Neither starting nor stopping changes receiver
+generation, mappings, action flags, quiet-period debounce or action concurrency.
+The new normal receiver plan adds `-w OOK:-` continuously; only bounded current
+packet assembly occurs outside recording. No second receiver or replay is started.
+
+Exports exclude management tokens, configuration backups, webhook destinations,
+headers, payloads and free-form request errors. Radio identifiers and surrounding
+traffic remain private. Pulse recordings are not raw IQ and cannot reconstruct
+information already lost in reception/demodulation. Counts are not physical press
+counts or proof of delivery. See LEARNING.md for text FSK replay limitations.
 
 RF capture exports additionally record `adaptive_sensitivity` when enabled. They
 still contain pulse records and decoded JSON, not raw I/Q samples.

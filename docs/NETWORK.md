@@ -32,7 +32,7 @@ choice; the interface explains this. There is no separate “keep HTTP” checkb
 
 1. Open **Settings → Network access**. Turn on **Allow access from my local
    network**. This changes a draft; it does not immediately disconnect anything.
-2. Tap **Server address** and choose the Linux server's actual LAN address from
+2. Open **Advanced: address and ports**, tap **Server address**, and choose the Linux server's actual LAN address from
    the large list. Each row names its network interface. A Docker bridge normally
    is not reachable from another PC. Choose a VPN address only if both devices
    already use that VPN. The app never guesses or switches interfaces for you.
@@ -40,9 +40,11 @@ choice; the interface explains this. There is no separate “keep HTTP” checkb
    choosing HTTPS, using the instructions below. Localhost HTTP does not need
    a separate switch and does not expose HTTP to other computers.
 4. Leave the ports alone unless needed. Defaults are 8787 for HTTP and 8788 for
-   HTTPS. **Advanced: ports** edits only the HTTP/localhost and HTTPS ports.
-   Use the **Server address** picker above for an address assigned to this host;
-   there is no separate IP text field.
+   HTTPS. **Advanced: address and ports** groups the existing address picker with
+   the editable HTTP/localhost and HTTPS fields. Use the large **−** and **+**
+   buttons for one-port steps, or **Reset** to put 8787/8788 into the draft.
+   These controls do not apply anything automatically; there is no separate IP
+   text field and no third active connection.
 5. Select **Apply network settings**. Open the proposed URL in another tab, log
    in with your current token, then go to Settings and **Confirm connection**.
    HTTPS changes must be confirmed over the proposed HTTPS address.
@@ -52,6 +54,10 @@ minutes** to confirm. A failed bind, **Cancel change**, timeout, or restart befo
 confirmation keeps the previously saved settings. The confirmation button is
 only enabled in a tab using the proposed address. Your token is never in a link.
 The URL cards show **saved** endpoints, not unapplied form edits.
+The confirmed design remains one selected network address plus localhost. Choosing
+another address replaces the former network address after confirmation; it does
+not enable simultaneous LAN and VPN listeners. Test.5 changes the control layout
+only, not this network behavior.
 
 After confirmation, copy the **Network URL** for your other devices and update
 bookmarks. The old tab may stop working if its listener was removed. If the new

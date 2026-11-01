@@ -7,6 +7,18 @@ import (
 	"github.com/ninoleto/rf433-button-manager/internal/receiver"
 )
 
+func (a *App) FinishInspection() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.expireLocked()
+	if a.learning == nil || !a.learning.InspectOnly || a.learning.Stage != "ready" || a.learning.Presses < a.learning.Required {
+		return errors.New("verify three separate presses before finishing inspection")
+	}
+	a.finishLearningLocked("inspected", "Inspection finished; no mapping or action changed")
+	a.learningNotice = nil
+	return nil
+}
+
 // An explicit allowlist of RF-only report fields, never a configuration export.
 type InspectionReport struct {
 	Format             string                       `json:"format"`
