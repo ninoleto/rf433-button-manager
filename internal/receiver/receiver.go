@@ -121,6 +121,11 @@ func arguments(cfg Config, dev device) []string {
 	for _, profile := range cfg.Profiles {
 		args = append(args, "-X", profile.FlexDecoder)
 	}
+	if !cfg.CapturePulses {
+		for _, spec := range ProfileFramingFallbacks(cfg.Profiles) {
+			args = append(args, "-X", spec)
+		}
+	}
 	if cfg.CapturePulses || cfg.MonitorPulses {
 		args = append(args, "-w", "OOK:-")
 	}

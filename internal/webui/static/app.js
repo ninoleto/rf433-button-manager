@@ -285,7 +285,7 @@
     $('button-fields').value = (button.identity_fields?.length ? button.identity_fields : state.settings.identity_fields?.length ? state.settings.identity_fields : DEFAULT_FIELDS).join(', ');
     const hook = button.webhook || {};
     $('webhook-url').value = hook.url || '';
-    $('webhook-method').value = hook.method || 'POST';
+    setWebhookMethod(hook.method || 'POST');
     $('webhook-timeout').value = hook.timeout_ms || 5000;
     $('webhook-payload').value = hook.payload || '';
     $('webhook-headers').value = Object.keys(hook.headers || {}).length ? JSON.stringify(hook.headers, null, 2) : '';
@@ -371,6 +371,13 @@
     $('inspect-open').disabled = learning || busy || !token;
     $('settings-save').disabled = learning || busy || !receiverListReady;
     $('receiver-serial').disabled = learning || busy || !receiverListReady;
+    $('receiver-picker').disabled = $('receiver-serial').disabled;
+    for (const id of ['button-debounce', 'webhook-timeout']) {
+      $(id).disabled = learning || busy;
+      for (const action of ['minus', 'plus', 'reset']) $(`${id}-${action}`).disabled = learning || busy;
+    }
+    $('webhook-method-post').disabled = learning || busy;
+    $('webhook-method-get').disabled = learning || busy;
     $('sensitivity-standard').disabled = learning || busy; $('sensitivity-adaptive').disabled = learning || busy;
     $('reception-reset').disabled = learning || busy || !currentButton()?.signature;
     $('recording-start').disabled = learning || busy || editorDirty || !state.reception_recording_supported || !!state.reception_recording?.active || !currentButton()?.signature || (!state.demo && state.receiver.state !== 'connected');
@@ -532,6 +539,30 @@
     $('receiver-activity').textContent = recent ? 'Decoded RF signal received' : at ? `Last decoded RF: ${fmtTime(at)}` : 'No decoded RF activity yet';
     $('receiver-activity').className = recent ? 'rf-activity recent' : 'rf-activity';
   }
+  function renderReceiverChoice() {
+    const wanted = $('receiver-serial').value;
+    const device = receiverDevices.find(d => d.selectable && d.serial === wanted);
+    $('receiver-choice-label').textContent = wanted ? (device?.name || `Saved serial ${wanted}`) : 'Automatic';
+    $('receiver-choice-detail').textContent = device ? `Serial ${device.serial}${device.usb_port ? ' · USB '+device.usb_port : ''}` : wanted ? 'Missing or ambiguous — saved selection retained' : receiverDevices.length === 1 ? 'Use the single connected receiver' : 'Choose a receiver with a unique serial';
+  }
+  function renderReceiverPicker() {
+    const list = document.createDocumentFragment();
+    for (const option of $('receiver-serial').children) {
+      const button = node('button', 'picker-option'); button.type = 'button'; button.disabled = option.disabled;
+      const device = receiverDevices.find(d => d.selectable && d.serial === option.value);
+      const label = node('span');
+      label.append(node('strong', '', device?.name || (option.value === '' ? 'Automatic' : option.textContent)), node('small', '', device ? `Serial ${device.serial}${device.usb_port ? ' · USB '+device.usb_port : ''}` : option.value === '' ? 'Use the single connected receiver' : 'Unavailable for selection'));
+      const selected = option.value === $('receiver-serial').value;
+      button.setAttribute('aria-current', selected ? 'true' : 'false');
+      button.append(label, node('span', 'picker-mark', selected ? '✓' : '›'));
+      button.addEventListener('click', () => {
+        if ($('receiver-picker').disabled || option.disabled) return;
+        $('receiver-serial').value = option.value; renderReceiverChoice(); close('receiver-picker-dialog');
+      });
+      list.append(button);
+    }
+    $('receiver-picker-list').replaceChildren(list);
+  }
   async function refreshReceiverDevices(wanted = $('receiver-serial').value) {
     const generation = ++receiverScanGeneration;
     receiverListReady = false;
@@ -556,6 +587,7 @@
       }
       $('receiver-serial').replaceChildren(...options);
       $('receiver-serial').value = wanted || '';
+      renderReceiverChoice();
       receiverListReady = true;
       const problems = receiverDevices.filter(d => !d.selectable).map(d => `${d.usb_port ? 'USB '+d.usb_port+': ' : ''}${d.reason}`);
       $('receiver-list-note').textContent = `${receiverDevices.length} receiver(s) detected. ${problems.join('. ') || 'Choose a receiver, then Save settings. Detection does not prove USB access or sample acquisition.'}`;
@@ -596,14 +628,15 @@
   function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
     $('theme-toggle').setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`);
-    $('appearance-theme').value = theme;
+    $('appearance-theme').checked = theme === 'dark';
+    $('appearance-theme-status').textContent = theme === 'dark' ? 'Dark appearance is on.' : 'Light appearance is on.';
     try { localStorage.setItem('rfbm-theme', theme); } catch (_) { /* Nonessential preference. */ }
   }
   let theme = 'dark';
   try { theme = localStorage.getItem('rfbm-theme') || 'dark'; } catch (_) { /* Default dark. */ }
   applyTheme(theme === 'light' ? 'light' : 'dark');
   bindAction('theme-toggle', async () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
-  $('appearance-theme').addEventListener('change', () => applyTheme($('appearance-theme').value));
+  $('appearance-theme').addEventListener('change', () => applyTheme($('appearance-theme').checked ? 'dark' : 'light'));
   document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => close(button.dataset.close)));
 
   function openRemote(mode) {
@@ -663,6 +696,34 @@
     if (event.target.id === 'ha-id' || event.target.id === 'ha-base' || event.target.id === 'button-fields') return;
     editorDirty = true; renderEditor();
   });
+  function setWebhookMethod(method) {
+    $('webhook-method').value = method === 'GET' ? 'GET' : 'POST';
+    $('webhook-method-post').checked = method !== 'GET';
+    $('webhook-method-get').checked = method === 'GET';
+  }
+  for (const method of ['POST', 'GET']) {
+    $(`webhook-method-${method.toLowerCase()}`).addEventListener('change', () => {
+      if (!$(`webhook-method-${method.toLowerCase()}`).checked) return;
+      setWebhookMethod(method); editorDirty = true; renderEditor();
+    });
+  }
+  function bindNumberStepper(id, minimum, maximum, step, reset, errorID, onChange) {
+    for (const [action, delta] of [['minus', -step], ['plus', step], ['reset', 0]]) {
+      bindAction(`${id}-${action}`, () => {
+        const input = $(id), value = Number(input.value);
+        if (input.disabled) return;
+        if (action !== 'reset' && (!String(input.value).trim() || !Number.isInteger(value) || value < minimum || value > maximum)) {
+          setError(errorID, `Enter a whole number from ${minimum} to ${maximum}, or use Reset.`); return;
+        }
+        input.value = String(action === 'reset' ? reset : Math.max(minimum, Math.min(maximum, value + delta)));
+        setError(errorID, ''); onChange();
+      }, errorID);
+    }
+  }
+  const markButtonChanged = () => { editorDirty = true; renderEditor(); };
+  bindNumberStepper('button-debounce', 100, 60000, 50, 700, 'editor-error', markButtonChanged);
+  bindNumberStepper('webhook-timeout', 100, 30000, 100, 5000, 'editor-error', markButtonChanged);
+  bindNumberStepper('remote-button-count', 1, 64, 1, 6, 'remote-error', () => {});
   $('button-editor').addEventListener('change', (event) => {
     if (event.target.id === 'ha-id' || event.target.id === 'ha-base' || event.target.id === 'button-fields') return;
     editorDirty = true; renderEditor();
@@ -710,7 +771,7 @@
       if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash || !['', '/'].includes(base.pathname)) throw new Error('Use a plain HTTP(S) Home Assistant origin, without credentials or a path.');
       $('webhook-url').value = `${base.origin}/api/webhook/${encodeURIComponent(value)}`;
     }
-    $('webhook-method').value = 'POST'; $('ha-id').value = '';
+    setWebhookMethod('POST'); $('ha-id').value = '';
     editorDirty = true; renderEditor(); toast('Home Assistant URL filled in. Save the button to apply it.');
   }, 'editor-error');
   bindAction('webhook-test', async () => {
@@ -796,6 +857,7 @@
     if (id) await mutate(`/buttons/${id}/reception/reset`, 'POST', {}, 'Reception counts reset. Action settings are unchanged.');
   }, 'editor-error');
   bindAction('receiver-refresh', () => refreshReceiverDevices(), 'settings-error');
+  bindAction('receiver-picker', () => { renderReceiverPicker(); show('receiver-picker-dialog'); }, 'settings-error');
   $('settings-form').addEventListener('submit', async (event) => {
     event.preventDefault(); setError('settings-error', '');
     try {

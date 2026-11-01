@@ -1,10 +1,56 @@
 # 0.4 validation record and operator test plan
 
-Version: **0.4.0-test.5**. Base: published RC1 commit
+Version: **0.4.0-test.6**. Base: published RC1 commit
 `e1822594297c0d5b208c22b671a3be0f7a183445`. No production host change or GitHub
 publication is performed by building this package.
 
-## Test.5: normal-use recording and network controls
+## Test.6: complete-word reception and touch controls
+
+A normal-use recording reproduced a decoder framing problem. A saved 25-bit PWM
+profile placed its row-gap threshold inside normal data gaps, splitting complete
+button words. Test.6 retains the original profile and adds a narrowly scoped
+normal-reception decoder using that profile's existing reset delimiter. It keeps
+the measured pulse widths, tolerance, exact bit length and exact identity. It does
+not fill missing bits, change gain/sensitivity, rewrite mappings or require relearning.
+The additional decoder is excluded during learning/inspection so duplicate output
+cannot count as repeated air frames in validation.
+
+The latest ten-press recording contains twelve packets: ten remote-like bursts
+and two background sensor packets. Original decoding produces four recognized
+presses; corrected replay through actual matching/debounce and isolated HTTP
+produces eight. The two remaining bursts contain only nineteen and six pulses,
+insufficient to establish a complete 25-bit identity. The earlier successful
+recordings retain their counts of 10, 10 and 32 actions without duplicates. These
+are offline results, not a promised physical success rate. Raw recordings and
+identifiers remain private and are not included in this package.
+
+Appearance now uses a **Dark theme** switch, synchronized with the toolbar and
+remembered in this browser. Receiver selection uses the same touch card picker as
+Server address. **POST / GET** are large choices. Timeout, release/debounce and
+remote button count have **−**, **+** and **Reset** controls; fields remain directly
+editable and Reset edits only the draft. Timeout steps by 100 ms, debounce by
+50 ms and button count by one. Defaults are 5000 ms, 700 ms and six buttons.
+Existing arbitrary integer values remain valid. Network behavior is unchanged.
+
+### First test after installing test.6
+
+1. Verify **0.4.0-test.6**, **Connected**, the same mappings, receiver and enabled
+   flags. Keep Standard sensitivity and existing debounce. Do not relearn.
+2. Keep the motion automation off for a clean comparison. On **B OFF → Reception
+   diagnostics**, reset counts, then start **Record normal use**. Make exactly ten
+   presses two seconds apart from the usual kitchen position, with the same grip.
+3. Wait for the final action result, then **Stop and download**. Report attempted,
+   recognized and actual light-response counts with that JSON, including failures.
+4. If that is improved, repeat for C OFF and check all other saved assignments.
+   Check that a hold causes only one action and nearby sensor traffic causes none.
+5. Check the theme switch and receiver picker without saving a receiver change.
+   Try the method and number controls, then restore the intended values before
+   Save. Port/address changes still require Apply, open the proposed URL, Confirm.
+
+Hardware reliability, long use, latency, holds and false matches still need this
+operator check. The package is a private test build; no GitHub release is replaced.
+
+## Historical test.5: normal-use recording and network controls
 
 This build adds evidence collection for presses that fail in everyday use. It
 does not claim to fix RF range or establish that the remote, USB receiver or

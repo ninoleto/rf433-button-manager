@@ -69,6 +69,7 @@ type ReceptionRecording struct {
 	Protocols           []int                     `json:"protocols"`
 	FlexDecoder         string                    `json:"flex_decoder"`
 	Profiles            []receiver.DecoderProfile `json:"decoder_profiles"`
+	FramingFallbacks    []string                  `json:"profile_framing_fallbacks,omitempty"`
 	ReceiverStart       receiver.Status           `json:"receiver_start"`
 	ReceiverEnd         receiver.Status           `json:"receiver_end"`
 	StreamStart         receiver.PulseStream      `json:"stream_start"`
@@ -106,7 +107,8 @@ func (a *App) StartRecording(id string) (*RecordingStatus, error) {
 		Generation: a.receiverApplied,
 		Target:     RecordingTarget{Signature: b.Signature, IdentityFields: clone(b.IdentityFields), DebounceMS: b.DebounceMS, Enabled: b.Enabled, ActionConfigured: b.Webhook.URL != ""},
 		Protocols:  clone(a.config.Settings.Protocols), FlexDecoder: a.config.Settings.FlexDecoder, Profiles: clone(a.config.DecoderProfiles),
-		ReceiverStart: clone(a.receiver), StreamStart: a.pulseStream,
+		FramingFallbacks: receiver.ProfileFramingFallbacks(a.config.DecoderProfiles),
+		ReceiverStart:    clone(a.receiver), StreamStart: a.pulseStream,
 		Packets: []RFPacket{}, Events: []RecordingEvent{}, started: now, expires: now.Add(recordingDuration),
 		Limitations: "Receive-only pulse timings, not raw IQ. Offsets are application receipt times. Packet and decoded-report counts are not physical press counts. A missing decode does not identify its cause. Recordings include surrounding RF traffic. Webhook events are timestamped by button and can include requests started before recording or by a manual test. Results arriving after recording stops are not included. No automatic retries or actions are introduced by recording. Credentials, webhook URLs, headers and bodies are excluded.",
 	}

@@ -50,6 +50,10 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
   });
   await check('create six-button remote and edit action', async () => {
     await page.locator('#remote-create-empty').click();
+    await page.locator('#remote-button-count-plus').click();
+    assert.equal(await page.locator('#remote-button-count').inputValue(),'7');
+    await page.locator('#remote-button-count-reset').click();
+    assert.equal(await page.locator('#remote-button-count').inputValue(),'6');
     await page.locator('#remote-submit').click();
     await hidden(page.locator('#remote-dialog'));
     assert.equal(await page.locator('.rf-button').count(), 6);
@@ -259,6 +263,80 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     await page.locator('.remote-nav').first().click();
     await page.locator('.rf-button').first().click();
   });
+  await check('touch theme, receiver picker and action controls preserve explicit saving', async () => {
+    const backup=async()=> (await fetch(`${base}/api/backup`,{headers:{Authorization:`Bearer ${token}`}})).json();
+    const before=await backup();
+    const receiverRoute=route=>route.fulfill({json:{devices:[
+      {name:'Desk tuner',serial:'synthetic-desk',usb_port:'1-2',selectable:true},
+      {name:'Roof tuner',serial:'synthetic-roof',usb_port:'2-1',selectable:true}
+    ]}});
+    await page.route('**/api/receivers',receiverRoute);
+    try {
+      await page.locator('#settings-open').click();
+      await page.locator('#receiver-picker').click();
+      await visible(page.locator('#receiver-picker-dialog'));
+      assert.equal(await page.locator('#receiver-picker-list button').first().isDisabled(),true);
+      await page.locator('#receiver-picker-list button').filter({hasText:'Roof tuner'}).click();
+      await hidden(page.locator('#receiver-picker-dialog'));
+      assert.equal(await page.locator('#receiver-choice-label').textContent(),'Roof tuner');
+      await page.locator('#receiver-refresh').click();
+      assert.equal(await page.locator('#receiver-serial').inputValue(),'synthetic-roof');
+      for(const theme of ['light','dark']) {
+        await page.locator('#appearance-theme').setChecked(theme==='dark');
+        assert.equal(await page.locator('html').getAttribute('data-theme'),theme);
+        for(const size of [{width:1440,height:1100},{width:820,height:1180},{width:390,height:844},{width:320,height:740}]) {
+          await page.setViewportSize(size);
+          await page.locator('#receiver-picker').click();
+          assert.equal(await page.locator('#receiver-picker-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+          for(const option of await page.locator('#receiver-picker-list button').all()) assert.ok((await option.boundingBox()).height>=48);
+          if(size.width===390) await page.screenshot({path:path.join(qa,`receiver-picker-${theme}-phone.png`)});
+          await page.keyboard.press('Escape');
+          await page.locator('#appearance-theme').scrollIntoViewIfNeeded();
+          assert.ok((await page.locator('.appearance-switch').boundingBox()).height>=48);
+          assert.equal(await page.locator('#main-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+          if(size.width===390) await page.screenshot({path:path.join(qa,`appearance-${theme}-phone.png`)});
+        }
+      }
+    } finally { await page.unroute('**/api/receivers',receiverRoute); }
+    assert.deepEqual((await backup()).settings,before.settings,'picker and theme must not save receiver settings');
+    await page.setViewportSize({width:1440,height:1100});
+    await page.locator('#view-remotes').click();
+    await page.locator('.rf-button').first().click();
+    await page.locator('#webhook-timeout-plus').click();
+    assert.equal(await page.locator('#webhook-timeout').inputValue(),'5100');
+    await page.locator('#webhook-method-get').check();
+    await delay(1200);
+    assert.equal(await page.locator('#webhook-method').inputValue(),'GET');
+    assert.deepEqual((await backup()).remotes[0].buttons[0].webhook,before.remotes[0].buttons[0].webhook);
+    await page.locator('#webhook-method-post').check();
+    await page.locator('#webhook-timeout').fill('5055');
+    assert.equal(await page.locator('#webhook-timeout').evaluate(el=>el.validity.valid),true,'existing integer timeouts remain valid');
+    await page.locator('#button-save').click();
+    await page.waitForFunction(()=>document.getElementById('unsaved-status').textContent==='');
+    assert.equal((await backup()).remotes[0].buttons[0].webhook.timeout_ms,5055);
+    await page.locator('#webhook-timeout-reset').click();
+    await page.locator('#button-save').click();
+    await page.waitForFunction(()=>document.getElementById('unsaved-status').textContent==='');
+    for(const theme of ['light','dark']) {
+      await page.locator('#settings-open').click();
+      await page.locator('#appearance-theme').setChecked(theme==='dark');
+      await page.locator('#view-remotes').click();
+      for(const size of [{width:1440,height:1100},{width:820,height:1180},{width:390,height:844},{width:320,height:740}]) {
+        await page.setViewportSize(size);
+        await page.locator('#button-debounce').evaluate(el=>{el.closest('details').open=true;});
+        for(const control of await page.locator('#button-editor .number-stepper button, #button-editor .number-stepper input, .method-choices label').all()) {
+          assert.ok((await control.boundingBox()).height>=48,'action controls need touch-sized targets');
+          assert.equal(await control.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+        }
+        assert.equal(await page.locator('#main-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,`action overflow at ${size.width}`);
+        if(size.width===390 || size.width===1440) {
+          await page.locator('#webhook-timeout').scrollIntoViewIfNeeded();
+          await page.screenshot({path:path.join(qa,`action-controls-${theme}-${size.width}.png`)});
+        }
+      }
+      await page.setViewportSize({width:1440,height:1100});
+    }
+  });
   await check('desktop and mobile layout; light and dark themes', async () => {
     await hidden(page.locator('#editor-back'));
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -306,7 +384,7 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     const keyBox=await page.locator('.rf-button').first().boundingBox();
     assert.ok(keyBox.width>=48 && keyBox.height>=48);
     await page.locator('#settings-open').click();
-    await page.locator('#appearance-theme').selectOption('dark');
+    await page.locator('#appearance-theme').check();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
     await page.locator('#view-remotes').click();
     await page.locator('.rf-button').first().click();

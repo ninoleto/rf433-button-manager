@@ -1,10 +1,10 @@
 /* One DOM and one editor across layouts: resizing never discards a draft. */
-.port-stepper{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:8px;align-items:stretch}
-.port-stepper button,.port-stepper input{min-height:48px;margin:0;min-width:0}
-.port-stepper button:not(.port-reset){font-size:22px;padding:8px}
-.port-stepper input{text-align:center;appearance:textfield;-moz-appearance:textfield}
-.port-stepper input::-webkit-inner-spin-button,.port-stepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-.port-stepper .port-reset{grid-column:1/-1}
+:is(.port-stepper,.number-stepper){display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:8px;align-items:stretch}
+:is(.port-stepper,.number-stepper) button,:is(.port-stepper,.number-stepper) input{min-height:48px;margin:0;min-width:0}
+:is(.port-stepper,.number-stepper) button:not(.port-reset):not(.number-reset){font-size:22px;padding:8px}
+:is(.port-stepper,.number-stepper) input{text-align:center;appearance:textfield;-moz-appearance:textfield}
+:is(.port-stepper,.number-stepper) input::-webkit-inner-spin-button,:is(.port-stepper,.number-stepper) input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+:is(.port-stepper,.number-stepper) :is(.port-reset,.number-reset){grid-column:1/-1}
 .normal-recording{border-top:1px solid var(--border);margin-top:18px;padding-top:18px}
 .normal-recording h3{font-size:16px}
 .recording-actions{display:flex;flex-wrap:wrap;gap:10px}
@@ -263,3 +263,24 @@ input.switch-input:checked:before{transform:translateX(22px);background:var(--te
 .reception-panel .signal-actions{align-items:center;gap:12px;flex-wrap:wrap}
 #reception-reset{min-height:48px}
 @media(max-width:640px){.sensitivity-choices{grid-template-columns:1fr}.reception-panel{padding:12px}.reception-metrics strong{font-size:15px}}
+
+/* Touch controls use the same scale in settings and the button editor. */
+input[type=number]{appearance:textfield;-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+label.appearance-switch{display:flex;align-items:center;gap:20px;min-height:64px;margin:0;cursor:pointer}
+.advanced .toggle{white-space:normal;min-height:44px}
+.advanced .toggle input{flex:0 0 17px}
+.appearance-switch input:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.receiver-choice{align-items:stretch;gap:12px}
+.receiver-choice .picker-trigger{flex:1;min-width:0}
+.receiver-choice #receiver-refresh{flex:0 0 auto;min-height:48px}
+.method-field{border:0;padding:0;margin:0;min-width:0}
+.method-field legend{font-size:12px;font-weight:600;margin:0 0 8px;padding:0}
+.method-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.method-choices label{display:flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:10px 12px;margin:0;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);cursor:pointer;font-size:14px}
+.method-choices label:has(input:checked){background:var(--accent-soft);border-color:var(--accent-strong)}
+.method-choices label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.method-choices input[type=radio]{width:18px;height:18px;min-height:18px;padding:0;margin:0;accent-color:var(--accent-strong)}
+@media(max-width:540px){.receiver-choice{flex-direction:column}.receiver-choice #receiver-refresh{width:100%}}
+
+@media(max-width:640px){.action-fields{grid-template-columns:1fr}}

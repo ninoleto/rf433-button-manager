@@ -4,6 +4,50 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
+## 0.4.0-test.6 software verification (2026-11-01)
+
+This private build corrects a reproduced complete-word PWM framing failure and
+adds the requested touch controls. Physical reception still requires operator
+validation; the remaining short bursts cannot be repaired by this change.
+
+- Go 1.27.3 module verification, uncached full race tests, vet, JavaScript syntax,
+  **25 controller checks**, deployment/history simulations and **10 updater
+  checks** passed. Public IQ fixtures were supplied. Dependency versions and schema
+  remain unchanged.
+- Actual rtl_433 23.11 file replay validates the bounded additional decoder:
+  complete synthetic words survive gap-boundary variation, every shorter length
+  and an overlong word are rejected, changed bits stay distinct, and separate
+  truncated packets are not joined. Eligibility and exclusion from learning are
+  tested. Original profile IDs, measured timings and registered models are retained.
+- Four private normal-use recordings were replayed through matching, shared
+  debounce and isolated HTTP delivery. Original versus corrected action counts
+  were **10 → 10**, **10 → 10**, **32 → 32**, and **4 → 8**. Stored configuration
+  remained identical apart from last-received time. The last recording includes
+  two sensor packets and two incomplete remote-like bursts; it is a ten-attempt
+  operator trial, not evidence of ten complete words or a 100% physical fix.
+- Existing recorded native/Smoke equivalence, saved-Smoke/profile cases and the
+  nine-burst weak-signal regression passed. Private inputs stay outside source,
+  history and the package; all action requests use disposable loopback endpoints.
+- **15 real headless Chrome for Testing 141 browser groups** passed. The new
+  coverage includes theme synchronization, modal receiver selection and draft
+  preservation, POST/GET choices, numeric bounds/reset, unchanged arbitrary integer
+  timeout values, explicit persistence, and 48px controls in both themes at 1440,
+  820, 390 and 320px widths. Existing learning, recording download, backup/restore,
+  lock and network workflows remain passing. New screens were visually inspected.
+  This is browser emulation, not physical phone acceptance.
+- Real isolated demo HTTP/TLS checks passed for network HTTP, network HTTPS with
+  network HTTP closed, and network-off modes while authenticated localhost HTTP
+  stays available. Confirmation, rollback, certificate trust/renewal and token
+  rotation/revocation remain passing. Network backend source is unchanged.
+- Packaging requires clean committed source, tracked-source and outgoing-history
+  review, archive and internal checksums, bundle cloning and a byte-identical
+  rebuild. Exact package commit and hashes are recorded in `release.json` and the
+  accompanying ZIP checksum. No GitHub release/tag or production service is changed.
+
+Next: the short test.6 kitchen recording in TESTING-0.4.md, using existing mappings
+and sensitivity. No relearn is needed. Hold behavior, long-running load, latency,
+false matches and actual light responses still require hardware observation.
+
 ## 0.4.0-test.5 software verification (2026-11-01)
 
 This private build adds normal-use recording, correct inspection completion

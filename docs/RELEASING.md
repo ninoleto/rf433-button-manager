@@ -1,6 +1,6 @@
 # Packaging and release procedure
 
-This branch is **0.4.0-test.5**. It is a private validation build, not a stable
+This branch is **0.4.0-test.6**. It is a private validation build, not a stable
 release. The public RC1 tag and ZIP remain unchanged. Historical release records
 are available through their Git tags and the historical test report.
 

@@ -394,7 +394,12 @@ test('receiver dropdown keeps selection through refresh and preserves button ass
  await h.el('settings-open').click();
  assert.equal(h.el('receiver-serial').value,'desk');
  assert.equal(h.el('receiver-serial').children[0].disabled,true);
- h.el('receiver-serial').value='roof';
+ await h.el('receiver-picker').click();
+ assert.equal(h.el('receiver-picker-dialog').open,true);
+ assert.equal(h.el('receiver-picker-list').children[0].disabled,true);
+ await h.el('receiver-picker-list').children[2].click();
+ assert.equal(h.el('receiver-picker-dialog').open,false);
+ assert.equal(h.el('receiver-choice-label').textContent,'Roof tuner');
  await h.refresh();assert.equal(h.el('receiver-serial').value,'roof','status polling cannot discard user choice');
  await h.el('receiver-refresh').click();assert.equal(h.el('receiver-serial').value,'roof');
  await h.el('settings-form').emit('submit');
@@ -410,6 +415,8 @@ test('missing and duplicate receivers stay explicit and scan failure cannot over
  assert.equal(h.el('receiver-serial').value,'absent');
  assert.equal(h.el('receiver-serial').children.every(o=>o.disabled),true);
  assert.match(h.el('receiver-list-note').textContent,/Duplicate USB serial/);
+ await h.el('receiver-picker').click();
+ assert.equal(h.el('receiver-picker-list').children.every(o=>o.disabled),true);
  h.el('receiver-serial').value='default';await h.el('settings-form').emit('submit');
  assert.equal(h.calls.some(c=>c.method==='PUT'),false);
  h.scanError(true);await h.el('receiver-refresh').click();
@@ -426,6 +433,44 @@ test('receiver activity clears on disconnect and settings are blocked during cap
  assert.match(h.el('receiver-activity').textContent,/No decoded RF/);
  assert.equal(h.el('settings-save').disabled,true);
  assert.equal(h.el('receiver-serial').disabled,true);
+ assert.equal(h.el('receiver-picker').disabled,true);
+});
+
+test('theme switch and toolbar stay synchronized without server writes',async()=>{
+  const h=await harness();
+  assert.equal(h.el('appearance-theme').checked,true);
+  h.el('appearance-theme').checked=false;await h.el('appearance-theme').emit('change');
+  assert.equal(h.root.dataset.theme,'light');assert.equal(h.local.get('rfbm-theme'),'light');
+  assert.match(h.el('appearance-theme-status').textContent,/Light/);
+  await h.el('theme-toggle').click();
+  assert.equal(h.el('appearance-theme').checked,true);assert.equal(h.root.dataset.theme,'dark');
+  assert.equal(h.calls.some(c=>c.method!=='GET'),false);
+});
+
+test('action touch controls preserve drafts, bounds and explicit saving',async()=>{
+  const h=await harness();h.button.signature='synthetic-saved-signal';
+  h.button.webhook={url:'http://localhost:8123/api/webhook/synthetic',method:'POST',timeout_ms:5000};
+  h.set({reception_recording_supported:true});await h.refresh();
+  await h.el('button-grid').children[0].click();
+  await h.el('webhook-timeout-plus').click();
+  assert.equal(h.el('webhook-timeout').value,'5100');
+  assert.equal(h.el('webhook-test').disabled,true);assert.equal(h.el('recording-start').disabled,true);
+  await h.refresh();assert.equal(h.el('webhook-timeout').value,'5100');
+  h.el('webhook-timeout').value='30000';await h.el('webhook-timeout-plus').click();
+  assert.equal(h.el('webhook-timeout').value,'30000');
+  h.el('webhook-timeout').value='';await h.el('webhook-timeout-minus').click();
+  assert.equal(h.el('webhook-timeout').value,'');assert.match(h.el('editor-error').textContent,/100 to 30000/);
+  await h.el('webhook-timeout-reset').click();assert.equal(h.el('webhook-timeout').value,'5000');
+  h.el('button-debounce').value='100';await h.el('button-debounce-minus').click();
+  assert.equal(h.el('button-debounce').value,'100');
+  await h.el('button-debounce-reset').click();assert.equal(h.el('button-debounce').value,'700');
+  h.el('webhook-method-get').checked=true;await h.el('webhook-method-get').emit('change');
+  assert.equal(h.el('webhook-method').value,'GET');assert.equal(h.el('webhook-method-post').checked,false);
+  await h.refresh();assert.equal(h.el('webhook-method-get').checked,true);
+  assert.equal(h.calls.some(c=>c.method!=='GET'),false,'editing must not save or send');
+  h.set({actions_paused:true});await h.refresh();
+  await h.el('webhook-timeout-plus').click();assert.equal(h.el('webhook-timeout').value,'5000');
+  assert.equal(h.el('webhook-method-get').disabled,true);
 });
 
 

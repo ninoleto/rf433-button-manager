@@ -277,7 +277,7 @@ For missed presses of an **already saved** button, use **Reception diagnostics â
 Record normal use** instead of Inspect signal. Inspect deliberately pauses
 actions and changes the receiver session. Normal recording keeps the receiver
 and existing action behavior running, which is the condition being investigated.
-See [the test.5 procedure](TESTING-0.4.md#test5-normal-use-recording-and-network-controls).
+See [the current test procedure](TESTING-0.4.md#first-test-after-installing-test6).
 
 ### Learning and inspection captures
 

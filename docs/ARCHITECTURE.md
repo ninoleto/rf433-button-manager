@@ -175,6 +175,17 @@ ordinary state polling, SQLite and backups; its authenticated export includes
 RF-only configuration, original JSON, match decisions and sanitized action
 outcomes. See [API](API.md#normal-use-recording-040-test5).
 
+From test.6, validated 25-bit PWM profiles with a legacy gap threshold inside the
+long-symbol band receive an additional normal-use `-X` specification with `g=0`.
+The original decoder stays active. Reset delimiter, widths, tolerance, model and
+exact bit length are unchanged; persisted profiles and their IDs are not rewritten.
+Eligibility also requires nonoverlapping symbol bands, no sync pulse, one-repeat
+validation and a reset larger than four long-symbol upper bounds. Full words must
+still match a saved exact identity; this does not join separate packets or repair
+partial words. Existing shared debounce suppresses equivalent reports. Capture
+learning/inspection excludes this extra decoder to preserve independent repeat
+evidence. `internal/receiver/framing.go` defines the complete bounded eligibility.
+
 Stderr is drained independently and a bounded sanitized last
 diagnostic is available on child failure. It never enters learning. Scanner lines
 are limited to 256 KiB; RF application input to 64 KiB. Shutdown sends SIGTERM to

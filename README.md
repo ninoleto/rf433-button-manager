@@ -21,7 +21,7 @@ physical button press to that automation.
 > hardware combinations remain unverified. Software CI and recorded-signal replay
 > are not physical receiver tests.
 >
-> **This checkout is 0.4.0-test.5, for private upgrade and hardware validation.**
+> **This checkout is 0.4.0-test.6, for private upgrade and hardware validation.**
 > The published RC1 remains unchanged. The new receiver preference, renamed
 > installation, HTTPS, token rotation and responsive interface need operator
 > acceptance before a stable release.
@@ -237,14 +237,14 @@ RTL-SDR and a remote using a supported signal format. Runtime state belongs on
 reliable internal storage. A browser is the management client; no Node server,
 Go compiler, Docker container or MQTT broker is required to install the binary.
 
-The private test package is `rf433-button-manager-0.4.0-test.5-linux-amd64.zip`.
+The private test package is `rf433-button-manager-0.4.0-test.6-linux-amd64.zip`.
 Use the package supplied for this validation round. Download its matching `.zip.sha256` asset as well, then
 verify before extracting into a fresh directory:
 
 ```sh
-sha256sum -c rf433-button-manager-0.4.0-test.5-linux-amd64.zip.sha256
+sha256sum -c rf433-button-manager-0.4.0-test.6-linux-amd64.zip.sha256
 rfb_extract_dir=$(mktemp -d "$HOME/rf433-button-manager.XXXXXX")
-unzip rf433-button-manager-0.4.0-test.5-linux-amd64.zip -d "$rfb_extract_dir"
+unzip rf433-button-manager-0.4.0-test.6-linux-amd64.zip -d "$rfb_extract_dir"
 cd "$rfb_extract_dir/rf433-button-manager"
 ```
 

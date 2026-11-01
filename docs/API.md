@@ -142,6 +142,11 @@ webhook events are button/timestamp observations, not falsely assigned to a
 specific report. Existing or manually tested requests can appear; results after
 the stop time are absent. Offsets are application receipt times, not RF timestamps.
 
+Test.6 adds optional `profile_framing_fallbacks`, containing the additional `-X`
+specifications actually used in normal reception. Replay tools must append these
+alongside the unchanged `decoder_profiles` to reproduce that capture's decoder
+plan. The format remains v1; older recordings omit this optional field.
+
 Retention is RAM-only, at most 60 seconds, 512 packets, 2,048 events and a 2 MiB
 encoded-data budget. Oversized individual decoded reports stop retention. Starting
 another recording replaces the retained one; restarting the app clears it.

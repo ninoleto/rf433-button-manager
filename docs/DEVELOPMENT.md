@@ -260,6 +260,16 @@ checksum-pinned public IQ recordings; `RFB_RF_TESTDATA=/tmp/rfb-rf-tests make ch
 runs the normal suite plus recorded-remote integration. No USB device is opened.
 See TEST-REPORT.md for provenance, tested flow and the physical-test distinction.
 
+The test.6 complete-word framing check uses synthetic pulse words with actual
+rtl_433 file input, checking gap-boundary jitter, all shorter word lengths,
+overlong words, individual changed bits and separated truncated packets. The
+optional end-to-end private regression reads `RFB_FRAMING_RECORDINGS`, an absolute
+path to a JSON array of `{ "File": "/private/recording.json", "Legacy": 4,
+"Corrected": 8 }` entries. Run `go test -race -count=1 ./internal/app -run
+TestPrivateFramingRecordingsToWebhook -v`. It compares original and corrected
+decoder output through real matching, debounce and isolated loopback HTTP, checking
+stored configuration preservation. Keep the manifest and captures outside Git.
+
 To add an already-decoded remote format, add a narrowly justified identity alias
 in `internal/app/decoded_learning.go`, plus positive and different-button tests.
 Never identify a button by RSSI, timestamp or sensor measurements. For an unknown

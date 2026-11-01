@@ -4,20 +4,25 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
-Test.5 adds a bounded normal-use recording in each saved button's Reception
-diagnostics. Starting/stopping retention does not restart the receiver or pause
-actions; complete pulse packets, unchanged decoded JSON, match decisions and
-sanitized webhook outcomes are retained together for offline inspection. Pulse
-output now runs continuously, with only the current bounded packet retained
-outside an explicit recording. Successful Finish inspection has its own outcome.
+Test.6 adds a narrowly scoped normal-reception framing fallback for validated
+25-bit PWM profiles whose gap limit cuts through their long-symbol timing band.
+Original profiles/IDs, native decoders, exact identities and debounce are retained.
+Private file replay through matching and isolated actions improves the latest
+failed ten-press recording from four recognized presses to eight; two incomplete
+bursts remain unidentifiable. Three previous recordings keep their action counts.
+No physical reliability claim follows from these offline checks.
 
-The network change is frontend only: Server address moves into Advanced: address
-and ports, alongside editable port fields with large minus, plus and Reset
-buttons. The two existing URL cards and one-network-address-plus-localhost
-backend, Apply/Test/Confirm and rollback remain unchanged. The runtime version is
-`0.4.0-test.5`. The next step is a normal-use recording of ten problem-button
-presses in the kitchen; previous captures did not include the failed normal-use
-presses. Do not relearn mappings or infer a hardware cause from those omissions.
+The UI now has a Dark theme switch, a receiver picker matching the address picker,
+large POST/GET choices and touch minus/plus/Reset controls for timeout, debounce
+and remote button count. Test.5's moved address selector and touch port controls
+remain. No network backend change is made. The runtime is `0.4.0-test.6`; the next
+step is the short Zorin comparison in TESTING-0.4.md without relearning mappings.
+
+Test.5 introduced normal-use recording without receiver restart or action pause,
+complete pulse evidence and sanitized outcomes, and frontend-only network layout.
+The operator installed it successfully with configuration preserved. Its clean
+trial reached ten of ten, but later recordings reproduced substantial misses.
+Those failures are now recorded evidence, not grounds for blaming hardware.
 
 Test.4 introduced opt-in Adaptive thresholds, separate signal/noise observations
 and per-button reception counters. Standard remains the default. Its operator
