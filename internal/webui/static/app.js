@@ -58,12 +58,12 @@
   function fmtTime(value) {
     if (!value || String(value).startsWith('0001-')) return 'Never';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? 'Unknown' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return Number.isNaN(d.getTime()) ? 'Unknown' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
   }
   function fmtDate(value) {
     if (!value || String(value).startsWith('0001-')) return 'No signal received';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? 'No signal received' : `Last received ${d.toLocaleString()}`;
+    return Number.isNaN(d.getTime()) ? 'No signal received' : `Last received ${d.toLocaleDateString()} ${fmtTime(value)}`;
   }
   function currentRemote() { return (state.remotes || []).find((r) => r.id === selectedRemote); }
   function currentButton() { return (currentRemote()?.buttons || []).find((b) => b.id === selectedButton); }

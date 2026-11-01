@@ -328,6 +328,9 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
           assert.ok((await control.boundingBox()).height>=48,'action controls need touch-sized targets');
           assert.equal(await control.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
         }
+        const methodBox=await page.locator('.method-field').boundingBox();
+        const timeoutBox=await page.locator('label[for="webhook-timeout"]').boundingBox();
+        assert.ok(timeoutBox.y>=methodBox.y+methodBox.height,`timeout must follow method vertically at ${size.width}`);
         assert.equal(await page.locator('#main-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,`action overflow at ${size.width}`);
         if(size.width===390 || size.width===1440) {
           await page.locator('#webhook-timeout').scrollIntoViewIfNeeded();
@@ -335,6 +338,34 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
         }
       }
       await page.setViewportSize({width:1440,height:1100});
+    }
+  });
+  await check('24-hour local timestamps across locales, including midnight', async () => {
+    const snapshot=await (await fetch(`${base}/api/state`,{headers:{Authorization:`Bearer ${token}`}})).json();
+    const at='2026-01-15T21:35:25Z', midnight='2026-01-14T23:00:05Z';
+    const button=snapshot.remotes[0].buttons[0];
+    button.last_received=at;
+    snapshot.receiver_last_decoded_at=at;
+    snapshot.reception={since:midnight,buttons:{[button.id]:{presses:1,repeats:0,last_matched_at:at,action:'Webhook accepted (HTTP 200)',action_at:at}}};
+    snapshot.events=[{time:at,kind:'matched',button_id:button.id,message:'Synthetic matched press'},{time:midnight,kind:'rf',message:'Synthetic midnight signal'}];
+    for(const [locale,timezoneId,evening,early] of [['en-US','Europe/Zagreb','22:35:25','00:00:05'],['hr-HR','Europe/Zagreb','22:35:25','00:00:05'],['en-US','UTC','21:35:25','23:00:05']]) {
+      const clockContext=await browser.newContext({locale,timezoneId,viewport:{width:1440,height:1100}});
+      try {
+        await clockContext.addInitScript(value=>sessionStorage.setItem('rfbm-token',value),token);
+        const clockPage=await clockContext.newPage();
+        await clockPage.route('**/api/state',route=>route.fulfill({json:snapshot}));
+        await clockPage.goto(base);
+        await clockPage.locator('.rf-button').first().click();
+        assert.equal(await clockPage.locator('#receiver-activity').textContent(),`Last decoded RF: ${evening}`);
+        assert.ok((await clockPage.locator('#button-last-received').textContent()).endsWith(evening));
+        assert.ok((await clockPage.locator('#reception-last').textContent()).includes(evening));
+        assert.ok((await clockPage.locator('#reception-action').textContent()).includes(`(${evening})`));
+        assert.ok((await clockPage.locator('#reception-since').textContent()).includes(early));
+        await clockPage.locator('#view-activity').click();
+        assert.deepEqual(await clockPage.locator('.event-time').allTextContents(),[evening,early]);
+        assert.equal(await clockPage.locator('.event-time').first().getAttribute('datetime'),at,'raw timestamps remain unchanged');
+        if(locale==='en-US' && timezoneId==='Europe/Zagreb') await clockPage.screenshot({path:path.join(qa,'activity-24-hour-desktop.png')});
+      } finally { await clockContext.close(); }
     }
   });
   await check('desktop and mobile layout; light and dark themes', async () => {

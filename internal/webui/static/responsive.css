@@ -283,4 +283,4 @@ label.appearance-switch{display:flex;align-items:center;gap:20px;min-height:64px
 .method-choices input[type=radio]{width:18px;height:18px;min-height:18px;padding:0;margin:0;accent-color:var(--accent-strong)}
 @media(max-width:540px){.receiver-choice{flex-direction:column}.receiver-choice #receiver-refresh{width:100%}}
 
-@media(max-width:640px){.action-fields{grid-template-columns:1fr}}
+.action-fields{grid-template-columns:1fr}

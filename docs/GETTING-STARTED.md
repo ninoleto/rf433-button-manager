@@ -7,8 +7,8 @@ you learn buttons and assign webhook URLs in your browser.
 **Physical testing is limited to Zorin OS 18.1, Linux x86_64**, one RTL2838/R820T
 receiver, rtl_433 23.11 and nine home buttons. Other distributions and hardware
 combinations are not physically verified. Automated Ubuntu CI is separate software
-evidence. This is an AI-assisted ("vibe coded") development prerelease, shared for
-review, testing and improvement. It cannot learn every signal sold as "433 MHz".
+evidence. This is an AI-assisted open-source project. It cannot learn every signal
+sold as "433 MHz"; check [compatibility](COMPATIBILITY.md) before choosing hardware.
 
 ## Before you start
 
@@ -126,12 +126,12 @@ it does not automatically create RF devices/entities in Home Assistant. See
 
 ## Download and unpack
 
-1. For this private validation build, use the supplied **0.4.0-test.6** package.
-   It is not a published stable release. RC1 users must use the instructions
-   included in their older package, whose internal paths differ.
+1. Open [Releases](https://github.com/ninoleto/rf433-button-manager/releases)
+   and choose **0.4.0**. For an existing installation, use [UPGRADING.md](UPGRADING.md)
+   instead of the first-installation procedure below.
 2. Obtain both files:
-   - **rf433-button-manager-0.4.0-test.6-linux-amd64.zip** — the application, source and documentation.
-   - **rf433-button-manager-0.4.0-test.6-linux-amd64.zip.sha256** — its integrity checksum.
+   - **rf433-button-manager-0.4.0-linux-amd64.zip** — the application, source and documentation.
+   - **rf433-button-manager-0.4.0-linux-amd64.zip.sha256** — its integrity checksum.
 3. Put both files in the same folder on the Linux computer where the app will run.
    GitHub's automatic **Source code** downloads do not contain the prebuilt executable.
 4. Open a terminal in that folder and run:
@@ -139,9 +139,9 @@ it does not automatically create RF devices/entities in Home Assistant. See
 ```sh
 (
   set -e
-  sha256sum -c rf433-button-manager-0.4.0-test.6-linux-amd64.zip.sha256
+  sha256sum -c rf433-button-manager-0.4.0-linux-amd64.zip.sha256
   rfb_extract_dir=$(mktemp -d "$HOME/rf433-button-manager.XXXXXX")
-  unzip -q rf433-button-manager-0.4.0-test.6-linux-amd64.zip -d "$rfb_extract_dir"
+  unzip -q rf433-button-manager-0.4.0-linux-amd64.zip -d "$rfb_extract_dir"
   cd "$rfb_extract_dir/rf433-button-manager"
   sha256sum -c SHA256SUMS
   chmod u+x bin/rf433-button-manager
@@ -150,7 +150,7 @@ it does not automatically create RF devices/entities in Home Assistant. See
 )
 ```
 
-Every checksum must report **OK**, and the version must be **0.4.0-test.6**. Stop on
+Every checksum must report **OK**, and the version must be **0.4.0**. Stop on
 an error. Copy the printed project folder and `cd` into it for the next steps.
 The inner folder is now called `rf433-button-manager`. Extraction leaves existing installations and workspaces untouched.
 

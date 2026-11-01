@@ -1,6 +1,18 @@
 # 0.4 validation work
 
-Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
+## 0.4.0 release preparation
+
+The maintainer tested test.6 on his existing equipment and chose a regular
+0.4.0 release. Occasional missed presses remain a documented limitation; no
+percentage or universal hardware support is claimed. See HARDWARE-TESTS.md.
+The final UI stacks Method above Timeout at all widths and uses local 24-hour
+time for activity, last reception, action results and receiver status. Midnight
+uses 00 hours. Stored/exported timestamps, settings, mappings and receiver
+behavior are unchanged. Final checks are recorded in FINAL-AUDIT-0.4.md.
+
+## Historical test builds
+
+Current observations are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 

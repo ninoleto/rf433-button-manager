@@ -53,7 +53,7 @@ def main():
         subprocess.run(['git', '-C', str(history), 'bundle', 'create', str(bundle), 'refs/heads/main', 'HEAD'], check=True)
         manifest = {'version': version, 'commit': commit, 'binary_sha256': digest(binary),
                     'bundle_sha256': digest(bundle), 'platform': 'linux-amd64',
-                    'hardware_validation': 'pending operator testing'}
+                    'hardware_validation': 'See docs/HARDWARE-TESTS.md for operator observations and unverified cases'}
         (root / 'release.json').write_text(json.dumps(manifest, indent=2) + '\n')
         files = sorted(p for p in root.rglob('*') if p.is_file())
         (root / 'SHA256SUMS').write_text(''.join(f'{digest(p)}  {p.relative_to(root).as_posix()}\n' for p in files))

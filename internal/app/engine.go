@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.4.0-test.6"
+const Version = "0.4.0"
 
 type App struct {
 	reception                           ReceptionDiagnostics

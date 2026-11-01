@@ -1,10 +1,30 @@
 # 0.4 validation record and operator test plan
 
-Version: **0.4.0-test.6**. Base: published RC1 commit
+Version: **0.4.0**. Base: published RC1 commit
 `e1822594297c0d5b208c22b671a3be0f7a183445`. No production host change or GitHub
 publication is performed by building this package.
 
-## Test.6: complete-word reception and touch controls
+## Final 0.4.0 review
+
+The maintainer completed the available test.6 trials and has chosen a regular
+release, with no further equipment purchases or speculative RF tuning. Detailed
+observations are in [HARDWARE-TESTS.md](HARDWARE-TESTS.md). The final runtime adds
+only stacked Method/Timeout fields and local 24-hour display, plus the version
+change. The existing reception, debounce, action and network behavior is retained.
+
+Recorded B OFF runs recognized 10/10, 7/10 and 10/10; recorded C OFF runs recognized
+10/10 twice. The maintainer then reported 9/10 and 10/10 with recording off and one
+remaining miss in a later uncounted all-button trial. These observations support
+use on his setup, but do not establish a general 98% success rate or prove that
+recording improves reception. No further repeated ten-press test is required by
+this release preparation.
+
+Software/replay/rendering results are in [FINAL-AUDIT-0.4.md](FINAL-AUDIT-0.4.md).
+The historical plans below remain useful for future equipment; unexecuted rows
+are not claimed as completed. Building a final package does not install it on the
+operator's server or publish a GitHub release.
+
+## Historical test.6: complete-word reception and touch controls
 
 A normal-use recording reproduced a decoder framing problem. A saved 25-bit PWM
 profile placed its row-gap threshold inside normal data gaps, splitting complete
@@ -527,7 +547,7 @@ room-by-room reception, nine button assignments and Windows/phone certificate
 trust remain operator acceptance tasks. Test.1/test.2 downloads and the published
 RC1 remain unchanged.
 
-## ZORIN acceptance — in progress
+## Historical ZORIN acceptance plan — not a completed matrix
 
 Use the private package and UPGRADING.md. Keep the rollback snapshot. Record the
 app commit/version, OS/kernel, rtl_433 version, receiver identity and which client

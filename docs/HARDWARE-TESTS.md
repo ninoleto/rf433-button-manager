@@ -1,7 +1,31 @@
-# Physical hardware acceptance gate
+# Physical hardware observations
 
-For the current 0.4 test build, use [TESTING-0.4.md](TESTING-0.4.md). Its physical
-acceptance is pending; earlier records below remain historical evidence.
+## 0.4.0: observations on the maintainer's equipment
+
+The maintainer installed test.6 on Zorin OS 18.1 (Linux x86_64), using one
+RTL2838/R820T receiver with rtl_433 23.11. The existing setup has nine configured
+button assignments; the detailed November 1 comparison exercised one six-button
+remote from another room. The final 0.4.0 runtime differs from test.6 only in UI
+presentation and version metadata. It does not add a new RF tuning change.
+
+| Observed trial | Result | Evidence limit |
+| --- | --- | --- |
+| B OFF, three recorded ten-press runs | 10, 7 and 10 recognized | Each recognized press had one HTTP 200 result; no duplicate actions in these recordings. |
+| C OFF, two recorded ten-press runs | 10 and 10 recognized | Each recognized press had one HTTP 200 result; this does not establish reliability in every position. |
+| C OFF, recording off | Operator reported 9/10, then 10/10 | No recording of the missed attempt; no proven recording-dependent change. |
+| Later informal use of all six buttons | Operator reported only one remaining miss | Attempt count was not recorded, so no overall success percentage can be calculated. |
+
+Intermittent misses remain unresolved. Successful HTTP responses are request
+acceptance, not independent confirmation of a light/device state. Earlier failed
+recordings also contain incomplete pulse bursts; the software cannot establish
+missing payload bits. Position, grip, interference, hardware and downstream
+automation remain possible factors, not proven diagnoses for every miss.
+
+The maintainer has chosen a regular 0.4.0 release with these limits documented.
+No additional equipment is available for this development cycle. Multi-tuner,
+hub recovery, other receiver/remote combinations and a formal extended soak
+remain unverified. The historical checklist below is retained as a future test
+matrix; its NOT RUN entries are not reclassified by the release decision.
 
 ## Historical acceptance: 0.3.6-dev publication
 
@@ -9,7 +33,7 @@ The operator tested three assigned home buttons and their webhooks and accepted
 the latest interface within the testing available. This is an operator report,
 not an independently repeated test or a complete pass of the matrix below.
 Physical multi-tuner selection, USB/hub recovery, soak and broader compatibility
-remain unverified. The current release is a development prerelease. Earlier
+remain unverified. That version was a development prerelease. Earlier
 version-specific reports below retain their original, narrower observations;
 their pending interface checks are superseded only by this limited acceptance.
 
@@ -108,7 +132,7 @@ prove that the desired physical state changed.
 | Upgrade | Apply an approved replacement binary | Existing data and token retained; one receiver process | NOT RUN |
 | Uninstall | Apply uninstall in an approved maintenance window | Only owned service/files removed; state preserved; other services untouched | NOT RUN |
 
-Stable release may proceed only after failures are fixed and rerun with recorded evidence.
-Development prereleases may disclose outstanding rows as described in [RELEASING.md](RELEASING.md).
+Fix reproduced software failures and rerun the relevant checks before publishing.
+Record operator observations separately from the still-unexecuted formal matrix.
 If a hardware topology or protocol was not tested, name that limitation in the
 release notes rather than claiming all receivers and hubs are supported.

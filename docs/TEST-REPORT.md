@@ -1,8 +1,16 @@
 # 0.4 validation work
 
-Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
+Current changes and operator observations are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
+
+## 0.4.0 final verification (2026-11-01)
+
+See [FINAL-AUDIT-0.4.md](FINAL-AUDIT-0.4.md) for the reviewed paths, executed
+checks, unchanged runtime boundaries and remaining hardware limitations. All
+software tests use disposable state, simulated input or file replay and local
+HTTP endpoints. No production service, USB receiver or Home Assistant automation
+is operated during this review. Historical test.6 evidence below is retained.
 
 ## 0.4.0-test.6 software verification (2026-11-01)
 

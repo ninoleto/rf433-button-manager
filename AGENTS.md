@@ -1,9 +1,11 @@
 # RF433 Button Manager: coding-agent guide
 
-The public project name is **RF433 Button Manager**. This checkout is the private
-`0.4.0-test.6` validation build, based on the published `0.3.8-rc.1` source.
-Do not publish it as stable until the operator completes the physical acceptance
-plan in [0.4 testing](docs/TESTING-0.4.md).
+The public project name is **RF433 Button Manager**. This checkout prepares
+`0.4.0`, based on the tested `0.4.0-test.6` build. The maintainer has chosen a
+regular release after testing the equipment available to him. This does not mark
+the entire physical test matrix passed. Preserve the observed limitations in
+[0.4 testing](docs/TESTING-0.4.md), and complete the software/package checks in
+[RELEASING](docs/RELEASING.md) before publication.
 
 Current folders, executable, service, Go module and data paths use
 `rf433-button-manager`. The prebuilt updater explicitly migrates legacy
@@ -147,7 +149,9 @@ Physical deployment has only been tested on **Zorin OS 18.1 (Linux x86_64)** wit
 one RTL2838/R820T receiver and rtl_433 23.11. Ubuntu CI is automated software
 verification, not a claim of hardware acceptance on Ubuntu or other distributions.
 The operator reports nine configured button assignments and working webhooks on
-his existing equipment. The new test.6 changes still require physical acceptance. Physical multi-tuner, USB/hub
+his existing equipment. Test.6 was installed and exercised with all six remote
+buttons; intermittent misses remain unresolved. The final 0.4.0 runtime changes
+only presentation and version metadata. Physical multi-tuner, USB/hub
 recovery, soak and broader compatibility remain unverified. Do not promise every
 Amazon button works. [TEST-REPORT](docs/TEST-REPORT.md) records software evidence;
 [HARDWARE-TESTS](docs/HARDWARE-TESTS.md) requires actual operator observations.
