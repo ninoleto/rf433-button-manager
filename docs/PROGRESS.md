@@ -4,15 +4,22 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
-Test.3 fixes a reproduced dispatch gap: a saved Smoke mapping ignored the same
+Test.4 removes the duplicate editable network IP field, adds opt-in Adaptive
+threshold selection while preserving Standard by default, and exposes separate
+signal/noise observations and per-button reception counters. Counters preserve
+normal debounce and action gating; resetting them cannot send a request. No
+decoder upgrade, gain change, looser matching or dispatch delay is introduced.
+The runtime version is `0.4.0-test.4`. The next step is a counted Standard/Adaptive
+comparison in the kitchen, followed by all nine assignments and idle observation.
+
+Test.3 fixed a reproduced dispatch gap: a saved Smoke mapping ignored the same
 complete payload when only a registered 25-bit PWM profile reported it. The bounded
 conversion now works in both directions, retains all command values, shares
 normal debounce and refuses conflicting mappings. No RF gain, sample rate, timing
 profile, webhook configuration or saved identity is changed. It also corrects
 network choices: authenticated localhost HTTP is independent of the selected LAN
 HTTP or HTTPS mode. The confusing “keep HTTP” option is removed. Existing legacy
-dual-protocol settings await explicit Apply/confirmation. The runtime version is
-`0.4.0-test.3`.
+dual-protocol settings await explicit Apply/confirmation.
 
 Full race/static/controller/deployment/updater checks, private recording replay
 and real demo HTTP/TLS/token lifecycle checks pass. Chromium rendering is now

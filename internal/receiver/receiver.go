@@ -13,21 +13,24 @@ import (
 )
 
 type Config struct {
-	Binary        string
-	Serial        string
-	FlexDecoder   string
-	Protocols     []int
-	Profiles      []DecoderProfile
-	CapturePulses bool
+	AdaptiveSensitivity bool
+	Binary              string
+	Serial              string
+	FlexDecoder         string
+	Protocols           []int
+	Profiles            []DecoderProfile
+	CapturePulses       bool
 }
 
 type Status struct {
-	State    string `json:"state"`
-	Message  string `json:"message"`
-	Serial   string `json:"serial"`
-	Restarts int    `json:"restarts"`
-	Name     string `json:"name,omitempty"`
-	USBPort  string `json:"usb_port,omitempty"`
+	AdaptiveSensitivity bool          `json:"adaptive_sensitivity"`
+	Noise               *NoiseReading `json:"noise,omitempty"`
+	State               string        `json:"state"`
+	Message             string        `json:"message"`
+	Serial              string        `json:"serial"`
+	Restarts            int           `json:"restarts"`
+	Name                string        `json:"name,omitempty"`
+	USBPort             string        `json:"usb_port,omitempty"`
 }
 
 type device struct {
@@ -101,7 +104,10 @@ func arguments(cfg Config, dev device) []string {
 	}
 	// These options are supported by rtl_433 23.11. -D quit prevents competing
 	// restart loops. Stats are emitted while IQ samples arrive, even in RF silence.
-	args := []string{"-c", "/dev/null", "-d", selector, "-D", "quit", "-f", "433.92M", "-F", "json", "-F", "log:/dev/stderr", "-M", "stats:1:10"}
+	args := []string{"-c", "/dev/null", "-d", selector, "-D", "quit", "-f", "433.92M", "-F", "json", "-F", "log:/dev/stderr", "-M", "stats:1:10", "-M", "level", "-M", "noise:10"}
+	if cfg.AdaptiveSensitivity {
+		args = append(args, "-Y", "autolevel")
+	}
 	if len(cfg.Protocols) > 0 || cfg.FlexDecoder != "" {
 		args = append(args, "-R", "0")
 	}
@@ -159,9 +165,10 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 		onStatus = func(Status) {}
 	}
 	var previous Status
+	var noise *NoiseReading
 	attempts := 0
 	emit := func(state, message string, d device) {
-		s := Status{State: state, Message: message, Serial: d.serial, Name: d.name, USBPort: d.port, Restarts: max(0, attempts-1)}
+		s := Status{State: state, Message: message, Serial: d.serial, Name: d.name, USBPort: d.port, Restarts: max(0, attempts-1), AdaptiveSensitivity: cfg.AdaptiveSensitivity, Noise: noise}
 		if s != previous {
 			previous = s
 			onStatus(s)
@@ -182,6 +189,7 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 	}
 	backoff := rt.initialBackoff
 	stop := func() {
+		noise = nil
 		if child != nil {
 			child.stop()
 			child = nil
@@ -262,6 +270,15 @@ func run(ctx context.Context, cfg Config, onJSON func([]byte), onStatus func(Sta
 					callback(PulsePacket{ErrorCode: "stream_read_error", Error: rec.err.Error(), Stream: pulses.snapshot()})
 				}
 				failure(rec.err.Error())
+				continue
+			}
+			if rec.stderr {
+				// Diagnostic logs never enter RF parsing, learning or the sample
+				// heartbeat. Only this bounded upstream noise report is accepted.
+				if value, ok := noiseLog(rec.data); ok {
+					noise = &NoiseReading{DBFS: value, At: time.Now().UTC().Format(time.RFC3339Nano)}
+					emit(previous.State, previous.Message, current)
+				}
 				continue
 			}
 			if cfg.CapturePulses {

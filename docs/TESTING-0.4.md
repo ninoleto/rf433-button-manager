@@ -1,8 +1,56 @@
 # 0.4 validation record and operator test plan
 
-Version: **0.4.0-test.3**. Base: published RC1 commit
+Version: **0.4.0-test.4**. Base: published RC1 commit
 `e1822594297c0d5b208c22b671a3be0f7a183445`. No production host change or GitHub
 publication is performed by building this package.
+
+## Test.4: network cleanup and reception comparison
+
+The upper **Server address** picker is now the only address control. **Advanced:
+ports** contains only the HTTP/HTTPS port fields. Localhost HTTP remains available
+independently of network HTTP or HTTPS; staged confirmation and rollback are
+unchanged. This UI does not assign a new IP address to the Linux computer.
+
+**Settings → Reception sensitivity** offers **Standard** (the existing default)
+and opt-in **Adaptive** (`rtl_433 -Y autolevel` only). Normal reception and capture
+use the same saved setting. No gain, sample rate, frequency, identity or timing
+profile is changed. The app obtains rtl_433 signal/SNR/noise observations separately
+from matching and displays unavailable or older readings explicitly.
+
+Each selected saved button has **Reception diagnostics**, with recognized-press
+and suppressed-repeat counts, last matched levels/time and latest action result.
+Other devices cannot inflate that button's count. Counts do not measure physical
+attempts or prove delivery; reset does not clear debounce or change action flags.
+They are temporary and clear on receiver restart/source change or mapping change.
+
+### First Zorin comparison for this build
+
+1. Upgrade and confirm **0.4.0-test.4**, **Connected**, the same saved buttons and
+   webhooks, and **Standard** sensitivity. Keep the existing mapping.
+2. Select the problem button and open **Reception diagnostics**. Finish/close
+   learning and inspection. If you do not want actions while counting, turn this
+   button's **Enabled** off and **Save button** first.
+3. Reset counts, wait two seconds, then make **30 presses, two seconds apart**,
+   from the normal kitchen position. Keep the same grip/orientation and receiver
+   placement. Record attempted presses, recognized presses, repeats and levels.
+4. Choose **Adaptive** in Settings, save and wait for **Connected**. Return to the
+   button, reset counts, wait two seconds and repeat the same 30-press comparison.
+   Do not use Inspect for this comparison: it pauses normal dispatch and resets
+   the receiver plan. A missed transmission has no level measurement.
+5. Compare results, then check the other eight assignments and idle behavior.
+   Keep the mode that behaves best. Restore this button's original enabled flag
+   and save it. Check resulting actions separately when ready to operate them.
+
+The operator previously estimated about 95% success from the kitchen, improving
+when the remote's front was not covered. This is an informal report with no fixed
+attempt count, not a measured acceptance rate or proof that the remote is faulty.
+Inspection/USB port swaps explain some reported receiver lifecycle events; no USB
+fault was established by the supplied excerpt. Stream Deck cable errors are not
+used as evidence against this receiver. See [the audit](RECEIVER-AUDIT-0.4.md).
+
+Software evidence is in TEST-REPORT.md. Physical improvement, false matches, hold
+behavior and latency still require this comparison on the operator's equipment.
+The published release and earlier private archives remain unchanged.
 
 ## Implemented changes
 

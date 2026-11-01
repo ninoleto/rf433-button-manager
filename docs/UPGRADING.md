@@ -1,6 +1,6 @@
 # Upgrade and name migration
 
-**0.4.0-test.3 is a private validation build.** Test it on the agreed ZORIN host
+**0.4.0-test.4 is a private validation build.** Test it on the agreed ZORIN host
 before stable publication. A working RC1 installation does not update itself when
 a new ZIP is downloaded or published.
 
@@ -14,9 +14,9 @@ host. Open a terminal there and run:
 ```sh
 (
   set -e
-  sha256sum -c rf433-button-manager-0.4.0-test.3-linux-amd64.zip.sha256
+  sha256sum -c rf433-button-manager-0.4.0-test.4-linux-amd64.zip.sha256
   rfb_update_dir=$(mktemp -d "$HOME/rf433-button-manager-update.XXXXXX")
-  unzip -q rf433-button-manager-0.4.0-test.3-linux-amd64.zip -d "$rfb_update_dir"
+  unzip -q rf433-button-manager-0.4.0-test.4-linux-amd64.zip -d "$rfb_update_dir"
   cd "$rfb_update_dir/rf433-button-manager"
   sha256sum --quiet -c SHA256SUMS
   ./bin/rf433-button-manager --version
@@ -40,7 +40,7 @@ If a receiver was connected before updating, it must reconnect for verification
 to pass. No test webhook or USB reset is performed by the updater. Once the old
 action flags are restored, ordinary physical presses can trigger their actions.
 
-Wait for **Update verified**. Refresh the browser and check **0.4.0-test.3**, your
+Wait for **Update verified**. Refresh the browser and check **0.4.0-test.4**, your
 remotes, the selected receiver and action flags. Your existing browser URL and
 token stay the same unless you deliberately change them in Settings afterward.
 Keep the printed snapshot path for recovery. Run the [acceptance plan](TESTING-0.4.md).

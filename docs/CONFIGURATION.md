@@ -40,6 +40,7 @@ then PUT. Every successful settings update notifies and restarts the owned decod
 | Field | Meaning |
 | --- | --- |
 | `receiver_serial` | Exact serial; empty means unambiguous singleton selection |
+| `adaptive_sensitivity` | Optional boolean; false/absent is Standard, true adds only `rtl_433 -Y autolevel` |
 | `flex_decoder` | One verified `rtl_433 -X` argument, without `-X`, shell quotes or a whole command |
 | `protocols` | Explicit positive `rtl_433 -R` protocol IDs, if required |
 | `identity_fields` | Stable defaults copied into newly created buttons |
@@ -50,6 +51,38 @@ Defaults: empty serial/decoder/protocols; identity fields
 `http://127.0.0.1:8123`. An allowed origin alone does not create or enable actions.
 With no explicit decoder/protocols, rtl_433 uses built-in defaults. Sample
 acquisition then does not establish that Switch433 is supported.
+
+## Reception sensitivity and measurements
+
+In **Settings → Reception sensitivity**, keep **Standard** for the existing
+detection threshold, or choose **Adaptive** and **Save settings** to let rtl_433
+adjust its threshold to estimated background noise. Saving restarts the owned
+decoder briefly. The setting persists and applies to normal reception, learning
+and inspection. It does not change tuner gain, sample rate, frequency, decoder
+profiles, matching rules, debounce or action settings. It is an option to compare
+on your equipment, not a guarantee that weak transmissions can be recovered.
+
+Select a saved button and open **Reception diagnostics**. **Recognized presses**
+counts matched groups after the existing debounce rule; **Repeat reports ignored**
+counts the matched reports suppressed by that rule. Background devices do not
+count. A radio transmission that cannot be decoded cannot appear in these counts,
+so keep your own attempted-press count. Resetting counts does not reset debounce,
+send a request, disable actions or save unsaved editor fields.
+
+Signal, noise during the signal and SNR are the last matched report's measurements,
+not a live signal-strength meter. Missing measurements show **Not available**;
+readings older than 30 seconds are marked. Signal/noise use relative **dBFS**, not
+calibrated dBm, and vary with tuner gain. SNR is the difference in dB. The separate
+background estimate in Settings belongs to the whole receiver and normally
+updates every ten seconds. These observations never participate in button identity.
+
+For a comparison, close inspection/learning, keep the receiver and remote position
+unchanged, reset counts, wait two seconds and make 30 presses two seconds apart.
+Record recognized presses in Standard, then repeat in Adaptive after saving and
+waiting for **Connected**. Test all saved assignments before keeping a new mode.
+If you want to count reception without running actions, disable that button and
+save it first; remember to re-enable and save it afterward. Counters are temporary:
+receiver restarts, source changes and changed mappings clear the relevant counts.
 
 ## Receiver ownership and decoder provenance
 

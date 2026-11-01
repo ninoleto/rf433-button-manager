@@ -39,7 +39,7 @@ minimal liveness; authenticated GET /api/state is status and configuration.
 Data: Remote {id,name,columns,buttons:[Button]}. Button {id,name,enabled,debounce_ms,
 signature,decoder_profile_id,identity_fields:[string],webhook:{url,method,payload,headers,timeout_ms},last_received}.
 payload is a JSON string (or empty), headers a string/string object.
-Settings {receiver_serial,flex_decoder,protocols:[int],identity_fields:[string],allowed_origins:[string]}.
+Settings {receiver_serial,adaptive_sensitivity?:boolean,flex_decoder,protocols:[int],identity_fields:[string],allowed_origins:[string]}.
 Defaults identity_fields = ["id","channel","command","state","button","code","codes"].
 Receiver {state,message,serial,restarts}. Event {id,time,kind,message,button_id,data}.
 Learning includes session_id, button_id, stage, message, automatic, candidate, raw,
@@ -64,6 +64,8 @@ Confirmation requires three separately armed captures; see LEARNING.md.
 - DELETE /api/buttons/{id} -> {ok:true}
 - POST /api/buttons/{id}/clear -> clears mapping+action, disables button
 - POST /api/buttons/{id}/test -> {ok:true} (test saved action; blocked in learning)
+- POST /api/buttons/{id}/reception/reset {} -> {ok:true} (diagnostic reset only;
+  requires normal reception, preserves debounce, action flags and pending actions)
 - POST /api/learn/start {button_id,identity_fields:[string]} -> Learning
 - POST /api/inspect/start {} -> Learning with `inspect_only:true`, no button ID
   required. Shares the bounded capture/three-arm workflow and webhook suppression.
@@ -83,6 +85,36 @@ Confirmation requires three separately armed captures; see LEARNING.md.
 Poll GET /api/state at 1 second for initial UI (bounded events, no SSE dependency).
 Never render external data through innerHTML. All mutating requests Content-Type
 application/json. Include visible labels for settings and asynchronous errors.
+
+## Reception diagnostics (0.4.0-test.4)
+
+`settings.adaptive_sensitivity` defaults to false when absent in an existing
+schema-2 configuration. True adds only `-Y autolevel` to both live receive plans.
+Every settings PUT still replaces the full settings object and reloads the owned
+receiver. Preserve other settings and do not silently enable this option.
+
+`receiver.adaptive_sensitivity` describes the running plan. Optional
+`receiver.noise` contains `{dbfs,at}` from rtl_433's bounded stderr estimate, with
+an RFC3339Nano observation time. Noise logs are not RF events or sample heartbeats.
+Disconnect/restart clears them; unknown formats have no measurement.
+
+Optional `event.levels` contains numeric `rssi_dbfs`, `snr_db`, `noise_dbfs`.
+Absent/invalid fields remain absent, and zero is valid. Values are extracted from
+the original event before identity normalization and are not part of matching.
+Old events remain valid. This additive event JSON needs no database schema change.
+
+`state.reception` contains `{since,buttons:{[button_id]:diagnostics}}`. A diagnostic
+has `since`, `reports`, `presses`, `repeats`, optional `last_matched_at`, `levels`,
+`action`, `action_at`. Reports match only that saved button, presses pass normal
+debounce, and repeats are suppressed reports. Disabled buttons count too; learning,
+inspection, cleanup and ambiguous matches do not. Actions retain their own gates.
+No counter establishes the number of physical attempts or webhook successes.
+These diagnostics are bounded by configured buttons, kept only in memory and
+excluded from configuration backups. Receiver restarts/source changes reset them;
+removed/relearned mappings lose their old counts. Reset cannot alter debounce.
+
+RF capture exports additionally record `adaptive_sensitivity` when enabled. They
+still contain pulse records and decoded JSON, not raw I/Q samples.
 
 ## Authentication and HTTP semantics
 

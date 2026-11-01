@@ -10,9 +10,10 @@ import (
 	"time"
 )
 
-const Version = "0.4.0-test.3"
+const Version = "0.4.0-test.4"
 
 type App struct {
+	reception                           ReceptionDiagnostics
 	discoverReceivers                   func() ([]receiver.DeviceInfo, error)
 	lastDecodedAt                       string
 	mu                                  sync.Mutex
@@ -59,12 +60,21 @@ func New(store *Store, c Config, demo bool) (*App, error) {
 func (a *App) Close()                           { a.mu.Lock(); a.closed = true; a.cancel(); a.mu.Unlock(); a.wg.Wait() }
 func (a *App) SettingsChanges() <-chan struct{} { return a.settingsChanged }
 func (a *App) Settings() Settings               { a.mu.Lock(); defer a.mu.Unlock(); return clone(a.config.Settings) }
-func (a *App) eventLocked(kind, message, button string, data json.RawMessage) bool {
+func (a *App) eventLocked(kind, message, button string, data json.RawMessage, levels ...*receiver.SignalLevels) bool {
+	if button != "" && (kind == "webhook_start" || kind == "webhook_ok" || kind == "webhook_error" || kind == "webhook_unknown" || kind == "webhook_busy") {
+		if d := a.reception.Buttons[button]; d != nil {
+			d.Action = message
+			d.ActionAt = a.now().UTC().Format(time.RFC3339Nano)
+		}
+	}
 	if len(data) > 8192 {
 		data = nil
 		message += " (large raw payload omitted from history)"
 	}
 	ev := Event{Time: a.now().UTC().Format(time.RFC3339Nano), Kind: kind, Message: message, ButtonID: button, Data: data}
+	if len(levels) == 1 {
+		ev.Levels = levels[0]
+	}
 	if kind == "rf" || kind == "matched" || kind == "receiver" {
 		ev.Receiver = &ReceiverSource{Name: a.receiver.Name, Serial: a.receiver.Serial, USBPort: a.receiver.USBPort}
 	}
@@ -93,6 +103,9 @@ func (a *App) setReceiverLocked(s receiver.Status) {
 	}
 	if a.receiver.Serial != s.Serial || a.receiver.USBPort != s.USBPort || s.State != "connected" {
 		a.lastDecodedAt = ""
+		if a.receiver.State == "connected" || a.receiver.Serial != s.Serial || a.receiver.USBPort != s.USBPort {
+			a.resetReceptionLocked()
+		}
 	}
 	if a.receiver.State != s.State || a.receiver.Message != s.Message || a.receiver.Serial != s.Serial || a.receiver.USBPort != s.USBPort {
 		a.receiver = s
@@ -130,7 +143,8 @@ func (a *App) State() any {
 		ReceiverGeneration    uint64                    `json:"receiver_generation"`
 		RFCaptureAvailable    bool                      `json:"rf_capture_available"`
 		ReceiverLastDecodedAt string                    `json:"receiver_last_decoded_at"`
-	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles, a.receiverMode, a.receiverApplied, a.rfCapture != nil && a.rfCapture.Bytes > 0, a.lastDecodedAt})
+		Reception             ReceptionDiagnostics      `json:"reception"`
+	}{a.config.Remotes, a.config.Settings, a.receiver, a.learning, a.events, Version, a.demo, a.storageErr, a.learningNotice, a.learning != nil || a.captureSuppressed, a.config.DecoderProfiles, a.receiverMode, a.receiverApplied, a.rfCapture != nil && a.rfCapture.Bytes > 0, a.lastDecodedAt, a.reception})
 }
 func findButton(c *Config, id string) *Button {
 	for ri := range c.Remotes {
@@ -164,6 +178,7 @@ func (a *App) mutateConfig(fn func(*Config) error, restartReceiver bool) error {
 		a.storageErr = true
 		return errors.New("configuration could not be saved")
 	}
+	a.pruneReceptionLocked(&next)
 	a.config = next
 	a.epoch++
 	if restartReceiver {
@@ -409,7 +424,7 @@ func (a *App) startLearning(id string, fields []string, inspect bool) (*Learning
 		a.captureSuppressed = true
 		a.receiverChangedLocked()
 		l.CaptureGeneration = a.receiverGeneration
-		a.rfCapture = &RFCapture{Format: "rf433-button-manager-capture-v1", Version: Version, StartedAt: now.UTC().Format(time.RFC3339Nano), FrequencyHz: 433920000, SampleRate: 250000, generation: l.CaptureGeneration, started: now}
+		a.rfCapture = &RFCapture{Format: "rf433-button-manager-capture-v1", Version: Version, StartedAt: now.UTC().Format(time.RFC3339Nano), FrequencyHz: 433920000, SampleRate: 250000, AdaptiveSensitivity: a.config.Settings.AdaptiveSensitivity, generation: l.CaptureGeneration, started: now}
 		l.CaptureReceiver = receiver.Status{State: "recovering", Message: "Capture receiver plan has not started"}
 		l.CaptureReceiverAt = now.UTC().Format(time.RFC3339Nano)
 	}
@@ -510,6 +525,7 @@ func (a *App) ConfirmLearning() error {
 		a.storageErr = true
 		return errors.New("mapping could not be saved")
 	}
+	a.pruneReceptionLocked(&next)
 	a.config = next
 	a.finishLearningLocked("saved", "Signal and validated decoder saved; action remains disabled")
 	a.learningNotice = nil
@@ -553,7 +569,8 @@ func (a *App) Receive(raw []byte) {
 		}
 	}
 	now := a.now()
-	a.eventLocked("rf", "Decoded RF transmission", "", append(json.RawMessage{}, raw...))
+	levels := receiver.ParseSignalLevels(original)
+	a.eventLocked("rf", "Decoded RF transmission", "", append(json.RawMessage{}, raw...), levels)
 	if l := a.learning; l != nil {
 		if l.Automatic {
 			a.receiveDecodedLearningLocked(l, raw)
@@ -594,12 +611,18 @@ func (a *App) Receive(raw []byte) {
 	}
 	for _, match := range matches {
 		b := match.button
+		diagnostic := a.buttonReceptionLocked(b.ID)
+		diagnostic.Reports++
+		diagnostic.LastMatchedAt = now.UTC().Format(time.RFC3339Nano)
+		diagnostic.Levels = levels
 		prior := a.lastSeen[b.ID]
 		a.lastSeen[b.ID] = now
 		b.LastReceived = now.UTC().Format(time.RFC3339Nano)
 		if !prior.IsZero() && now.Sub(prior) < time.Duration(b.DebounceMS)*time.Millisecond {
+			diagnostic.Repeats++
 			continue
 		}
+		diagnostic.Presses++
 		if e := a.store.Save(a.config); e != nil {
 			a.storageErr = true
 		}

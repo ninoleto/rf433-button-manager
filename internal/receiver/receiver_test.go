@@ -39,7 +39,7 @@ func TestDeviceSelectionFailClosed(t *testing.T) {
 func TestSafeArguments(t *testing.T) {
 	spec := "n=Switch433,m=OOK_PWM,s=1,l=2,r=3; $(touch /tmp/do-not-run)"
 	args := arguments(Config{Protocols: []int{30}, FlexDecoder: spec}, device{serial: "abc"})
-	want := []string{"-c", "/dev/null", "-d", ":abc", "-D", "quit", "-f", "433.92M", "-F", "json", "-F", "log:/dev/stderr", "-M", "stats:1:10", "-R", "0", "-R", "30", "-X", spec}
+	want := []string{"-c", "/dev/null", "-d", ":abc", "-D", "quit", "-f", "433.92M", "-F", "json", "-F", "log:/dev/stderr", "-M", "stats:1:10", "-M", "level", "-M", "noise:10", "-R", "0", "-R", "30", "-X", spec}
 	if !reflect.DeepEqual(args, want) {
 		t.Fatal(args)
 	}

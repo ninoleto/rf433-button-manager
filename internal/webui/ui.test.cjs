@@ -86,6 +86,52 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     assert.equal((await page.locator('#mapping-status').textContent()).trim(), 'Signal learned');
     assert.equal(await page.locator('#button-enabled').isChecked(), false, 'Learned action remains disabled');
   });
+  await check('reception counters and sensitivity controls on desktop and touch layouts', async () => {
+    // No host USB/sysfs is required. Settings persistence still uses the real API.
+    const inventory = route => route.fulfill({json:{devices:[]}});
+    await page.route('**/api/receivers', inventory);
+    await page.locator('#view-remotes').click();
+    await page.locator('.rf-button').first().click();
+    await page.locator('#button-reception').evaluate(el=>{el.open=true;});
+    await visible(page.locator('#reception-reset'));
+    await page.locator('#reception-reset').click();
+    await page.waitForFunction(()=>document.getElementById('reception-count').textContent==='0');
+    assert.match(await page.locator('#reception-action').textContent(),/disabled/);
+    assert.equal(await page.locator('#reception-signal').textContent(),'Not available','demo must not invent signal levels');
+    await page.locator('#settings-open').click();
+    assert.equal(await page.locator('#sensitivity-standard').isChecked(),true);
+    await page.locator('#sensitivity-adaptive').check();
+    await delay(1200);assert.equal(await page.locator('#sensitivity-adaptive').isChecked(),true);
+    await page.locator('#settings-save').click();
+    await hidden(page.locator('#settings-dialog'));
+    const saved=await (await fetch(`${base}/api/backup`,{headers:{Authorization:`Bearer ${token}`}})).json();
+    assert.equal(saved.settings.adaptive_sensitivity,true);
+    await page.locator('#settings-open').click();assert.equal(await page.locator('#sensitivity-adaptive').isChecked(),true);
+    await page.locator('#sensitivity-standard').check();await page.locator('#settings-save').click();
+    await hidden(page.locator('#settings-dialog'));
+    for(const size of [{width:1440,height:1100},{width:820,height:1180},{width:390,height:844},{width:320,height:740}]) {
+      await page.setViewportSize(size);
+      await page.locator('#view-remotes').click();
+      // Phone navigation retains the selected editor and hides the remote grid.
+      if (await page.locator('.rf-button').first().isVisible()) await page.locator('.rf-button').first().click();
+      await page.locator('#button-reception').scrollIntoViewIfNeeded();
+      assert.equal(await page.locator('#main-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+      assert.ok((await page.locator('#reception-reset').boundingBox()).height>=48);
+      if(size.width===390) await page.screenshot({path:path.join(qa,'reception-phone.png'),fullPage:true});
+      if(size.width===1440) await page.screenshot({path:path.join(qa,'reception-desktop.png'),fullPage:true});
+      await page.locator('#settings-open').click();
+      await page.locator('#sensitivity-adaptive').scrollIntoViewIfNeeded();
+      for(const choice of await page.locator('.sensitivity-choice').all()) {
+        assert.ok((await choice.boundingBox()).height>=48);
+        assert.equal(await choice.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+      }
+      assert.equal(await page.locator('#main-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+      if(size.width===390) await page.screenshot({path:path.join(qa,'sensitivity-phone.png'),fullPage:true});
+    }
+    await page.setViewportSize({width:1440,height:1100});
+    await page.locator('#view-remotes').click();
+    await page.unroute('**/api/receivers', inventory);
+  });
   await check('HTML-like remote labels render as text', async () => {
     await page.locator('#button-name').fill('<img src=x onerror=alert(1)>');
     await page.locator('#button-save').click();
@@ -238,6 +284,8 @@ async function hidden(locator) { await locator.waitFor({state: 'hidden', timeout
     assert.equal(await page.locator('#network-http').isDisabled(),true);
     assert.equal(await page.locator('#network-https').isDisabled(),true);
     assert.equal(await page.locator('#network-keep-http').count(),0);
+    assert.equal(await page.locator('#network-address').count(),0);
+    assert.equal(await page.locator('#network-advanced summary').textContent(),'Advanced: ports');
     assert.equal(await page.locator('#network-stage').isDisabled(),true);
     assert.match(await page.locator('#network-local-urls').textContent(),new RegExp(`127.0.0.1:${port}`));
     await page.locator('#network-enabled').check();

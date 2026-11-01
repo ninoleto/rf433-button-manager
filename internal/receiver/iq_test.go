@@ -6,11 +6,92 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"math"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestAdaptiveIQRecoveryAndRealMeasurementOutput(t *testing.T) {
+	binary := installedRTL(t)
+	strong := syntheticIQ(false)
+	weak := append([]byte(nil), strong...)
+	for i, value := range weak {
+		weak[i] = byte(128 + (int(value)-128)/8)
+	}
+	for _, tc := range []struct {
+		name     string
+		data     []byte
+		adaptive bool
+		want     bool
+	}{{"strong_standard", strong, false, true}, {"faint_standard", weak, false, false}, {"faint_adaptive", weak, true, true}} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Twelve seconds of quiet I/Q lets the noise estimate settle. Input is
+			// entirely synthetic, including its noise floor; no range claim follows.
+			data := append(bytes.Repeat([]byte{128}, 12*250000*2), tc.data...)
+			path := filepath.Join(t.TempDir(), "synthetic_433.92M_250k.cu8")
+			if err := os.WriteFile(path, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			cfg := Config{AdaptiveSensitivity: tc.adaptive, FlexDecoder: "n=SensitivityFixture,m=OOK_PWM,s=400,l=1200,r=20000,g=7000,t=160,bits=24,repeats>=2"}
+			// Exercise production options with file input and a shorter diagnostic
+			// reporting interval for offline playback, which runs faster than RF.
+			var args []string
+			live := arguments(cfg, device{serial: "must-not-open"})
+			for i := 0; i < len(live); i++ {
+				if live[i] == "-d" || live[i] == "-D" {
+					i++
+					continue
+				}
+				args = append(args, live[i])
+			}
+			// File replay finishes faster than the live ten-second report interval.
+			args = append(args, "-r", path, "-M", "noise:1")
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, binary, args...)
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			if err := cmd.Run(); err != nil {
+				t.Fatalf("file replay failed: %v: %s", err, stderr.String())
+			}
+			found := false
+			for _, line := range strings.Split(stdout.String(), "\n") {
+				var e struct {
+					Model string
+					Codes []string
+				}
+				if json.Unmarshal([]byte(line), &e) == nil && e.Model == "SensitivityFixture" {
+					for _, code := range e.Codes {
+						if code == "{24}a9b2c5" {
+							found = true
+						}
+					}
+					if levels := ParseSignalLevels([]byte(line)); levels == nil || levels.RSSI == nil || levels.SNR == nil || levels.Noise == nil {
+						t.Fatal("real level metadata not available")
+					}
+				}
+			}
+			if found != tc.want {
+				t.Fatalf("target decoded=%v want %v", found, tc.want)
+			}
+			noise := false
+			for _, line := range strings.Split(stderr.String(), "\n") {
+				if _, ok := noiseLog([]byte(line)); ok {
+					noise = true
+				}
+			}
+			if !noise {
+				t.Fatalf("upstream noise log format was not recognized: %s", stderr.String())
+			}
+		})
+	}
+}
 
 // Entirely synthetic RF, unrelated to the operator's remote. IQ input exercises
 // rtl_433's sample-processing callback; .ook replay takes a different code path.

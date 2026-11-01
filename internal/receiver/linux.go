@@ -120,6 +120,14 @@ func startProcessDetailed(parent context.Context, binary string, args []string, 
 		scanner.Buffer(make([]byte, 4096), 256*1024)
 		for scanner.Scan() {
 			if !deliver && !captureStderr {
+				if _, ok := noiseLog(scanner.Bytes()); ok {
+					select {
+					case p.records <- record{data: append([]byte(nil), scanner.Bytes()...), stderr: true}:
+					case <-ctx.Done():
+						return
+					}
+					continue
+				}
 				line := strings.TrimSpace(strings.Map(func(r rune) rune {
 					if r < 32 || r == 127 {
 						return -1

@@ -41,11 +41,12 @@ type Remote struct {
 	Buttons []Button `json:"buttons"`
 }
 type Settings struct {
-	ReceiverSerial string   `json:"receiver_serial"`
-	FlexDecoder    string   `json:"flex_decoder"`
-	Protocols      []int    `json:"protocols"`
-	IdentityFields []string `json:"identity_fields"`
-	AllowedOrigins []string `json:"allowed_origins"`
+	AdaptiveSensitivity bool     `json:"adaptive_sensitivity,omitempty"`
+	ReceiverSerial      string   `json:"receiver_serial"`
+	FlexDecoder         string   `json:"flex_decoder"`
+	Protocols           []int    `json:"protocols"`
+	IdentityFields      []string `json:"identity_fields"`
+	AllowedOrigins      []string `json:"allowed_origins"`
 }
 type Config struct {
 	DecoderProfiles []receiver.DecoderProfile `json:"decoder_profiles"`
@@ -59,13 +60,14 @@ type ReceiverSource struct {
 	USBPort string `json:"usb_port,omitempty"`
 }
 type Event struct {
-	Receiver *ReceiverSource `json:"receiver,omitempty"`
-	ID       int64           `json:"id"`
-	Time     string          `json:"time"`
-	Kind     string          `json:"kind"`
-	Message  string          `json:"message"`
-	ButtonID string          `json:"button_id,omitempty"`
-	Data     json.RawMessage `json:"data,omitempty"`
+	Levels   *receiver.SignalLevels `json:"levels,omitempty"`
+	Receiver *ReceiverSource        `json:"receiver,omitempty"`
+	ID       int64                  `json:"id"`
+	Time     string                 `json:"time"`
+	Kind     string                 `json:"kind"`
+	Message  string                 `json:"message"`
+	ButtonID string                 `json:"button_id,omitempty"`
+	Data     json.RawMessage        `json:"data,omitempty"`
 }
 type Learning struct {
 	CaptureGeneration   uint64                       `json:"capture_generation"`

@@ -11,17 +11,18 @@ import (
 // One bounded, in-memory attempt. Never stored in SQLite or included in state
 // polling. Export deliberately has no Config, Settings, token, or webhook fields.
 type RFCapture struct {
-	Format      string            `json:"format"`
-	Version     string            `json:"version"`
-	StartedAt   string            `json:"started_at"`
-	FrequencyHz int               `json:"frequency_hz"`
-	SampleRate  int               `json:"sample_rate"`
-	Bytes       int               `json:"captured_bytes"`
-	Limited     bool              `json:"limit_reached"`
-	Packets     []RFPacket        `json:"packets"`
-	Events      []json.RawMessage `json:"decoded_events"`
-	generation  uint64
-	started     time.Time
+	AdaptiveSensitivity bool              `json:"adaptive_sensitivity,omitempty"`
+	Format              string            `json:"format"`
+	Version             string            `json:"version"`
+	StartedAt           string            `json:"started_at"`
+	FrequencyHz         int               `json:"frequency_hz"`
+	SampleRate          int               `json:"sample_rate"`
+	Bytes               int               `json:"captured_bytes"`
+	Limited             bool              `json:"limit_reached"`
+	Packets             []RFPacket        `json:"packets"`
+	Events              []json.RawMessage `json:"decoded_events"`
+	generation          uint64
+	started             time.Time
 }
 
 type RFPacket struct {

@@ -52,6 +52,7 @@ async function harness() {
       else if(url==='/api/learn/cancel') state={...state,learning:null,learning_notice:null,actions_paused:false};
       else if(url==='/api/learn/arm') state={...state,learning:{...state.learning,stage:'waiting'}};
       else if(url==='/api/learn/confirm') state={...state,learning:null,learning_notice:null,actions_paused:true};
+      else if(url==='/api/buttons/fixture-button/reception/reset') state={...state,reception:{since:new Date().toISOString(),buttons:{}}};
       else if(url==='/api/buttons/fixture-button' && options.method==='PUT') {
         const {allow_webhook_origin,...saved}=JSON.parse(options.body);
         Object.assign(button,saved);
@@ -88,18 +89,21 @@ test('layout and page navigation preserve selected button and unsaved fields',as
 
 test('network stage is explicit, preserves receiver settings and can be cancelled',async()=>{
   const h=await harness();
+  h.network({config:{address:'127.0.0.1',http:true,http_port:8787,https:false,https_port:8788},interfaces:[{address:'192.168.50.20',interface:'eth0'}],pending:null});
   await h.el('settings-open').click();
-  h.el('network-enabled').checked=true;h.el('network-address').value='192.168.50.20';h.el('network-https').checked=true;h.el('network-http').checked=false;
+  h.el('network-enabled').checked=true;await h.el('network-enabled').emit('change');
+  await h.el('network-address-list').children[0].click();
+  h.el('network-https').checked=true;h.el('network-http').checked=false;
   h.el('receiver-flex').value='unsaved decoder draft';
   await h.el('view-activity').click();await h.el('settings-open').click();
   assert.equal(h.el('receiver-flex').value,'unsaved decoder draft');
-  assert.equal(h.el('network-address').value,'192.168.50.20');
+  assert.equal(h.el('network-address-label').textContent,'192.168.50.20');
   await h.el('network-form').emit('submit');
   assert.equal(h.el('network-stage').disabled,true);assert.equal(h.el('network-pending').hidden,false);
   assert.equal(h.el('network-links').children[0].href,'https://192.168.50.20:8788');
   assert.equal(h.calls.some(c=>c.url==='/api/settings' && c.method==='PUT'),false);
   await h.el('network-cancel').click();
-  assert.equal(h.el('network-stage').disabled,true);assert.equal(h.el('network-address').value,'127.0.0.1');
+  assert.equal(h.el('network-stage').disabled,true);assert.equal(h.el('network-address-label').textContent,'Choose a LAN or VPN address');
   assert.equal(h.el('network-enabled').checked,false);
 });
 
@@ -382,4 +386,32 @@ test('receiver activity clears on disconnect and settings are blocked during cap
  assert.match(h.el('receiver-activity').textContent,/No decoded RF/);
  assert.equal(h.el('settings-save').disabled,true);
  assert.equal(h.el('receiver-serial').disabled,true);
+});
+
+
+test('adaptive sensitivity is explicit, preserves settings drafts and is saved with the receiver',async()=>{
+  const h=await harness();
+  h.set({settings:{receiver_serial:'',flex_decoder:'fixture decoder',protocols:[1],identity_fields:['codes'],allowed_origins:['http://localhost:8123']}});
+  await h.refresh();await h.el('settings-open').click();
+  assert.equal(h.el('sensitivity-standard').checked,true);assert.equal(h.el('sensitivity-adaptive').checked,false);
+  h.el('sensitivity-adaptive').checked=true;h.el('sensitivity-standard').checked=false;
+  await h.refresh();assert.equal(h.el('sensitivity-adaptive').checked,true,'poll keeps draft');
+  assert.equal(h.calls.some(c=>c.method==='PUT'),false,'selection is not auto-applied');
+  await h.el('settings-form').emit('submit');
+  const saved=h.calls.find(c=>c.url==='/api/settings'&&c.method==='PUT').body;
+  assert.equal(saved.adaptive_sensitivity,true);assert.equal(saved.flex_decoder,'fixture decoder');
+  assert.deepEqual(saved.protocols,[1]);assert.deepEqual(saved.identity_fields,['codes']);
+});
+
+test('selected-button diagnostics show unavailable levels honestly and reset without saving the button',async()=>{
+  const h=await harness();h.button.signature='synthetic';await h.el('button-grid').children[0].click();
+  h.set({reception:{since:'2026-01-01T00:00:00Z',buttons:{'fixture-button':{presses:3,repeats:8,last_matched_at:'2026-01-01T00:00:00Z',levels:{rssi_dbfs:0,snr_db:12.5,noise_dbfs:-30}}}},receiver:{state:'connected',adaptive_sensitivity:true,noise:{dbfs:-33,at:'2026-01-01T00:00:00Z'}}});
+  await h.refresh();
+  assert.equal(h.el('reception-count').textContent,'3');assert.equal(h.el('reception-repeats').textContent,'8');
+  assert.equal(h.el('reception-signal').textContent,'0.0 dBFS');assert.equal(h.el('reception-snr').textContent,'12.5 dB');
+  assert.match(h.el('reception-last').textContent,/older reading/);assert.match(h.el('receiver-noise').textContent,/-33.0 dBFS/);
+  h.el('button-name').value='Unsaved name';await h.el('button-editor').emit('input');
+  await h.el('reception-reset').click();
+  assert.equal(h.el('reception-count').textContent,'0');assert.equal(h.el('reception-signal').textContent,'Not available');
+  assert.equal(h.el('button-name').value,'Unsaved name');assert.equal(h.calls.some(c=>c.method==='PUT'),false);
 });

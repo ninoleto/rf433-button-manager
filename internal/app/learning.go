@@ -63,7 +63,7 @@ func (a *App) ReceiverPlan(binary string) (receiver.Config, uint64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	s := a.config.Settings
-	return receiver.Config{Binary: binary, Serial: s.ReceiverSerial, FlexDecoder: s.FlexDecoder,
+	return receiver.Config{Binary: binary, Serial: s.ReceiverSerial, FlexDecoder: s.FlexDecoder, AdaptiveSensitivity: s.AdaptiveSensitivity,
 		Protocols: clone(s.Protocols), Profiles: clone(a.config.DecoderProfiles),
 		CapturePulses: a.learning != nil && a.learning.Automatic}, a.receiverGeneration
 }
@@ -77,6 +77,7 @@ func (a *App) ReceiverPlanApplied(generation uint64) {
 		return
 	}
 	a.receiverApplied = generation
+	a.resetReceptionLocked()
 	a.lastDecodedAt = ""
 	a.receiver = receiver.Status{State: "recovering", Message: "Starting reception; waiting for sample acquisition"}
 	a.receiverMode = "normal"

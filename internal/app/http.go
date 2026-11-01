@@ -116,6 +116,9 @@ func (a *App) ManagedHandler(valid func(string) bool, static fs.FS, management h
 		return nil, a.ClearButton(r.PathValue("id"))
 	})
 	handle("POST /api/buttons/{id}/test", func(w http.ResponseWriter, r *http.Request) (any, error) { return nil, a.TestButton(r.PathValue("id")) })
+	handle("POST /api/buttons/{id}/reception/reset", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		return nil, a.ResetReception(r.PathValue("id"))
+	})
 	handle("POST /api/learn/start", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		var b struct {
 			ButtonID string   `json:"button_id"`

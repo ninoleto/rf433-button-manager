@@ -93,6 +93,29 @@ func TestNativeProcessOversizedOutputFailsBoundedly(t *testing.T) {
 	}
 }
 
+func TestNativeProcessRoutesOnlyNoiseDiagnosticsFromStderr(t *testing.T) {
+	script := writeScript(t, "printf '%s\\n' 'ignored log' 'Auto Level: Current noise level -24.0 dB, estimated noise -25.0 dB' >&2\nprintf '%s\\n' '"+signalJSON+"'\n")
+	p, err := startProcess(context.Background(), script, nil, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.stop()
+	noise, events := 0, 0
+	for rec := range p.output() {
+		if rec.stderr {
+			if value, ok := noiseLog(rec.data); !ok || value != -25 {
+				t.Fatal("unexpected diagnostic", string(rec.data))
+			}
+			noise++
+		} else if classify(rec.data) == event {
+			events++
+		}
+	}
+	if noise != 1 || events != 1 {
+		t.Fatal(noise, events)
+	}
+}
+
 func TestNativeProcessDrainsStderr(t *testing.T) {
 	script := writeScript(t, "i=0; while [ \"$i\" -lt 5000 ]; do echo 'diagnostic noise' >&2; i=$((i+1)); done\nprintf '%s\\n' '"+signalJSON+"'\n")
 	p, err := startProcess(context.Background(), script, nil, 30*time.Millisecond)

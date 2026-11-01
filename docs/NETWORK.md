@@ -40,7 +40,9 @@ choice; the interface explains this. There is no separate “keep HTTP” checkb
    choosing HTTPS, using the instructions below. Localhost HTTP does not need
    a separate switch and does not expose HTTP to other computers.
 4. Leave the ports alone unless needed. Defaults are 8787 for HTTP and 8788 for
-   HTTPS. **Advanced: address and ports** also allows a manual address.
+   HTTPS. **Advanced: ports** edits only the HTTP/localhost and HTTPS ports.
+   Use the **Server address** picker above for an address assigned to this host;
+   there is no separate IP text field.
 5. Select **Apply network settings**. Open the proposed URL in another tab, log
    in with your current token, then go to Settings and **Confirm connection**.
    HTTPS changes must be confirmed over the proposed HTTPS address.

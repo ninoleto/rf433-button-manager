@@ -4,6 +4,52 @@ Current changes and operator gates are in [TESTING-0.4.md](TESTING-0.4.md).
 The historical record below describes earlier versions. It is not evidence that
 0.4 passed hardware tests, and historical file names have been preserved.
 
+## 0.4.0-test.4 software verification (2026-11-01)
+
+This private build adds optional Adaptive threshold selection, separately tracked
+RF measurements and selected-button counters, and removes the duplicate network
+address text input. Standard remains the default for existing configurations.
+
+- Full uncached Go race tests, vet, JavaScript syntax, **21 controller checks**,
+  deployment/history checks and **10 updater/migration simulations** passed with
+  Go 1.27.3. The four checksum-pinned public recordings and private replay inputs
+  were supplied. Existing saved-Smoke/PWM equivalence and shared debounce tests
+  remain passing; no private capture or identifier is packaged.
+- A new file-only I/Q test uses actual rtl_433 23.11 and production arguments,
+  substituting file input and a shorter diagnostic reporting interval. A synthetic
+  strong PWM burst decodes in Standard; an attenuated copy does not decode in
+  Standard but does in Adaptive. Both real per-event levels and stderr noise
+  measurements are parsed. This demonstrates the option on constructed input,
+  not improved physical range or a success rate on the user's remote.
+- Native-process and fake-supervisor checks show that only the bounded upstream
+  noise format is forwarded, unrelated logs are drained, and diagnostic output
+  cannot become RF, count as a press or keep a stalled receiver connected.
+- App checks cover persistence, normal/capture mode agreement, original metrics
+  through identity normalization, unmatched-traffic exclusion, disabled-button
+  counts, learning suppression, source-change clearing, authenticated resets and
+  reset without clearing debounce or sending another request. Measurements are
+  excluded from identities and ephemeral counts are excluded from backups.
+- Chromium 141 passed **13 browser groups**, including sensitivity persistence
+  against the real demo API, counter reset, unavailable metrics, preserved drafts,
+  the address-picker-only network flow and layouts at 1440, 820, 390 and 320 px.
+  USB inventory is simulated for the sensitivity group because this test runtime
+  has no receiver/sysfs inventory. Actual RF and delivery remain disabled in demo.
+  New desktop and phone reception/sensitivity screens were visually inspected.
+- The demo executable passes HTTP, HTTPS without LAN HTTP, and network-off modes
+  while retaining authenticated localhost HTTP. CA trust, staged confirmation,
+  token rotation/revocation, restart persistence and leaf renewal also passed.
+
+The audit's four public-file comparisons found no changed non-measurement decoded
+payload sequence with `-Y autolevel`. Its tests and limits are recorded in
+RECEIVER-AUDIT-0.4.md. No gain, frequency, sample rate, decoder version, learned
+profile, identity rule or dispatch delay is changed by this build.
+
+Package checksums and a clean rebuild from the included history are verified
+separately before delivery. No GitHub publication/CI run, Zorin installation, live
+USB test, actual Home Assistant request or apartment range improvement is claimed.
+Use the counted Standard/Adaptive comparison in TESTING-0.4.md before choosing a
+mode or advancing to a public candidate.
+
 ## 0.4.0-test.3 software verification (2026-11-01)
 
 This private build fixes a reproduced saved-Smoke / registered-PWM dispatch gap

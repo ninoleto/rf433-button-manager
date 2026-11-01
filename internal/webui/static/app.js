@@ -27,6 +27,7 @@
   let settingsLoaded = false;
   let networkLoaded = false;
   let networkState = null;
+  let networkAddress = '';
   let networkTimer = null;
   let networkURLKey = '';
   let networkSavedKey = '';
@@ -107,7 +108,7 @@
 
   function lock(message = '') {
     token = '';
-    clearTimeout(networkTimer); settingsLoaded = false; networkLoaded = false; networkState = null; networkURLKey = ''; networkSavedKey = ''; networkPendingID = null;
+    clearTimeout(networkTimer); settingsLoaded = false; networkLoaded = false; networkState = null; networkAddress = ''; networkURLKey = ''; networkSavedKey = ''; networkPendingID = null;
     $('new-management-token').value = ''; $('new-token-panel').hidden = true;
     $('management-token').type = 'password'; $('token-visibility').textContent = 'Show';
     setView('remotes'); document.documentElement.dataset.editor = 'closed';
@@ -309,7 +310,32 @@
     $('button-last-received').textContent = fmtDate(button.last_received);
     $('unsaved-status').textContent = editorDirty ? 'Unsaved changes' : '';
     renderWebhookDestination();
+    renderReception();
     updateActionAvailability();
+  }
+  function levelText(value, unit) {
+    return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(1)} ${unit}` : 'Not available';
+  }
+  function readingTime(at) {
+    const age = Date.now() - new Date(at || '').getTime();
+    return `${fmtTime(at)}${age > 30000 ? ' · older reading' : ''}`;
+  }
+  function renderReception() {
+    const button = currentButton();
+    if (!button) return;
+    const d = state.reception?.buttons?.[button.id];
+    $('reception-mode').textContent = `${state.demo ? 'Synthetic demo · ' : ''}${state.receiver.adaptive_sensitivity ? 'Adaptive' : 'Standard'} sensitivity · ${state.actions_paused ? 'normal reception paused' : (state.receiver.state || 'not connected')}`;
+    $('reception-count').textContent = String(d?.presses || 0);
+    $('reception-repeats').textContent = String(d?.repeats || 0);
+    $('reception-signal').textContent = levelText(d?.levels?.rssi_dbfs, 'dBFS');
+    $('reception-snr').textContent = levelText(d?.levels?.snr_db, 'dB');
+    $('reception-noise').textContent = levelText(d?.levels?.noise_dbfs, 'dBFS');
+    $('reception-last').textContent = d?.last_matched_at ? `Last matched signal: ${readingTime(d.last_matched_at)}` : 'Waiting for this saved button. Background RF traffic does not update these measurements.';
+    const since = d?.since || state.reception?.since;
+    $('reception-since').textContent = since ? `Since ${fmtTime(since)} · resets when reception restarts` : 'Counts begin with normal reception.';
+    const action = d?.action ? `Latest action: ${d.action} (${fmtTime(d.action_at)})` : 'No action result in this counting session.';
+    const stateNote = state.actions_paused ? 'Actions are paused.' : state.storage_error ? 'Actions are paused because storage failed.' : !button.enabled ? 'This button is disabled; matched presses are still counted.' : !button.webhook?.url ? 'No webhook is configured.' : 'This button is enabled; recognized presses may run its action.';
+    $('reception-action').textContent = `${stateNote} ${action}`;
   }
   function webhookDestination(raw) {
     if (!raw) return null;
@@ -336,6 +362,8 @@
     $('inspect-open').disabled = learning || busy || !token;
     $('settings-save').disabled = learning || busy || !receiverListReady;
     $('receiver-serial').disabled = learning || busy || !receiverListReady;
+    $('sensitivity-standard').disabled = learning || busy; $('sensitivity-adaptive').disabled = learning || busy;
+    $('reception-reset').disabled = learning || busy || !currentButton()?.signature;
     $('webhook-test').disabled = !!state.demo || learning || busy || editorDirty || !currentButton()?.webhook?.url;
     $('learn-start').disabled = learning || busy || editorDirty;
     $('button-save').disabled = busy || learning;
@@ -373,6 +401,7 @@
       const content = node('div', 'event-message');
       content.append(node('span', '', event.message || 'Received event'));
       if (event.receiver && (event.receiver.serial || event.receiver.usb_port || event.receiver.name)) content.append(node('p', 'event-source', `Receiver: ${receiverLabel(event.receiver)}`));
+      if (event.levels) content.append(node('p', 'event-source', `Signal ${levelText(event.levels.rssi_dbfs, 'dBFS')} · SNR ${levelText(event.levels.snr_db, 'dB')} · noise ${levelText(event.levels.noise_dbfs, 'dBFS')}`));
       if (event.data !== undefined && event.data !== null && event.data !== '') {
         const details = node('details');
         details.append(node('summary', '', event.data.diagnostics || event.kind === 'learning_capture' ? 'Capture diagnostics' : 'Decoded data'), node('pre', '', typeof event.data === 'string' ? event.data : JSON.stringify(event.data, null, 2)));
@@ -482,6 +511,9 @@
     const active = ['connected','recovering'].includes(state.receiver.state) && (state.receiver.name || state.receiver.usb_port || state.receiver.serial);
     const label = active ? receiverLabel(state.receiver) : (state.settings.receiver_serial ? `Selected serial ${state.settings.receiver_serial} · not receiving` : 'No active receiver');
     $('receiver-device').textContent = label;
+    $('receiver-sensitivity-active').textContent = `Running mode: ${state.receiver.adaptive_sensitivity ? 'Adaptive' : 'Standard'}${state.receiver.state !== 'connected' ? ' · receiver not yet connected' : ''}`;
+    const noise = state.receiver.noise;
+    $('receiver-noise').textContent = noise && state.receiver.state === 'connected' ? `Estimated background noise: ${levelText(noise.dbfs, 'dBFS')} · ${readingTime(noise.at)}. This is receiver-wide, not specific to a button.` : 'Background noise: waiting for a measurement. Measurements normally update every 10 seconds.';
     $('receiver-settings-active').textContent = `Current receiver: ${label}`;
     const at = state.receiver_last_decoded_at;
     const recent = state.receiver.state === 'connected' && at && Date.now() - new Date(at).getTime() >= 0 && Date.now() - new Date(at).getTime() < 2500;
@@ -738,6 +770,8 @@
     receiverListReady = false;
     $('receiver-flex').value = settings.flex_decoder || '';
     $('receiver-protocols').value = (settings.protocols || []).join(', ');
+    $('sensitivity-adaptive').checked = !!settings.adaptive_sensitivity;
+    $('sensitivity-standard').checked = !settings.adaptive_sensitivity;
     $('settings-identity-fields').value = (settings.identity_fields?.length ? settings.identity_fields : DEFAULT_FIELDS).join(', ');
     $('allowed-origins').value = (settings.allowed_origins || []).join('\n');
     setError('settings-error', ''); show('settings-dialog');
@@ -745,6 +779,10 @@
     settingsLoaded = true;
     await loadManagement();
   });
+  bindAction('reception-reset', async () => {
+    const id = currentButton()?.id;
+    if (id) await mutate(`/buttons/${id}/reception/reset`, 'POST', {}, 'Reception counts reset. Action settings are unchanged.');
+  }, 'editor-error');
   bindAction('receiver-refresh', () => refreshReceiverDevices(), 'settings-error');
   $('settings-form').addEventListener('submit', async (event) => {
     event.preventDefault(); setError('settings-error', '');
@@ -760,6 +798,7 @@
         if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || !['', '/'].includes(url.pathname)) throw new Error('Each allowlist entry must be an HTTP(S) origin without a path or credentials.');
       }
       await mutate('/settings', 'PUT', {
+        adaptive_sensitivity: $('sensitivity-adaptive').checked,
         receiver_serial: $('receiver-serial').value.trim(), flex_decoder: $('receiver-flex').value.trim(),
         protocols: protocolParts.map(Number), identity_fields: fields($('settings-identity-fields').value),
         allowed_origins: origins.map((value) => new URL(value).origin),
@@ -825,23 +864,22 @@
   }
   function networkDraft() {
     const enabled = $('network-enabled').checked;
-    return {address: enabled ? $('network-address').value.trim() : '127.0.0.1', http: !enabled || $('network-http').checked, https: enabled && $('network-https').checked, http_port: Number($('network-http-port').value), https_port: Number($('network-https-port').value)};
+    return {address: enabled ? networkAddress : '127.0.0.1', http: !enabled || $('network-http').checked, https: enabled && $('network-https').checked, http_port: Number($('network-http-port').value), https_port: Number($('network-https-port').value)};
   }
   function networkKey(c) { return JSON.stringify([c.address,c.http,c.http_port,c.https,c.https_port]); }
   function fillNetwork(c) {
     $('network-enabled').checked = !isLoopback(c.address);
-    $('network-address').value = c.address;
+    networkAddress = c.address;
     $('network-http').checked = !c.https; $('network-https').checked = c.https;
     $('network-http-port').value = c.http_port; $('network-https-port').value = c.https_port;
   }
   function renderNetworkDraft() {
     if (!networkState) return;
-    const enabled = $('network-enabled').checked, address = $('network-address').value.trim();
+    const enabled = $('network-enabled').checked, address = networkAddress;
     const info = (networkState.interfaces || []).find(i => i.address === address);
     $('network-address-choice').hidden = !enabled;
     $('network-address-label').textContent = address && !isLoopback(address) ? address : 'Choose a LAN or VPN address';
     $('network-interface-label').textContent = info && !isLoopback(address) ? info.interface : 'An address assigned to the Linux server';
-    $('network-address').disabled = !enabled;
     $('network-http').disabled = !enabled; $('network-https').disabled = !enabled;
     $('network-https-help').hidden = !enabled || !$('network-https').checked;
     $('network-legacy-both').hidden = !(networkState.config.http && networkState.config.https);
@@ -858,10 +896,10 @@
       const button = node('button', 'picker-option'); button.type = 'button';
       const vpn = /^(tailscale|wg|tun|tap)/i.test(item.interface), virtual = /^(docker|br-|veth|virbr)/i.test(item.interface);
       const label = node('span'); label.append(node('strong', '', item.address), node('small', '', `${item.interface} · ${vpn ? 'VPN connection' : virtual ? 'Virtual network — advanced' : 'Network interface'}`));
-      const selected = item.address === $('network-address').value.trim();
+      const selected = item.address === networkAddress;
       button.setAttribute('aria-current', selected ? 'true' : 'false');
       button.append(label, node('span', 'picker-mark', selected ? '✓' : '›'));
-      button.addEventListener('click', () => { $('network-address').value = item.address; close('network-address-dialog'); renderNetworkDraft(); });
+      button.addEventListener('click', () => { networkAddress = item.address; close('network-address-dialog'); renderNetworkDraft(); });
       list.append(button);
     }
     $('network-address-list').replaceChildren(list);
@@ -934,7 +972,7 @@
     $('network-form').addEventListener('input', renderNetworkDraft);
     $('network-enabled').addEventListener('change', () => {
       renderNetworkDraft();
-      if ($('network-enabled').checked && isLoopback($('network-address').value.trim())) { renderAddressPicker(); show('network-address-dialog'); }
+      if ($('network-enabled').checked && isLoopback(networkAddress)) { renderAddressPicker(); show('network-address-dialog'); }
     });
     bindAction('token-visibility', () => {
       const show = $('management-token').type === 'password'; $('management-token').type = show ? 'text' : 'password';
